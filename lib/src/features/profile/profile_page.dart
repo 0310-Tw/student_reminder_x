@@ -44,6 +44,7 @@ class _ProfilePageState extends State<ProfilePage> {
       await AuthService.instance.logout();
       MaterialPageRoute(builder: (_) => const LoginPage());
       // if (mounted) Navigator.pushReplacementNamed(context, AppRoutes.login);
+      // bhsaguhg
     } catch (e) {
       if (mounted) {
         displaySnackBar(context, 'Error logging out: $e');
