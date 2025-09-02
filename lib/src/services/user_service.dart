@@ -30,11 +30,17 @@ class UserService {
   //Update a User's info
   Future<void> updateMyProfile(
     String uid, {
+    String? firstName,
+    String? lastName,
+    String? displayName,
     String? gender,
     String? phone,
     String? bio,
   }) async {
     final data = <String, dynamic>{};
+    if (firstName != null) data['firstName'] = firstName;
+    if (lastName != null) data['lastName'] = lastName;
+    if (displayName != null) data['displayName'] = displayName;
     if (gender != null) data['gender'] = gender;
     if (phone != null) data['phone'] = phone;
     if (bio != null) data['bio'] = bio;

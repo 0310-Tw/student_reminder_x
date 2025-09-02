@@ -1,0 +1,91 @@
+// file: firestore.rules
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+    }
+    
+    // Users collection rules
+    match /users/{uid} {
+      // Allow signed-in users to read and update their own user document
+      allow read, write: if isSignedIn() && isOwner(uid);
+      
+      // Allow users to read other users' profiles (for displaying classmates, etc.)
+      allow read: if isSignedIn();
+      
+      // Allow admins to read and update any user document
+      allow read, write: if isAdmin();
+      
+      // Allow users to create their own profile during signup
+      allow create: if isSignedIn() && isOwner(uid);
+
+      // Notes subcollection rules
+      match /notes/{noteId} {
+        // Allow users to create notes in their own collection
+        allow create: if isSignedIn() && isOwner(uid);
+        
+        // Allow users to read and write their own notes
+        allow read, write: if isSignedIn() && isOwner(uid);
+        
+        // Allow users to read public notes from any user
+        allow read: if isSignedIn() && resource.data.visibility == "public";
+        
+        // Allow admins full access to any notes
+        allow read, write, delete: if isAdmin();
+      }
+    }
+    
+    // Attendance collection rules
+    match /attendance/{uid} {
+      // Allow users to read their own attendance data
+      allow read: if isSignedIn() && isOwner(uid);
+      
+      // Allow admins to read any attendance data
+      allow read: if isAdmin();
+      
+      // Nested rules for attendance days
+      match /days/{dayId} {
+        // Allow students to create and update their own attendance days
+        allow create, update: if isSignedIn() && isOwner(uid);
+        
+        // Allow students to read their own attendance days
+        allow read: if isSignedIn() && isOwner(uid);
+        
+        // Allow admins full access to any attendance day
+        allow read, write, delete: if isAdmin();
+      }
+      
+      // Nested rules for attendance events (audit logs)
+      match /events/{eventId} {
+        // Allow students to create events under their own attendance
+        allow create: if isSignedIn() && isOwner(uid);
+        
+        // Allow students to read their own events
+        allow read: if isSignedIn() && isOwner(uid);
+        
+        // Allow admins full access to any attendance events
+        allow read, write, delete: if isAdmin();
+      }
+    }
+
+    // Collection group rules for notes (for public feeds)
+    match /{path=**}/notes/{noteId} {
+      // Allow reading public notes from any user's notes collection
+      allow read: if isSignedIn() && resource.data.visibility == "public";
+      
+      // Allow admins to read any notes
+      allow read: if isAdmin();
+    }
+  }
+}

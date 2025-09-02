@@ -3,16 +3,20 @@ import 'package:students_reminder/src/features/auth/login_page.dart';
 import 'package:students_reminder/src/features/auth/register_page.dart';
 import 'package:students_reminder/src/features/profile/student_profile_page.dart';
 import 'package:students_reminder/src/shared/main_layout.dart';
+import 'package:students_reminder/src/admin/pages/attendance_admin_page.dart';
+import 'package:students_reminder/src/features/splash/splash_gate.dart';
 
 class AppRoutes {
   static const login = '/login';
   static const register = '/register';
   static const main = '/main';
+  static const admin = '/admin';
+  static const splash = '/splash';
 
   static Route<dynamic> onGenerateRoute(RouteSettings setting) {
-      //Expecting /student/:uid
-      //              /student/12345
-      //              /student/
+    //Expecting /student/:uid
+    //              /student/12345
+    //              /student/
     final url = Uri.parse(setting.name ?? '');
     if (url.pathSegments.isNotEmpty && url.pathSegments[0] == 'student') {
       final uid = url.pathSegments.length > 1 ? url.pathSegments[1] : '';
@@ -26,8 +30,12 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const RegisterPage());
       case main:
         return MaterialPageRoute(builder: (_) => const MainLayoutPage());
+      case admin:
+        return MaterialPageRoute(builder: (_) => const AttendanceAdminPage());
+      case splash:
+        return MaterialPageRoute(builder: (_) => const SplashGate());
       default:
-        return MaterialPageRoute(builder: (_) => const LoginPage());
+        return MaterialPageRoute(builder: (_) => const SplashGate());
     }
   }
 }

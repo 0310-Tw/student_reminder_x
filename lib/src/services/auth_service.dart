@@ -32,6 +32,7 @@ class AuthService {
       'phone': phone,
       'gender': null,
       'bio': null,
+      'role': 'student', // Default role for new users
       'createdAt': FieldValue.serverTimestamp(),
     });
     await SessionManager.onLoginSuccess();

@@ -191,7 +191,13 @@ class PublicFeeds extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final uid = AuthService.instance.currentUser!.uid;
+    final user = AuthService.instance.currentUser;
+    if (user == null) {
+      return const Scaffold(
+        body: Center(child: Text('Please log in to view public feeds')),
+      );
+    }
+    final uid = user.uid;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Public Feeds')),
@@ -208,7 +214,9 @@ class PublicFeeds extends StatelessWidget {
           final docs = snap.data!.docs;
           if (docs.isEmpty) {
             return const Center(
-              child: Text('No notes to show. Click the + button to add a note.'),
+              child: Text(
+                'No notes to show. Click the + button to add a note.',
+              ),
             );
           }
 
@@ -222,10 +230,12 @@ class PublicFeeds extends StatelessWidget {
 
               final visible = (data['visibility'] ?? 'private') as String;
               final title = (data['title'] ?? '').toString();
-              final body  = (data['body'] ?? '').toString();
+              final body = (data['body'] ?? '').toString();
 
-              final likes   = (data['likesCount'] ?? 0) as int;
-              final likedBy = Map<String, dynamic>.from(data['likedBy'] ?? const {});
+              final likes = (data['likesCount'] ?? 0) as int;
+              final likedBy = Map<String, dynamic>.from(
+                data['likedBy'] ?? const {},
+              );
               final bool isLiked = likedBy[uid] == true;
 
               return ListTile(
@@ -242,9 +252,14 @@ class PublicFeeds extends StatelessWidget {
                     Text(likes.toString()),
                     IconButton(
                       tooltip: isLiked ? 'Unlike' : 'Like',
-                      icon: Icon(isLiked ? Icons.favorite : Icons.favorite_border),
+                      icon: Icon(
+                        isLiked ? Icons.favorite : Icons.favorite_border,
+                      ),
                       onPressed: () {
-                        NotesService.instance.toggleLike(noteRef: ref, uid: uid);
+                        NotesService.instance.toggleLike(
+                          noteRef: ref,
+                          uid: uid,
+                        );
                       },
                     ),
                     PopupMenuButton<String>(
@@ -258,13 +273,20 @@ class PublicFeeds extends StatelessWidget {
                               reason: reason.trim(),
                             );
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Thanks — report submitted.')),
+                              const SnackBar(
+                                content: Text('Thanks — report submitted.'),
+                              ),
                             );
                           }
                         } else if (v == 'unreport') {
-                          await NotesService.instance.unreportNote(noteRef: ref, uid: uid);
+                          await NotesService.instance.unreportNote(
+                            noteRef: ref,
+                            uid: uid,
+                          );
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Your report was removed.')),
+                            const SnackBar(
+                              content: Text('Your report was removed.'),
+                            ),
                           );
                         }
                       },
@@ -272,7 +294,10 @@ class PublicFeeds extends StatelessWidget {
                         // If you later cache "did I report?", toggle which items to show.
                         return const [
                           PopupMenuItem(value: 'report', child: Text('Report')),
-                          PopupMenuItem(value: 'unreport', child: Text('Undo report')),
+                          PopupMenuItem(
+                            value: 'unreport',
+                            child: Text('Undo report'),
+                          ),
                         ];
                       },
                     ),

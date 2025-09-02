@@ -35,7 +35,13 @@ class _MyNotesPageState extends State<MyNotesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final uid = AuthService.instance.currentUser!.uid;
+    final user = AuthService.instance.currentUser;
+    if (user == null) {
+      return const Scaffold(
+        body: Center(child: Text('Please log in to view your notes')),
+      );
+    }
+    final uid = user.uid;
 
     return Scaffold(
       appBar: AppBar(
@@ -421,6 +427,9 @@ class _MyNotesPageState extends State<MyNotesPage> {
   }
 
   void _showFilterDialog() {
+    final user = AuthService.instance.currentUser;
+    if (user == null) return;
+
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -495,9 +504,7 @@ class _MyNotesPageState extends State<MyNotesPage> {
 
                 // Tags Filter
                 StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: NotesService.instance.watchMyNotes(
-                    AuthService.instance.currentUser!.uid,
-                  ),
+                  stream: NotesService.instance.watchMyNotes(user.uid),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return SizedBox.shrink();

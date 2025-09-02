@@ -22,10 +22,13 @@ class NotesService {
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> publicFeeds() {
-  return _db
+    return _db
         .collectionGroup('notes')
         .where('visibility', isEqualTo: 'public')
-        .orderBy('aud_dt', descending: true) // or orderBy('likesCount', descending: true)
+        .orderBy(
+          'aud_dt',
+          descending: true,
+        ) // or orderBy('likesCount', descending: true)
         .limit(100)
         .snapshots();
   }
@@ -42,6 +45,7 @@ class NotesService {
       'title': title,
       'body': body,
       'visibility': visibility,
+      'authorId': uid, // Add authorId for security
       'dueDate': dueDate != null ? Timestamp.fromDate(dueDate) : null,
       'tags': tags ?? [],
       'aud_dt': FieldValue.serverTimestamp(),
@@ -72,7 +76,8 @@ class NotesService {
   Future<void> deleteNote(String uid, String noteId) {
     return _notesCol(uid).doc(noteId).delete();
   }
-   Future<void> toggleLike({
+
+  Future<void> toggleLike({
     required DocumentReference<Map<String, dynamic>> noteRef,
     required String uid,
   }) async {
@@ -83,8 +88,9 @@ class NotesService {
       if (!snap.exists) return;
 
       final data = snap.data()!;
-      final Map<String, dynamic> likedBy =
-          Map<String, dynamic>.from(data['likedBy'] ?? const {});
+      final Map<String, dynamic> likedBy = Map<String, dynamic>.from(
+        data['likedBy'] ?? const {},
+      );
       final bool alreadyLiked = likedBy[uid] == true;
       final int currentCount = (data['likesCount'] ?? 0) as int;
 
@@ -99,13 +105,11 @@ class NotesService {
       } else {
         // LIKE
         final newCount = currentCount + 1;
-        tx.update(noteRef, {
-          'likesCount': newCount,
-          'likedBy.$uid': true,
-        });
+        tx.update(noteRef, {'likesCount': newCount, 'likedBy.$uid': true});
       }
     });
   }
+
   Future<void> reportNote({
     required DocumentReference<Map<String, dynamic>> noteRef,
     required String uid,
@@ -127,7 +131,9 @@ class NotesService {
   }
 
   /// Admin: stream all report docs across all notes (newest first)
-  Stream<QuerySnapshot<Map<String, dynamic>>> streamAllReportsForAdmin({int limit = 200}) {
+  Stream<QuerySnapshot<Map<String, dynamic>>> streamAllReportsForAdmin({
+    int limit = 200,
+  }) {
     return FirebaseFirestore.instance
         .collectionGroup('reports')
         .orderBy('createdAt', descending: true)
