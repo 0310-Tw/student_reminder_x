@@ -77,4 +77,5 @@ class DefaultFirebaseOptions {
     authDomain: 'student-reminder-xx-16738.firebaseapp.com',
     storageBucket: 'student-reminder-xx-16738.firebasestorage.app',
   );
+
 }

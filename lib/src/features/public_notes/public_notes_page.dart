@@ -185,6 +185,7 @@ import 'package:flutter/material.dart';
 import 'package:students_reminder/src/features/notes/dialogs/note_editor_dialog.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/note_service.dart';
+import 'package:students_reminder/src/widgets/suspension_check.dart';
 
 class PublicFeeds extends StatelessWidget {
   const PublicFeeds({super.key});
@@ -201,127 +202,206 @@ class PublicFeeds extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Public Feeds')),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: NotesService.instance.publicFeeds(),
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (!snap.hasData) {
-            return const Center(child: Text('Loading...'));
-          }
+      body: SuspensionCheck(
+        restrictWriteAccess: true,
+        child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: NotesService.instance.publicFeeds(),
+          builder: (context, snap) {
+            if (snap.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (!snap.hasData) {
+              return const Center(child: Text('Loading...'));
+            }
 
-          final docs = snap.data!.docs;
-          if (docs.isEmpty) {
-            return const Center(
-              child: Text(
-                'No notes to show. Click the + button to add a note.',
-              ),
-            );
-          }
-
-          return ListView.separated(
-            itemCount: docs.length,
-            separatorBuilder: (_, __) => const Divider(height: 2),
-            itemBuilder: (context, i) {
-              final doc = docs[i];
-              final data = doc.data();
-              final ref = doc.reference;
-
-              final visible = (data['visibility'] ?? 'private') as String;
-              final title = (data['title'] ?? '').toString();
-              final body = (data['body'] ?? '').toString();
-
-              final likes = (data['likesCount'] ?? 0) as int;
-              final likedBy = Map<String, dynamic>.from(
-                data['likedBy'] ?? const {},
-              );
-              final bool isLiked = likedBy[uid] == true;
-
-              return ListTile(
-                leading: Chip(label: Text(visible)),
-                title: Text(title),
-                subtitle: Text(
-                  body,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+            final docs = snap.data!.docs;
+            if (docs.isEmpty) {
+              return const Center(
+                child: Text(
+                  'No notes to show. Click the + button to add a note.',
                 ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(likes.toString()),
-                    IconButton(
-                      tooltip: isLiked ? 'Unlike' : 'Like',
-                      icon: Icon(
-                        isLiked ? Icons.favorite : Icons.favorite_border,
-                      ),
-                      onPressed: () {
-                        NotesService.instance.toggleLike(
-                          noteRef: ref,
-                          uid: uid,
-                        );
-                      },
-                    ),
-                    PopupMenuButton<String>(
-                      onSelected: (v) async {
-                        if (v == 'report') {
-                          final reason = await askReportReason(context);
-                          if (reason != null && reason.trim().isNotEmpty) {
-                            await NotesService.instance.reportNote(
-                              noteRef: ref,
-                              uid: uid,
-                              reason: reason.trim(),
-                            );
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Thanks — report submitted.'),
-                              ),
-                            );
+              );
+            }
+
+            return ListView.separated(
+              itemCount: docs.length,
+              separatorBuilder: (_, __) => const Divider(height: 2),
+              itemBuilder: (context, i) {
+                final doc = docs[i];
+                final data = doc.data();
+                final ref = doc.reference;
+
+                final visible = (data['visibility'] ?? 'private') as String;
+                final title = (data['title'] ?? '').toString();
+                final body = (data['body'] ?? '').toString();
+
+                final likes = (data['likesCount'] ?? 0) as int;
+                final likedBy = Map<String, dynamic>.from(
+                  data['likedBy'] ?? const {},
+                );
+                final bool isLiked = likedBy[uid] == true;
+
+                return ListTile(
+                  leading: Chip(label: Text(visible)),
+                  title: Text(title),
+                  subtitle: Text(
+                    body,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(likes.toString()),
+                      StreamBuilder<DocumentSnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(uid)
+                            .snapshots(),
+                        builder: (context, userSnapshot) {
+                          bool isSuspended = false;
+                          if (userSnapshot.hasData) {
+                            final userData =
+                                userSnapshot.data!.data()
+                                    as Map<String, dynamic>?;
+                            isSuspended = userData?['status'] == 'suspended';
                           }
-                        } else if (v == 'unreport') {
-                          await NotesService.instance.unreportNote(
-                            noteRef: ref,
-                            uid: uid,
-                          );
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Your report was removed.'),
+
+                          return IconButton(
+                            tooltip: isSuspended
+                                ? 'Cannot like (suspended)'
+                                : (isLiked ? 'Unlike' : 'Like'),
+                            icon: Icon(
+                              isLiked ? Icons.favorite : Icons.favorite_border,
+                              color: isSuspended ? Colors.grey : null,
                             ),
+                            onPressed: isSuspended
+                                ? null
+                                : () {
+                                    NotesService.instance.toggleLike(
+                                      noteRef: ref,
+                                      uid: uid,
+                                    );
+                                  },
                           );
-                        }
-                      },
-                      itemBuilder: (BuildContext context) {
-                        // If you later cache "did I report?", toggle which items to show.
-                        return const [
-                          PopupMenuItem(value: 'report', child: Text('Report')),
-                          PopupMenuItem(
-                            value: 'unreport',
-                            child: Text('Undo report'),
-                          ),
-                        ];
-                      },
-                    ),
-                  ],
-                ),
-                onTap: () {
-                  // TODO: push a detail page if you have one
-                },
-              );
-            },
-          );
-        },
+                        },
+                      ),
+                      StreamBuilder<DocumentSnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(uid)
+                            .snapshots(),
+                        builder: (context, userSnapshot) {
+                          bool isSuspended = false;
+                          if (userSnapshot.hasData) {
+                            final userData =
+                                userSnapshot.data!.data()
+                                    as Map<String, dynamic>?;
+                            isSuspended = userData?['status'] == 'suspended';
+                          }
+
+                          return isSuspended
+                              ? IconButton(
+                                  tooltip: 'Actions disabled (suspended)',
+                                  icon: Icon(
+                                    Icons.more_vert,
+                                    color: Colors.grey,
+                                  ),
+                                  onPressed: null,
+                                )
+                              : PopupMenuButton<String>(
+                                  onSelected: (v) async {
+                                    if (v == 'report') {
+                                      final reason = await askReportReason(
+                                        context,
+                                      );
+                                      if (reason != null &&
+                                          reason.trim().isNotEmpty) {
+                                        await NotesService.instance.reportNote(
+                                          noteRef: ref,
+                                          uid: uid,
+                                          reason: reason.trim(),
+                                        );
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Thanks — report submitted.',
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    } else if (v == 'unreport') {
+                                      await NotesService.instance.unreportNote(
+                                        noteRef: ref,
+                                        uid: uid,
+                                      );
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Your report was removed.',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  itemBuilder: (BuildContext context) {
+                                    return const [
+                                      PopupMenuItem(
+                                        value: 'report',
+                                        child: Text('Report'),
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'unreport',
+                                        child: Text('Undo report'),
+                                      ),
+                                    ];
+                                  },
+                                );
+                        },
+                      ),
+                    ],
+                  ),
+                  onTap: () {
+                    // TODO: push a detail page if you have one
+                  },
+                );
+              },
+            );
+          },
+        ),
       ),
 
-      // Optional: quick-add note (opens your editor)
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          await showModalBottomSheet(
-            context: context,
-            isScrollControlled: true,
-            builder: (_) => NoteEditorDialog(uid: uid),
+      // Optional: quick-add note (opens your editor) - disabled for suspended users
+      floatingActionButton: StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .snapshots(),
+        builder: (context, userSnapshot) {
+          bool isSuspended = false;
+          if (userSnapshot.hasData) {
+            final userData = userSnapshot.data!.data() as Map<String, dynamic>?;
+            isSuspended = userData?['status'] == 'suspended';
+          }
+
+          return FloatingActionButton(
+            onPressed: isSuspended
+                ? null
+                : () async {
+                    await showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      builder: (_) => NoteEditorDialog(uid: uid),
+                    );
+                  },
+            backgroundColor: isSuspended ? Colors.grey : null,
+            child: Icon(Icons.add, color: isSuspended ? Colors.white54 : null),
           );
         },
-        child: const Icon(Icons.add),
       ),
     );
   }

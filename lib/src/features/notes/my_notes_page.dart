@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:students_reminder/src/features/notes/dialogs/note_editor_dialog.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/note_service.dart';
+import 'package:students_reminder/src/widgets/user_notifications.dart';
+import 'package:students_reminder/src/widgets/suspension_check.dart';
 
 class MyNotesPage extends StatefulWidget {
   const MyNotesPage({super.key});
@@ -68,8 +70,12 @@ class _MyNotesPageState extends State<MyNotesPage> {
         },
         child: Icon(Icons.add),
       ),
-      body: Column(
-        children: [
+      body: SuspensionCheck(
+        restrictWriteAccess: true,
+        child: Column(
+          children: [
+            // User notifications for flags/suspensions
+            UserNotifications(),
           // Search and Filter Section
           Container(
             padding: EdgeInsets.all(16),
@@ -423,6 +429,7 @@ class _MyNotesPageState extends State<MyNotesPage> {
           ),
         ],
       ),
+    ),
     );
   }
 

@@ -8,8 +8,11 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:students_reminder/src/features/auth/login_page.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/user_service.dart';
+import 'package:students_reminder/src/services/admin_service.dart';
 import 'package:students_reminder/src/shared/misc.dart';
 import 'package:students_reminder/src/shared/widgets/live_char_counter_text_field.dart';
+import 'package:students_reminder/src/widgets/user_notifications.dart';
+import 'package:students_reminder/src/widgets/suspension_check.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -362,7 +365,9 @@ class _ProfilePageState extends State<ProfilePage> {
     }
 
     return Scaffold(
-      body: CustomScrollView(
+      body: SuspensionCheck(
+        restrictWriteAccess: true,
+        child: CustomScrollView(
         slivers: [
           // Collapsible cover image with SliverAppBar
           SliverAppBar(
@@ -370,6 +375,13 @@ class _ProfilePageState extends State<ProfilePage> {
             floating: false,
             pinned: true,
             actions: [
+              IconButton(
+                onPressed: () {
+                  Navigator.pushNamed(context, '/test-notifications');
+                },
+                icon: Icon(Icons.notifications_active),
+                tooltip: 'Test Notifications',
+              ),
               IconButton(
                 onPressed: () => _onLogout(context),
                 icon: Icon(Icons.logout),
@@ -447,6 +459,9 @@ class _ProfilePageState extends State<ProfilePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // User notifications for flags/suspensions
+                  UserNotifications(),
+                  SizedBox(height: 16),
                   // Profile image section
                   Center(
                     child: SizedBox(
@@ -596,6 +611,36 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                   ),
                   SizedBox(height: 12),
+
+                  // Admin Dashboard Button
+                  FutureBuilder<bool>(
+                    future: AdminService.instance.isCurrentUserAdmin(),
+                    builder: (context, snapshot) {
+                      if (snapshot.data == true) {
+                        return Column(
+                          children: [
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  Navigator.pushNamed(context, '/admin-nav');
+                                },
+                                icon: Icon(Icons.admin_panel_settings),
+                                label: Text('Admin Center'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red.shade700,
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: 12),
+                          ],
+                        );
+                      }
+                      return SizedBox.shrink();
+                    },
+                  ),
+
                   SizedBox(
                     width: double.infinity,
                     child: TextButton(
@@ -612,6 +657,7 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

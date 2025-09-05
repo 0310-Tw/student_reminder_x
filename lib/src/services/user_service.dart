@@ -14,6 +14,39 @@ class UserService {
     return _db.collection('users').doc(uid).snapshots();
   }
 
+  // Check if current user is suspended
+  Future<bool> isCurrentUserSuspended() async {
+    try {
+      final user = await _db
+          .collection('users')
+          .doc('currentUserId')
+          .get(); // Replace with actual current user ID
+      final userData = user.data();
+      return userData?['status'] == 'suspended';
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Get user suspension details
+  Future<Map<String, dynamic>?> getUserSuspensionDetails(String uid) async {
+    try {
+      final userDoc = await _db.collection('users').doc(uid).get();
+      final userData = userDoc.data();
+
+      if (userData?['status'] == 'suspended') {
+        return {
+          'suspended': true,
+          'reason': userData?['suspensionReason'] ?? 'No reason provided',
+          'suspendedAt': userData?['suspendedAt'],
+        };
+      }
+      return {'suspended': false};
+    } catch (e) {
+      return {'suspended': false};
+    }
+  }
+
   //Return Filtered list of students >> web | mobile
   Stream<QuerySnapshot<Map<String, dynamic>>> watchUserByCourseGroup(
     String course,

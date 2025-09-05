@@ -175,9 +175,11 @@ class AttendanceService {
 
   /// Get students for admin panel
   static Stream<QuerySnapshot> getStudentsStream() {
+    // Get all users and filter out admins in the UI if needed
+    // This ensures we capture users who might not have a 'role' field set
     return _firestore
         .collection('users')
-        .where('role', isEqualTo: 'student')
+        .orderBy('lastName', descending: false)
         .snapshots();
   }
 

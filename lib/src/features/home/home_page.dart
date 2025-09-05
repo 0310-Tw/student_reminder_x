@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/user_service.dart';
 import 'package:students_reminder/src/widgets/group_filter.dart';
+import 'package:students_reminder/src/widgets/user_notifications.dart';
+import 'package:students_reminder/src/widgets/suspension_check.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -16,34 +18,37 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-   
     final uid = AuthService.instance.currentUser?.uid;
 
     return Scaffold(
       appBar: AppBar(title: Text('Home')),
-      body: Column(
-        children: [
-              GroupFilter(value: _group, onChanged: (val) => setState(() => _group = val)),
-          Expanded(
+      body: SuspensionCheck(
+        child: Column(
+          children: [
+            // Show user notifications for flags/suspensions
+            UserNotifications(),
+            GroupFilter(
+              value: _group,
+              onChanged: (val) => setState(() => _group = val),
+            ),
+            Expanded(
             child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: UserService.instance.watchUserByCourseGroup(_group),
               builder: (context, snap) {
                 if (snap.connectionState == ConnectionState.waiting) {
                   return Center(child: CircularProgressIndicator());
                 }
-               
-                if(snap.hasError){
-                  return Center(
-                    child: Text('Error Detected: ${snap.error}'),
-                  );
+
+                if (snap.hasError) {
+                  return Center(child: Text('Error Detected: ${snap.error}'));
                 }
-                 final docs = snap.data?.docs ?? [];
+                final docs = snap.data?.docs ?? [];
                 // if (docs.isEmpty) {
                 //   return Center(
                 //     child: Text('There are no students in this group'),
                 //   );
                 // }
-                
+
                 return ListView.separated(
                   separatorBuilder: (_, _) => Divider(height: 1),
                   itemCount: docs.length,
@@ -78,6 +83,7 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
         ],
+      ),
       ),
     );
   }
