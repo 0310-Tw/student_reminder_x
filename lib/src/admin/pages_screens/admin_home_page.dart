@@ -1,8 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:students_reminder/src/services/admin_service.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/user_service.dart';
-import 'package:students_reminder/src/services/admin_service.dart';
+import 'package:students_reminder/src/services/notification_service.dart';
 import 'package:students_reminder/src/shared/misc.dart';
 import 'package:students_reminder/src/widgets/group_filter.dart';
 
@@ -512,8 +513,11 @@ class _AdminHomePageState extends State<AdminHomePage> {
     String reason,
   ) async {
     try {
+      print('🔔 Attempting to send flag notification to user: $userId');
+      print('📝 Reason: $reason');
+
       // Create a notification document for the user
-      await FirebaseFirestore.instance
+      final notificationRef = await FirebaseFirestore.instance
           .collection('users')
           .doc(userId)
           .collection('notifications')
@@ -527,13 +531,54 @@ class _AdminHomePageState extends State<AdminHomePage> {
             'severity': 'warning',
           });
 
+      print('✅ Flag notification created with ID: ${notificationRef.id}');
+
       // Also update the user's profile to show flag status
       await FirebaseFirestore.instance.collection('users').doc(userId).update({
         'flaggedAt': FieldValue.serverTimestamp(),
         'flagReason': reason,
       });
+
+      print('✅ User profile updated with flag status');
+
+      // Send push notification to user's device
+      try {
+        // Get user's FCM token from their profile
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .get();
+
+        final userData = userDoc.data();
+        final fcmToken = userData?['fcmToken'] as String?;
+
+        if (fcmToken != null && fcmToken.isNotEmpty) {
+          print(
+            '📱 Sending push notification to FCM token: ${fcmToken.substring(0, 20)}...',
+          );
+
+          final pushSent = await NotificationService.sendPushNotificationv2(
+            deviceToken: fcmToken,
+            title: 'Account Flagged',
+            body: 'Your account has been flagged. Reason: $reason',
+          );
+
+          if (pushSent) {
+            print('✅ Push notification sent successfully');
+          } else {
+            print('⚠️ Push notification failed to send');
+          }
+        } else {
+          print('⚠️ No FCM token found for user, skipping push notification');
+        }
+      } catch (pushError) {
+        print('❌ Error sending push notification: $pushError');
+        // Don't throw error - in-app notification was still created successfully
+      }
     } catch (e) {
-      print('Error sending flag notification: $e');
+      print('❌ Error sending flag notification: $e');
+      // Re-throw to let the caller know there was an error
+      rethrow;
     }
   }
 

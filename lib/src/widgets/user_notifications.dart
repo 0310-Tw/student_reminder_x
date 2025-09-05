@@ -20,14 +20,31 @@ class UserNotifications extends StatelessWidget {
           .limit(5)
           .snapshots(),
       builder: (context, snapshot) {
+        print('🔍 UserNotifications StreamBuilder triggered');
+        print('📊 Has data: ${snapshot.hasData}');
+        print('📝 Docs count: ${snapshot.data?.docs.length ?? 0}');
+
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          print('⚠️ No notifications found or no data');
           return SizedBox.shrink();
         }
 
         final notifications = snapshot.data!.docs;
+        print('📋 Total notifications: ${notifications.length}');
+
+        // Debug: Print all notifications
+        for (int i = 0; i < notifications.length; i++) {
+          final data = notifications[i].data() as Map;
+          print(
+            '📬 Notification $i: ${data['type']} - ${data['severity']} - ${data['title']}',
+          );
+        }
+
         final criticalNotifications = notifications
             .where((doc) => (doc.data() as Map)['severity'] == 'critical')
             .toList();
+
+        print('🚨 Critical notifications: ${criticalNotifications.length}');
 
         // Show critical notifications (suspensions) as prominent banners
         if (criticalNotifications.isNotEmpty) {

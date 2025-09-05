@@ -65,6 +65,25 @@ service cloud.firestore {
           allow read, write, delete: if isAdmin();
         }
       }
+
+      // Notifications subcollection rules
+      match /notifications/{notificationId} {
+        // Allow users to read their own notifications
+        allow read: if isSignedIn() && isOwner(uid);
+        
+        // Allow users to update their own notifications (mark as read, delete)
+        allow update, delete: if isSignedIn() && isOwner(uid);
+        
+        // Allow admins to create notifications for any user (for flagging, suspension, etc.)
+        allow create: if isAdmin();
+        
+        // Allow admins full access to any notifications
+        allow read, write, delete: if isAdmin();
+        
+        // Allow system to create notifications (for automated notifications)
+        // This is for Cloud Functions or other server-side operations
+        allow create: if request.auth.token.admin == true;
+      }
     }
     
     // Reports collection - for user reports on notes and other users

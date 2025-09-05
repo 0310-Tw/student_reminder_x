@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:students_reminder/src/features/auth/login_page.dart';
 import 'package:students_reminder/src/features/home/home_page.dart';
@@ -10,7 +11,7 @@ import 'package:students_reminder/src/admin/pages_screens/admin_public_feeds.dar
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/admin_service.dart';
 import 'package:students_reminder/src/admin/pages_screens/attendance_admin_page.dart';
-import 'package:students_reminder/src/services/notification_service_v2.dart';
+import 'package:students_reminder/src/services/notification_service.dart';
 
 class MainLayoutPage extends StatefulWidget {
   const MainLayoutPage({super.key});
@@ -73,6 +74,16 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
             print(
               "✅ FCM Token obtained in MainLayout: ${token.substring(0, 20)}...",
             );
+
+            // Store FCM token in user's profile for push notifications
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .update({
+                  'fcmToken': token,
+                  'lastTokenUpdate': FieldValue.serverTimestamp(),
+                });
+            print("✅ FCM Token stored in user profile");
 
             // Subscribe to user-specific notification topic
             await NotificationService.subscribeToTopic('user_${user.uid}');

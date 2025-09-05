@@ -10,7 +10,6 @@ import 'package:students_reminder/src/admin/pages_screens/admin_home_page.dart';
 import 'package:students_reminder/src/admin/pages_screens/admin_public_feeds.dart';
 import 'package:students_reminder/src/admin/pages_screens/admin_navigation_page.dart';
 import 'package:students_reminder/src/features/splash/splash_gate.dart';
-import 'package:students_reminder/src/features/test_notifications/test_notifications_page.dart';
 
 class AppRoutes {
   static const login = '/login';
@@ -22,7 +21,6 @@ class AppRoutes {
   static const adminFeeds = '/admin-feeds';
   static const adminNav = '/admin-nav';
   static const splash = '/splash';
-  static const testNotifications = '/test-notifications';
 
   static Route<dynamic> onGenerateRoute(RouteSettings setting) {
     //Expecting /student/:uid
@@ -53,8 +51,6 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const AdminNavigationPage());
       case splash:
         return MaterialPageRoute(builder: (_) => const SplashGate());
-      case testNotifications:
-        return MaterialPageRoute(builder: (_) => const TestNotificationsPage());
       default:
         return MaterialPageRoute(builder: (_) => const SplashGate());
     }

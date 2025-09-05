@@ -289,7 +289,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
         }
 
         final allUsers = snapshot.data?.docs ?? [];
-        
+
         // Filter out admin users - only show non-admin users in attendance
         final students = allUsers.where((doc) {
           final userData = doc.data() as Map<String, dynamic>;
@@ -302,11 +302,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.people_outline,
-                  size: 64,
-                  color: Colors.grey[400],
-                ),
+                Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
                 SizedBox(height: 16),
                 Text(
                   'No students found',
@@ -319,10 +315,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                 SizedBox(height: 8),
                 Text(
                   'Make sure users have been properly registered',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[500],
-                  ),
+                  style: TextStyle(fontSize: 14, color: Colors.grey[500]),
                 ),
               ],
             ),

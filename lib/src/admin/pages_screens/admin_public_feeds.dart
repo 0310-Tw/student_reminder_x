@@ -190,12 +190,14 @@ class AdminPublicFeeds extends StatelessWidget {
                                 StreamBuilder<QuerySnapshot>(
                                   stream: ref.collection('reports').snapshots(),
                                   builder: (context, reportsSnapshot) {
-                                    if (!reportsSnapshot.hasData)
+                                    if (!reportsSnapshot.hasData) {
                                       return SizedBox.shrink();
+                                    }
                                     final reportsCount =
                                         reportsSnapshot.data!.docs.length;
-                                    if (reportsCount == 0)
+                                    if (reportsCount == 0) {
                                       return SizedBox.shrink();
+                                    }
 
                                     return Chip(
                                       label: Text(
@@ -591,7 +593,7 @@ class AdminPublicFeeds extends StatelessWidget {
             fontWeight: FontWeight.bold,
           ),
         ),
-        content: Container(
+        content: SizedBox(
           width: double.maxFinite,
           height: 400,
           child: Column(
