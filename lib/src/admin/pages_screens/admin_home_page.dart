@@ -389,6 +389,8 @@ class _AdminHomePageState extends State<AdminHomePage> {
           );
           if (confirmed == true) {
             await AdminService.instance.unsuspendUser(userId);
+            // Send notification to user about unsuspension
+            await _sendUnsuspendedNotificationToUser(userId, userName);
             displaySnackBar(context, 'User unsuspended successfully');
           }
           break;
@@ -513,8 +515,8 @@ class _AdminHomePageState extends State<AdminHomePage> {
     String reason,
   ) async {
     try {
-      print('🔔 Attempting to send flag notification to user: $userId');
-      print('📝 Reason: $reason');
+      print('Attempting to send flag notification to user: $userId');
+      print('Reason: $reason');
 
       // Create a notification document for the user
       final notificationRef = await FirebaseFirestore.instance
@@ -531,7 +533,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
             'severity': 'warning',
           });
 
-      print('✅ Flag notification created with ID: ${notificationRef.id}');
+      print('Flag notification created with ID: ${notificationRef.id}');
 
       // Also update the user's profile to show flag status
       await FirebaseFirestore.instance.collection('users').doc(userId).update({
@@ -539,7 +541,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
         'flagReason': reason,
       });
 
-      print('✅ User profile updated with flag status');
+      print('User profile updated with flag status');
 
       // Send push notification to user's device
       try {
@@ -554,29 +556,29 @@ class _AdminHomePageState extends State<AdminHomePage> {
 
         if (fcmToken != null && fcmToken.isNotEmpty) {
           print(
-            '📱 Sending push notification to FCM token: ${fcmToken.substring(0, 20)}...',
+            'Sending push notification to FCM token: ${fcmToken.substring(0, 20)}...',
           );
 
-          final pushSent = await NotificationService.sendPushNotificationv2(
+          final pushSent = await NotificationService.sendPushNotification(
             deviceToken: fcmToken,
             title: 'Account Flagged',
             body: 'Your account has been flagged. Reason: $reason',
           );
 
           if (pushSent) {
-            print('✅ Push notification sent successfully');
+            print('Push notification sent successfully');
           } else {
-            print('⚠️ Push notification failed to send');
+            print('Push notification failed to send');
           }
         } else {
-          print('⚠️ No FCM token found for user, skipping push notification');
+          print('No FCM token found for user, skipping push notification');
         }
       } catch (pushError) {
-        print('❌ Error sending push notification: $pushError');
+        print('Error sending push notification: $pushError');
         // Don't throw error - in-app notification was still created successfully
       }
     } catch (e) {
-      print('❌ Error sending flag notification: $e');
+      print('Error sending flag notification: $e');
       // Re-throw to let the caller know there was an error
       rethrow;
     }
@@ -587,24 +589,96 @@ class _AdminHomePageState extends State<AdminHomePage> {
     String userName,
   ) async {
     try {
+      print('Attempting to send unflag notification to user: $userId');
+
       // Create a notification document for the user
-      await FirebaseFirestore.instance
+      final notificationRef = await FirebaseFirestore.instance
           .collection('users')
           .doc(userId)
           .collection('notifications')
           .add({
-            'type': 'unflag',
-            'title': 'Flag Removed',
+            'type': 'flag',
+            'title': 'Account Unflagged',
             'message':
-                'Good news! The flag on your account has been removed by an administrator.\n\nYou can now continue using the platform normally. Thank you for your cooperation.',
+                'Your account has been unflagged by an administrator.\n\nYou can now continue using the platform normally. Thank you for your cooperation.',
             'timestamp': FieldValue.serverTimestamp(),
             'read': false,
             'severity': 'info',
           });
+
+      print('Unflag notification created with ID: ${notificationRef.id}');
+
+      // Also update the user's profile to show flag status
+      await FirebaseFirestore.instance.collection('users').doc(userId).update({
+        'flaggedAt': FieldValue.serverTimestamp(),
+      });
+
+      print('User profile updated with flag status');
+
+      // Send push notification to user's device
+      try {
+        // Get user's FCM token from their profile
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .get();
+
+        final userData = userDoc.data();
+        final fcmToken = userData?['fcmToken'] as String?;
+
+        if (fcmToken != null && fcmToken.isNotEmpty) {
+          print(
+            'Sending push notification to FCM token: ${fcmToken.substring(0, 20)}...',
+          );
+
+          final pushSent = await NotificationService.sendPushNotification(
+            deviceToken: fcmToken,
+            title: 'Account Unflagged',
+            body: 'Your account has been unflagged. ',
+          );
+
+          if (pushSent) {
+            print('Push notification sent successfully');
+          } else {
+            print('Push notification failed to send');
+          }
+        } else {
+          print('No FCM token found for user, skipping push notification');
+        }
+      } catch (pushError) {
+        print('Error sending push notification: $pushError');
+        // Don't throw error - in-app notification was still created successfully
+      }
     } catch (e) {
-      print('Error sending unflag notification: $e');
+      print('Error sending flag notification: $e');
+      // Re-throw to let the caller know there was an error
+      rethrow;
     }
   }
+
+  // Future<void> _sendUnflagNotificationToUser(
+  //   String userId,
+  //   String userName,
+  // ) async {
+  //   try {
+  //     // Create a notification document for the user
+  //     await FirebaseFirestore.instance
+  //         .collection('users')
+  //         .doc(userId)
+  //         .collection('notifications')
+  //         .add({
+  //           'type': 'unflag',
+  //           'title': 'Flag Removed',
+  //           'message':
+  //               'Good news! The flag on your account has been removed by an administrator.\n\nYou can now continue using the platform normally. Thank you for your cooperation.',
+  //           'timestamp': FieldValue.serverTimestamp(),
+  //           'read': false,
+  //           'severity': 'info',
+  //         });
+  //   } catch (e) {
+  //     print('Error sending unflag notification: $e');
+  //   }
+  // }
 
   Future<void> _sendSuspensionNotificationToUser(
     String userId,
@@ -634,6 +708,95 @@ class _AdminHomePageState extends State<AdminHomePage> {
       });
     } catch (e) {
       print('Error sending suspension notification: $e');
+      try {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .get();
+
+        final userData = userDoc.data();
+        final fcmToken = userData?['fcmToken'] as String?;
+        if (fcmToken != null && fcmToken.isNotEmpty) {
+          print(
+            'Sending push notification to FCM token: ${fcmToken.substring(0, 20)}...',
+          );
+
+          final pushSent = await NotificationService.sendPushNotification(
+            deviceToken: fcmToken,
+            title: 'Account Suspended',
+            body: 'Your account has been suspended. Reason: $reason',
+          );
+
+          if (pushSent) {
+            print('Push notification sent successfully');
+          } else {
+            print('Push notification failed to send');
+          }
+        } else {
+          print('No FCM token found for user, skipping push notification');
+        }
+      } catch (pushError) {
+        print('Error sending push notification: $pushError');
+      }
+    }
+  }
+
+  Future<void> _sendUnsuspendedNotificationToUser(
+    String userId,
+    String userName,
+  ) async {
+    try {
+      // Create a notification document for the user
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('notifications')
+          .add({
+            'type': 'unsuspension',
+            'title': 'Account Unsuspended',
+            'message':
+                'Good news! Your account has been unsuspended by an administrator.\n\nYou can now continue using the platform normally. Thank you for your cooperation.',
+            'timestamp': FieldValue.serverTimestamp(),
+            'read': false,
+            'severity': 'critical',
+          });
+
+      // Update user's profile with unsuspension details
+      await FirebaseFirestore.instance.collection('users').doc(userId).update({
+        'unsuspendedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('Error sending unsuspension notification: $e');
+      try {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .get();
+
+        final userData = userDoc.data();
+        final fcmToken = userData?['fcmToken'] as String?;
+        if (fcmToken != null && fcmToken.isNotEmpty) {
+          print(
+            'Sending push notification to FCM token: ${fcmToken.substring(0, 20)}...',
+          );
+
+          final pushSent = await NotificationService.sendPushNotification(
+            deviceToken: fcmToken,
+            title: 'Account Unsuspended',
+            body: 'Your account has been unsuspended.',
+          );
+
+          if (pushSent) {
+            print('Push notification sent successfully');
+          } else {
+            print('Push notification failed to send');
+          }
+        } else {
+          print('No FCM token found for user, skipping push notification');
+        }
+      } catch (pushError) {
+        print('Error sending push notification: $pushError');
+      }
     }
   }
 
@@ -755,7 +918,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
-                '⚠️ This action is irreversible!',
+                'This action is irreversible!',
                 style: TextStyle(
                   color: Color(0xFFD32F2F),
                   fontWeight: FontWeight.bold,

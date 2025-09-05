@@ -13,7 +13,7 @@ class NotificationService {
   NotificationService._();
 
   /// Send push notification using Cloud Functions
-  static Future<bool> sendPushNotificationv2({
+  static Future<bool> sendPushNotification({
     required String deviceToken,
     required String title,
     required String body,
@@ -28,14 +28,14 @@ class NotificationService {
       );
 
       if (response.statusCode == 200) {
-        print("✅ Notification sent: ${response.body}");
+        print("Notification sent: ${response.body}");
         return true;
       } else {
-        print("⚠️ Failed: ${response.statusCode} - ${response.body}");
+        print("Failed: ${response.statusCode} - ${response.body}");
         return false;
       }
     } catch (e) {
-      print("❌ Error sending push notification: $e");
+      print("Error sending push notification: $e");
       return false;
     }
   }
@@ -56,14 +56,14 @@ class NotificationService {
       );
 
       if (response.statusCode == 200) {
-        print("✅ Topic notification sent: ${response.body}");
+        print("Topic notification sent: ${response.body}");
         return true;
       } else {
-        print("⚠️ Failed: ${response.statusCode} - ${response.body}");
+        print("Failed: ${response.statusCode} - ${response.body}");
         return false;
       }
     } catch (e) {
-      print("❌ Error sending topic notification: $e");
+      print("Error sending topic notification: $e");
       return false;
     }
   }
@@ -73,7 +73,7 @@ class NotificationService {
     try {
       return await FirebaseMessaging.instance.getToken();
     } catch (e) {
-      print("❌ Error getting FCM token: $e");
+      print("Error getting FCM token: $e");
       return null;
     }
   }
@@ -82,9 +82,9 @@ class NotificationService {
   static Future<void> subscribeToTopic(String topic) async {
     try {
       await FirebaseMessaging.instance.subscribeToTopic(topic);
-      print("✅ Subscribed to topic: $topic");
+      print("Subscribed to topic: $topic");
     } catch (e) {
-      print("❌ Error subscribing to topic $topic: $e");
+      print("Error subscribing to topic $topic: $e");
     }
   }
 
@@ -92,9 +92,9 @@ class NotificationService {
   static Future<void> unsubscribeFromTopic(String topic) async {
     try {
       await FirebaseMessaging.instance.unsubscribeFromTopic(topic);
-      print("✅ Unsubscribed from topic: $topic");
+      print("Unsubscribed from topic: $topic");
     } catch (e) {
-      print("❌ Error unsubscribing from topic $topic: $e");
+      print("Error unsubscribing from topic $topic: $e");
     }
   }
 
@@ -110,7 +110,7 @@ class NotificationService {
     final token = await getFCMToken();
     if (token == null) return false;
 
-    return await sendPushNotificationv2(
+    return await sendPushNotification(
       deviceToken: token,
       title: 'Test Notification',
       body: 'This is a test notification from your Student Reminder app!',

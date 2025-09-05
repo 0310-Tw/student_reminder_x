@@ -72,7 +72,7 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
           String? token = await NotificationService.getFCMToken();
           if (token != null) {
             print(
-              "✅ FCM Token obtained in MainLayout: ${token.substring(0, 20)}...",
+              "FCM Token obtained in MainLayout: ${token.substring(0, 20)}...",
             );
 
             // Store FCM token in user's profile for push notifications
@@ -83,7 +83,7 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
                   'fcmToken': token,
                   'lastTokenUpdate': FieldValue.serverTimestamp(),
                 });
-            print("✅ FCM Token stored in user profile");
+            print("FCM Token stored in user profile");
 
             // Subscribe to user-specific notification topic
             await NotificationService.subscribeToTopic('user_${user.uid}');
@@ -91,10 +91,10 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
             // Subscribe to general topics
             await NotificationService.subscribeToTopic('all_users');
 
-            print("✅ Notification setup completed for user: ${user.uid}");
+            print("Notification setup completed for user: ${user.uid}");
           }
         } catch (e) {
-          print("❌ Error setting up notifications: $e");
+          print("Error setting up notifications: $e");
         }
       }
     });

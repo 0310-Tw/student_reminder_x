@@ -38,7 +38,7 @@ Future<void> initNotifications() async {
 
   // Check if permissions were granted and setup notifications accordingly
   if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-    print("✅ Notification permissions granted");
+    print("Notification permissions granted");
 
     // Get the token
     String? token = await messaging.getToken();
@@ -46,18 +46,18 @@ Future<void> initNotifications() async {
 
     // Setup foreground message handling
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print("📱 Foreground message received: ${message.notification?.title}");
+      print("Foreground message received: ${message.notification?.title}");
     });
 
     // Setup message handling when app is opened from notification
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      print("🔔 App opened from notification: ${message.notification?.title}");
+      print("App opened from notification: ${message.notification?.title}");
     });
   } else if (settings.authorizationStatus == AuthorizationStatus.denied) {
-    print("❌ Notification permissions denied");
+    print("Notification permissions denied");
   } else if (settings.authorizationStatus == AuthorizationStatus.provisional) {
-    print("⚠️ Notification permissions provisional");
+    print("Notification permissions provisional");
   } else {
-    print("⚠️ Notification permission status: ${settings.authorizationStatus}");
+    print("Notification permission status: ${settings.authorizationStatus}");
   }
 }

@@ -185,6 +185,7 @@ import 'package:flutter/material.dart';
 import 'package:students_reminder/src/features/notes/dialogs/note_editor_dialog.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/note_service.dart';
+import 'package:students_reminder/src/services/notification_service.dart';
 import 'package:students_reminder/src/widgets/suspension_check.dart';
 
 class PublicFeeds extends StatelessWidget {
@@ -277,11 +278,29 @@ class PublicFeeds extends StatelessWidget {
                             ),
                             onPressed: isSuspended
                                 ? null
-                                : () {
-                                    NotesService.instance.toggleLike(
+                                : () async {
+                                    // Toggle the like
+                                    await NotesService.instance.toggleLike(
                                       noteRef: ref,
                                       uid: uid,
                                     );
+
+                                    // Send notification if note was just liked (not unliked)
+                                    if (!isLiked) {
+                                      try {
+                                        await NotificationService.sendPushNotification(
+                                          deviceToken:
+                                              'user_${data['authorId']}', // This should be the actual FCM token
+                                          title: 'Your note was liked!',
+                                          body:
+                                              'Someone liked your note: "$title"',
+                                        );
+                                      } catch (e) {
+                                        print(
+                                          'Error sending like notification: $e',
+                                        );
+                                      }
+                                    }
                                   },
                           );
                         },

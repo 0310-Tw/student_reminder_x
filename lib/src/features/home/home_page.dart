@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/user_service.dart';
 import 'package:students_reminder/src/widgets/group_filter.dart';
-import 'package:students_reminder/src/widgets/user_notifications.dart';
+import 'package:students_reminder/src/widgets/user_banner_notifications.dart';
 import 'package:students_reminder/src/widgets/suspension_check.dart';
 
 class HomePage extends StatefulWidget {
@@ -26,7 +26,7 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           children: [
             // Show user notifications for flags/suspensions
-            UserNotifications(),
+            UserBannerNotifications(),
             GroupFilter(
               value: _group,
               onChanged: (val) => setState(() => _group = val),

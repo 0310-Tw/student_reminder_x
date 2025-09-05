@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 
-class UserNotifications extends StatelessWidget {
-  const UserNotifications({super.key});
+class UserBannerNotifications extends StatelessWidget {
+  const UserBannerNotifications({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -20,23 +20,23 @@ class UserNotifications extends StatelessWidget {
           .limit(5)
           .snapshots(),
       builder: (context, snapshot) {
-        print('🔍 UserNotifications StreamBuilder triggered');
-        print('📊 Has data: ${snapshot.hasData}');
-        print('📝 Docs count: ${snapshot.data?.docs.length ?? 0}');
+        print('UserNotifications StreamBuilder triggered');
+        print('Has data: ${snapshot.hasData}');
+        print('Docs count: ${snapshot.data?.docs.length ?? 0}');
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          print('⚠️ No notifications found or no data');
+          print('No notifications found or no data');
           return SizedBox.shrink();
         }
 
         final notifications = snapshot.data!.docs;
-        print('📋 Total notifications: ${notifications.length}');
+        print('Total notifications: ${notifications.length}');
 
         // Debug: Print all notifications
         for (int i = 0; i < notifications.length; i++) {
           final data = notifications[i].data() as Map;
           print(
-            '📬 Notification $i: ${data['type']} - ${data['severity']} - ${data['title']}',
+            'Notification $i: ${data['type']} - ${data['severity']} - ${data['title']}',
           );
         }
 
@@ -44,7 +44,7 @@ class UserNotifications extends StatelessWidget {
             .where((doc) => (doc.data() as Map)['severity'] == 'critical')
             .toList();
 
-        print('🚨 Critical notifications: ${criticalNotifications.length}');
+        print('Critical notifications: ${criticalNotifications.length}');
 
         // Show critical notifications (suspensions) as prominent banners
         if (criticalNotifications.isNotEmpty) {

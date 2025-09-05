@@ -77,7 +77,7 @@ exports.sendDailyAttendanceReminder = functions.pubsub
           promises.push(
             exports.sendNotificationToToken(
               userData.fcmToken,
-              'Time to Clock In! ⏰',
+              'Time to Clock In!',
               'Don\'t forget to clock in for your attendance today.',
               { 
                 type: 'clock_in',
@@ -89,10 +89,10 @@ exports.sendDailyAttendanceReminder = functions.pubsub
       });
 
       await Promise.all(promises);
-      console.log(`✅ Sent ${promises.length} attendance reminders`);
+      console.log(`Sent ${promises.length} attendance reminders`);
       return null;
     } catch (error) {
-      console.error('❌ Error sending attendance reminders:', error);
+      console.error('Error sending attendance reminders:', error);
       throw error;
     }
   });
@@ -120,7 +120,7 @@ exports.sendDailyClockOutReminder = functions.pubsub
           promises.push(
             exports.sendNotificationToToken(
               userData.fcmToken,
-              'Time to Clock Out! 🏃‍♂️',
+              'Time to Clock Out!',
               'Remember to clock out before leaving today.',
               { 
                 type: 'clock_out',
@@ -132,10 +132,10 @@ exports.sendDailyClockOutReminder = functions.pubsub
       });
 
       await Promise.all(promises);
-      console.log(`✅ Sent ${promises.length} clock-out reminders`);
+      console.log(`Sent ${promises.length} clock-out reminders`);
       return null;
     } catch (error) {
-      console.error('❌ Error sending clock-out reminders:', error);
+      console.error('Error sending clock-out reminders:', error);
       throw error;
     }
   });
@@ -177,7 +177,7 @@ exports.sendNoteDueReminders = functions.pubsub
             promises.push(
               exports.sendNotificationToToken(
                 userData.fcmToken,
-                'Note Due Tomorrow 📝',
+                'Note Due Tomorrow',
                 `Your note "${noteData.title}" is due tomorrow.`,
                 { 
                   type: 'note_due',
@@ -192,10 +192,10 @@ exports.sendNoteDueReminders = functions.pubsub
       }
 
       await Promise.all(promises);
-      console.log(`✅ Sent ${promises.length} note due reminders`);
+      console.log(`Sent ${promises.length} note due reminders`);
       return null;
     } catch (error) {
-      console.error('❌ Error sending note due reminders:', error);
+      console.error('Error sending note due reminders:', error);
       throw error;
     }
   });
