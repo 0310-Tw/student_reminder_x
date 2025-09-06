@@ -45,6 +45,6 @@ Future<void> markMissedDaysAbsent(String userId) async {
       }
     }
 
-    currentDate = currentDate.add(Duration(days: 1));
+    // currentDate = currentDate.add(Duration(days: 1));
   }
 }
