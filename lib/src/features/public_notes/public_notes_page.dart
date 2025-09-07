@@ -84,7 +84,7 @@ class _PublicFeedsState extends State<PublicFeeds> {
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel')),
-          ElevatedButton(onPressed: () => Navigator.pop(ctx, reason), child: Text('Submit')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, reason), child: Text('Submit.')),
         ],
       ),
     );
