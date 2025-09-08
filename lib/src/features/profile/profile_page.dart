@@ -8,8 +8,11 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:students_reminder/src/features/auth/login_page.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/user_service.dart';
+import 'package:students_reminder/src/services/admin_service.dart';
 import 'package:students_reminder/src/shared/misc.dart';
 import 'package:students_reminder/src/shared/widgets/live_char_counter_text_field.dart';
+import 'package:students_reminder/src/widgets/user_banner_notifications.dart';
+import 'package:students_reminder/src/widgets/suspension_check.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -42,8 +45,7 @@ class _ProfilePageState extends State<ProfilePage> {
       );
       if (safeToLogout != true) return;
       await AuthService.instance.logout();
-      MaterialPageRoute(builder: (_) => const LoginPage());
-      // if (mounted) Navigator.pushReplacementNamed(context, AppRoutes.login);
+      // Navigation will be handled automatically by SplashGate
     } catch (e) {
       if (mounted) {
         displaySnackBar(context, 'Error logging out: $e');
@@ -55,9 +57,13 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _updateProfile() async {
     setState(() => _busy = true);
     try {
-      final uid = AuthService.instance.currentUser!.uid;
+      final user = AuthService.instance.currentUser;
+      if (user == null) return; // User logged out during operation
+
       await UserService.instance.updateMyProfile(
-        uid,
+        user.uid,
+        firstName: _firstName.text.trim(),
+        lastName: _lastName.text.trim(),
         phone: _phone.text.trim(),
         bio: _bio.text.trim(),
       );
@@ -126,14 +132,14 @@ class _ProfilePageState extends State<ProfilePage> {
         child: Container(
           height: 400,
           width: 300,
-          padding:  EdgeInsets.all(16),
+          padding: EdgeInsets.all(16),
           child: Column(
             children: [
-               Text(
+              Text(
                 'Crop Profile Photo',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-               SizedBox(height: 16),
+              SizedBox(height: 16),
               Expanded(
                 child: Crop(
                   image: _imageData!,
@@ -148,10 +154,10 @@ class _ProfilePageState extends State<ProfilePage> {
                   radius: 0,
                   interactive: true,
                   fixCropRect: false,
-                  cornerDotBuilder: (size, edgeAlignment) =>  DotControl(),
+                  cornerDotBuilder: (size, edgeAlignment) => DotControl(),
                 ),
               ),
-               SizedBox(height: 16),
+              SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
@@ -160,11 +166,11 @@ class _ProfilePageState extends State<ProfilePage> {
                       Navigator.of(context).pop();
                       setState(() => _imageData = null);
                     },
-                    child:  Text('Cancel'),
+                    child: Text('Cancel'),
                   ),
                   ElevatedButton(
                     onPressed: () => _cropController.crop(),
-                    child:  Text('Crop'),
+                    child: Text('Crop'),
                   ),
                 ],
               ),
@@ -220,8 +226,13 @@ class _ProfilePageState extends State<ProfilePage> {
       );
       await tempFile.writeAsBytes(imageBytes);
 
-      final uid = AuthService.instance.currentUser!.uid;
-      await UserService.instance.uploadProfilePhoto(uid: uid, file: tempFile);
+      final user = AuthService.instance.currentUser;
+      if (user == null) return; // User logged out during operation
+
+      await UserService.instance.uploadProfilePhoto(
+        uid: user.uid,
+        file: tempFile,
+      );
 
       // Clean up the temporary file
       if (await tempFile.exists()) {
@@ -274,18 +285,23 @@ class _ProfilePageState extends State<ProfilePage> {
       }
 
       // Upload cover image without cropping (landscape format)
-      final uid = AuthService.instance.currentUser!.uid;
+      final user = AuthService.instance.currentUser;
+      if (user == null) {
+        setState(() => _coverBusy = false);
+        return; // User logged out during operation
+      }
+
       final storageRef = FirebaseStorage.instance
           .ref()
           .child('covers')
-          .child('$uid.jpg');
+          .child('${user.uid}.jpg');
 
       final uploadTask = storageRef.putFile(File(file.path));
       final snapshot = await uploadTask;
       final downloadUrl = await snapshot.ref.getDownloadURL();
 
       // Update Firestore with cover URL
-      await UserService.instance.updateCoverImage(uid, downloadUrl);
+      await UserService.instance.updateCoverImage(user.uid, downloadUrl);
 
       if (mounted) {
         displaySnackBar(context, 'Cover image updated!');
@@ -316,28 +332,42 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
-    final uid = AuthService.instance.currentUser!.uid;
-    UserService.instance.getUser(uid).listen((doc) {
-      final data = doc.data();
-      if (data != null && mounted) {
-        _firstName.text = (data['firstName'] ?? '') as String;
-        _lastName.text = (data['lastName'] ?? '') as String;
-        _bio.text = (data['bio'] ?? '') as String;
-        _phone.text = (data['phone'] ?? '') as String;
-        setState(() {
-          _photoUrl = data['photoUrl'] as String?;
-          _coverUrl = data['coverUrl'] as String?; // Listen for cover URL
-        });
-      }
-    });
+    final user = AuthService.instance.currentUser;
+    if (user != null) {
+      UserService.instance.getUser(user.uid).listen((doc) {
+        final data = doc.data();
+        if (data != null && mounted) {
+          _firstName.text = (data['firstName'] ?? '') as String;
+          _lastName.text = (data['lastName'] ?? '') as String;
+          _bio.text = (data['bio'] ?? '') as String;
+          _phone.text = (data['phone'] ?? '') as String;
+          setState(() {
+            _photoUrl = data['photoUrl'] as String?;
+            _coverUrl = data['coverUrl'] as String?; // Listen for cover URL
+          });
+        }
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final user = AuthService.instance.currentUser!;
+    final user = AuthService.instance.currentUser;
+
+    // If user is null, redirect to login
+    if (user == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.of(
+          context,
+        ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginPage()));
+      });
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
     return Scaffold(
-      body: CustomScrollView(
+      body: SuspensionCheck(
+        restrictWriteAccess: true,
+        child: CustomScrollView(
         slivers: [
           // Collapsible cover image with SliverAppBar
           SliverAppBar(
@@ -345,6 +375,13 @@ class _ProfilePageState extends State<ProfilePage> {
             floating: false,
             pinned: true,
             actions: [
+              IconButton(
+                onPressed: () {
+                  Navigator.pushNamed(context, '/test-notifications');
+                },
+                icon: Icon(Icons.notifications_active),
+                tooltip: 'Test Notifications',
+              ),
               IconButton(
                 onPressed: () => _onLogout(context),
                 icon: Icon(Icons.logout),
@@ -418,10 +455,13 @@ class _ProfilePageState extends State<ProfilePage> {
           // Profile content
           SliverToBoxAdapter(
             child: Padding(
-              padding:  EdgeInsets.all(16),
+              padding: EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // User notifications for flags/suspensions
+                  UserBannerNotifications(),
+                  SizedBox(height: 16),
                   // Profile image section
                   Center(
                     child: SizedBox(
@@ -441,7 +481,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             child: _busy
                                 ? Container(
                                     color: Colors.grey.shade200,
-                                    child:  Center(
+                                    child: Center(
                                       child: CircularProgressIndicator(),
                                     ),
                                   )
@@ -452,7 +492,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                     errorBuilder: (context, error, stackTrace) {
                                       return Container(
                                         color: Colors.grey.shade200,
-                                        child:  Icon(
+                                        child: Icon(
                                           Icons.person,
                                           size: 60,
                                           color: Colors.grey,
@@ -481,7 +521,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                   )
                                 : Container(
                                     color: Colors.grey.shade200,
-                                    child:  Icon(
+                                    child: Icon(
                                       Icons.person,
                                       size: 60,
                                       color: Colors.grey,
@@ -492,31 +532,47 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                     ),
                   ),
-                   SizedBox(height: 8),
+                  SizedBox(height: 8),
                   Center(
                     child: TextButton.icon(
-                      icon:  Icon(Icons.camera_alt),
+                      icon: Icon(Icons.camera_alt),
                       onPressed: _busy ? null : _onPickPhoto,
                       label: Text(
                         _busy ? 'Uploading...' : 'Change Profile Image',
                       ),
                     ),
                   ),
-                   SizedBox(height: 24),
+                  SizedBox(height: 24),
                   // User info section
                   Text('Name: ${_firstName.text} ${_lastName.text}'),
-                   SizedBox(height: 8),
+                  SizedBox(height: 8),
                   Text('Email: ${user.email}'),
-                   SizedBox(height: 24),
+                  SizedBox(height: 24),
                   // Editable fields
                   TextField(
+                    controller: _firstName,
+                    decoration: InputDecoration(
+                      labelText: 'First Name',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  TextField(
+                    controller: _lastName,
+                    decoration: InputDecoration(
+                      labelText: 'Last Name',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  TextField(
                     controller: _phone,
-                    decoration:  InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Phone #',
                       border: OutlineInputBorder(),
                     ),
                   ),
-                   SizedBox(height: 16),
+                  SizedBox(height: 16),
                   LiveCharCounterTextField(
                     controller: _bio,
                     maxLength: 100,
@@ -524,20 +580,19 @@ class _ProfilePageState extends State<ProfilePage> {
                     hintText: 'Tell us about yourself...',
                     maxLines: 3,
                     keyboardType: TextInputType.multiline,
-                    
                   ),
-                   SizedBox(height: 24),
+                  SizedBox(height: 24),
                   // Action buttons
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: _busy ? null : _updateProfile,
                       child: _busy
-                          ?  CircularProgressIndicator()
-                          :  Text('Save Profile'),
+                          ? CircularProgressIndicator()
+                          : Text('Save Profile'),
                     ),
                   ),
-                   SizedBox(height: 12),
+                  SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton(
@@ -552,26 +607,57 @@ class _ProfilePageState extends State<ProfilePage> {
                           );
                         }
                       },
-                      child:  Text('Send Password Reset Email'),
+                      child: Text('Send Password Reset Email'),
                     ),
                   ),
-                   SizedBox(height: 12),
+                  SizedBox(height: 12),
+
+                  // Admin Dashboard Button
+                  FutureBuilder<bool>(
+                    future: AdminService.instance.isCurrentUserAdmin(),
+                    builder: (context, snapshot) {
+                      if (snapshot.data == true) {
+                        return Column(
+                          children: [
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  Navigator.pushNamed(context, '/admin-nav');
+                                },
+                                icon: Icon(Icons.admin_panel_settings),
+                                label: Text('Admin Center'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red.shade700,
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: 12),
+                          ],
+                        );
+                      }
+                      return SizedBox.shrink();
+                    },
+                  ),
+
                   SizedBox(
                     width: double.infinity,
                     child: TextButton(
                       onPressed: () async {
                         await AuthService.instance.logout();
                       },
-                      child:  Text('Logout'),
+                      child: Text('Logout'),
                     ),
                   ),
-                  
-                   SizedBox(height: 24), // Extra bottom padding
+
+                  SizedBox(height: 24), // Extra bottom padding
                 ],
               ),
             ),
           ),
         ],
+      ),
       ),
     );
   }

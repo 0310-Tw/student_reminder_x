@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:students_reminder/src/features/auth/login_page.dart';
 import 'package:students_reminder/src/features/home/home_page.dart';
@@ -7,6 +8,9 @@ import 'package:students_reminder/src/features/profile/profile_page.dart';
 import 'package:students_reminder/src/features/public_notes/public_notes_page.dart';
 import 'package:students_reminder/src/history/attendance_history.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
+import 'package:students_reminder/src/services/admin_service.dart';
+import 'package:students_reminder/src/admin/pages_screens/attendance_admin_page.dart';
+import 'package:students_reminder/src/services/notification_service.dart';
 
 class MainLayoutPage extends StatefulWidget {
   const MainLayoutPage({super.key});
@@ -17,6 +21,8 @@ class MainLayoutPage extends StatefulWidget {
 
 class _MainLayoutPageState extends State<MainLayoutPage> {
   int _index = 0;
+  bool _isAdmin = false;
+  bool _isLoadingAdminStatus = true;
 
     final _pages = [const HomePage(), const MyNotesPage(), PublicFeeds(), AttendanceHistory14d(), const ProfilePage()];
 
@@ -25,7 +31,8 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
     return StreamBuilder<User?>(
       stream: AuthService.instance.authStateChanged(),
       builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
+        if (snap.connectionState == ConnectionState.waiting ||
+            _isLoadingAdminStatus) {
           return Scaffold(body: Center(child: CircularProgressIndicator()));
         }
         final user = snap.data;
