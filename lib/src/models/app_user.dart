@@ -22,7 +22,7 @@ class AppUser {
     this.photoUrl,
     this.createdAt,
   });
-
+// jhsduycgtye
   //From Firebase to Dart
   factory AppUser.fromMap(String uid, Map<String, dynamic> data) {
     return AppUser(
