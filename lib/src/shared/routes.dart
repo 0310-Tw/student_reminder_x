@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:students_reminder/src/admin/pages/admin_home_page.dart';
 
 import 'package:students_reminder/src/features/auth/login_page.dart';
 import 'package:students_reminder/src/features/auth/register_page.dart';
 import 'package:students_reminder/src/features/profile/student_profile_page.dart';
 import 'package:students_reminder/src/shared/main_layout.dart';
-import 'package:students_reminder/src/admin/pages_screens/attendance_admin_page.dart';
+import 'package:students_reminder/src/admin/pages/attendance_admin_page.dart';
+import 'package:students_reminder/src/admin/pages/admin_public_feeds.dart';
 
-import 'package:students_reminder/src/admin/pages_screens/admin_home_page.dart';
-import 'package:students_reminder/src/admin/pages_screens/admin_public_feeds.dart';
-import 'package:students_reminder/src/admin/pages_screens/admin_navigation_page.dart';
 import 'package:students_reminder/src/features/splash/splash_gate.dart';
 
 class AppRoutes {
@@ -19,7 +18,7 @@ class AppRoutes {
   static const adminDashboard = '/admin-dashboard';
   static const adminHome = '/admin-home';
   static const adminFeeds = '/admin-feeds';
-  static const adminNav = '/admin-nav';
+  static const adminNav = '/admin-home';
   static const splash = '/splash';
 
   static Route<dynamic> onGenerateRoute(RouteSettings setting) {
@@ -41,14 +40,13 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const MainLayoutPage());
       case admin:
         return MaterialPageRoute(builder: (_) => const AttendanceAdminPage());
-      // case adminDashboard:
-      //   return MaterialPageRoute(builder: (_) => const AdminDashboardPage());
+      case adminDashboard:
+        return MaterialPageRoute(builder: (_) => const AdminHomePage());
       case adminHome:
         return MaterialPageRoute(builder: (_) => const AdminHomePage());
       case adminFeeds:
         return MaterialPageRoute(builder: (_) => const AdminPublicFeeds());
-      case adminNav:
-        return MaterialPageRoute(builder: (_) => const AdminNavigationPage());
+
       case splash:
         return MaterialPageRoute(builder: (_) => const SplashGate());
       default:

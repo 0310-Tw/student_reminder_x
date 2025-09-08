@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart'; // for DateUtils.dateOnly
 
 /* ----------------------- JmTime (time helpers) ----------------------- */
@@ -199,6 +200,219 @@ class AttendanceService {
     };
   }
 
+  /* ----- Admin Methods (Extended) ----- */
+
+  /// Admin marks a student as present for a specific date
+  static Future<void> adminMarkPresent(
+    String adminUid,
+    String targetUid,
+    String yyyyMMdd,
+  ) async {
+    try {
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        // Reference to the attendance day document
+        final dayRef = FirebaseFirestore.instance
+            .collection('attendance')
+            .doc(targetUid)
+            .collection('days')
+            .doc(yyyyMMdd);
+
+        // Reference to the event document
+        final eventRef = FirebaseFirestore.instance
+            .collection('attendance')
+            .doc(targetUid)
+            .collection('events')
+            .doc();
+
+        // Update attendance day with merge option to preserve existing fields
+        transaction.set(dayRef, {
+          'dayId': yyyyMMdd,
+          'status': 'present',
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        // Create audit event
+        transaction.set(eventRef, {
+          'type': 'admin_action',
+          'at': FieldValue.serverTimestamp(),
+          'meta': {
+            'adminId': adminUid,
+            'action': 'mark_present',
+            'targetDate': yyyyMMdd,
+          },
+        });
+      });
+    } catch (e) {
+      throw Exception('Failed to mark student present: $e');
+    }
+  }
+
+  /// Admin marks a student as absent for a specific date
+  static Future<void> adminMarkAbsent(
+    String adminUid,
+    String targetUid,
+    String yyyyMMdd, {
+    String? reason,
+  }) async {
+    try {
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        // Reference to the attendance day document
+        final dayRef = FirebaseFirestore.instance
+            .collection('attendance')
+            .doc(targetUid)
+            .collection('days')
+            .doc(yyyyMMdd);
+
+        // Reference to the event document
+        final eventRef = FirebaseFirestore.instance
+            .collection('attendance')
+            .doc(targetUid)
+            .collection('events')
+            .doc();
+
+        // Prepare update data
+        Map<String, dynamic> updateData = {
+          'dayId': yyyyMMdd,
+          'status': 'absent',
+          'inAt': null,
+          'clockInAt': null,
+          'inLoc': null,
+          'clockInLoc': null,
+          'outAt': null,
+          'clockOutAt': null,
+          'outLoc': null,
+          'clockOutLoc': null,
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
+
+        if (reason != null) {
+          updateData['lateReason'] = reason;
+        }
+
+        // Update attendance day
+        transaction.set(dayRef, updateData, SetOptions(merge: true));
+
+        // Create audit event
+        Map<String, dynamic> eventMeta = {
+          'adminId': adminUid,
+          'action': 'mark_absent',
+          'targetDate': yyyyMMdd,
+        };
+
+        if (reason != null) {
+          eventMeta['reason'] = reason;
+        }
+
+        transaction.set(eventRef, {
+          'type': 'admin_action',
+          'at': FieldValue.serverTimestamp(),
+          'meta': eventMeta,
+        });
+      });
+    } catch (e) {
+      throw Exception('Failed to mark student absent: $e');
+    }
+  }
+
+  /// Admin edits the late reason for a student's attendance
+  static Future<void> adminEditLateReason(
+    String adminUid,
+    String targetUid,
+    String yyyyMMdd,
+    String lateReason,
+  ) async {
+    try {
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        // Reference to the attendance day document
+        final dayRef = FirebaseFirestore.instance
+            .collection('attendance')
+            .doc(targetUid)
+            .collection('days')
+            .doc(yyyyMMdd);
+
+        // Reference to the event document
+        final eventRef = FirebaseFirestore.instance
+            .collection('attendance')
+            .doc(targetUid)
+            .collection('events')
+            .doc();
+
+        // Update late reason
+        transaction.set(dayRef, {
+          'lateReason': lateReason,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        // Create audit event
+        transaction.set(eventRef, {
+          'type': 'admin_action',
+          'at': FieldValue.serverTimestamp(),
+          'meta': {
+            'adminId': adminUid,
+            'action': 'edit_late_reason',
+            'targetDate': yyyyMMdd,
+            'reason': lateReason,
+          },
+        });
+      });
+    } catch (e) {
+      throw Exception('Failed to edit late reason: $e');
+    }
+  }
+
+  /// Check if current user is admin
+  static Future<bool> isCurrentUserAdmin() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      return userDoc.data()?['role'] == 'admin';
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Get students for admin panel
+  static Stream<QuerySnapshot> getStudentsStream() {
+    return FirebaseFirestore.instance
+        .collection('users')
+        .orderBy('lastName', descending: false)
+        .snapshots();
+  }
+
+  /// Get attendance data for a student within date range
+  static Stream<QuerySnapshot> getStudentAttendanceStream(
+    String studentUid,
+    DateTime startDate,
+    DateTime endDate,
+  ) {
+    final startDateStr = _formatDateAdmin(startDate);
+    final endDateStr = _formatDateAdmin(endDate);
+
+    return FirebaseFirestore.instance
+        .collection('attendance')
+        .doc(studentUid)
+        .collection('days')
+        .where('dayId', isGreaterThanOrEqualTo: startDateStr)
+        .where('dayId', isLessThanOrEqualTo: endDateStr)
+        .orderBy('dayId')
+        .snapshots();
+  }
+
+  /// Helper method to format date as YYYYMMDD for admin functions
+  static String _formatDateAdmin(DateTime date) {
+    return '${date.year}${date.month.toString().padLeft(2, '0')}${date.day.toString().padLeft(2, '0')}';
+  }
+
+  /// Get today's date as YYYYMMDD string
+  static String getTodayString() {
+    return _formatDateAdmin(DateTime.now());
+  }
+
   /* ----- mutations ----- */
 
   /// Clock In
@@ -231,9 +445,13 @@ class AttendanceService {
         'dayId': JmTime.dateId(ts),
         'status': status, // 'early'|'late'|'absent'|'in_progress'
         'inAt': Timestamp.fromDate(ts),
+        'clockInAt': Timestamp.fromDate(ts), // backward compatibility
         'inLoc': {'lat': lat, 'lng': lng},
+        'clockInLoc': {'lat': lat, 'lng': lng}, // backward compatibility
         'outAt': null,
+        'clockOutAt': null, // backward compatibility
         'outLoc': null,
+        'clockOutLoc': null, // backward compatibility
         'lateReason': status == 'late' ? (lateReason ?? '') : null,
         'createdAt': data?['createdAt'] ?? Timestamp.fromDate(ts),
         'updatedAt': Timestamp.fromDate(ts),
@@ -270,7 +488,9 @@ class AttendanceService {
 
       tx.update(ref, {
         'outAt': Timestamp.fromDate(ts),
+        'clockOutAt': Timestamp.fromDate(ts), // backward compatibility
         'outLoc': {'lat': lat, 'lng': lng},
+        'clockOutLoc': {'lat': lat, 'lng': lng}, // backward compatibility
         'updatedAt': Timestamp.fromDate(ts),
       });
     });
@@ -293,7 +513,9 @@ class AttendanceService {
       if (data?['inAt'] != null && data?['outAt'] == null) {
         tx.update(ref, {
           'outAt': Timestamp.fromDate(ts),
+          'clockOutAt': Timestamp.fromDate(ts), // backward compatibility
           'outLoc': {'lat': lat, 'lng': lng},
+          'clockOutLoc': {'lat': lat, 'lng': lng}, // backward compatibility
           'updatedAt': Timestamp.fromDate(ts),
         });
       }

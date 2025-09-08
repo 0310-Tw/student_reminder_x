@@ -612,34 +612,6 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                   SizedBox(height: 12),
 
-                  // Admin Dashboard Button
-                  FutureBuilder<bool>(
-                    future: AdminService.instance.isCurrentUserAdmin(),
-                    builder: (context, snapshot) {
-                      if (snapshot.data == true) {
-                        return Column(
-                          children: [
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: () {
-                                  Navigator.pushNamed(context, '/admin-nav');
-                                },
-                                icon: Icon(Icons.admin_panel_settings),
-                                label: Text('Admin Center'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red.shade700,
-                                  foregroundColor: Colors.white,
-                                ),
-                              ),
-                            ),
-                            SizedBox(height: 12),
-                          ],
-                        );
-                      }
-                      return SizedBox.shrink();
-                    },
-                  ),
 
                   SizedBox(
                     width: double.infinity,

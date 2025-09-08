@@ -1,5 +1,4 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:students_reminder/src/features/auth/login_page.dart';
 import 'package:students_reminder/src/features/home/home_page.dart';
@@ -9,8 +8,9 @@ import 'package:students_reminder/src/features/public_notes/public_notes_page.da
 import 'package:students_reminder/src/history/attendance_history.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/admin_service.dart';
-import 'package:students_reminder/src/admin/pages_screens/attendance_admin_page.dart';
-import 'package:students_reminder/src/services/notification_service.dart';
+import 'package:students_reminder/src/admin/pages/admin_home_page.dart';
+import 'package:students_reminder/src/admin/pages/admin_public_feeds.dart';
+import 'package:students_reminder/src/admin/pages/attendance_admin_page.dart';
 
 class MainLayoutPage extends StatefulWidget {
   const MainLayoutPage({super.key});
@@ -23,8 +23,96 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
   int _index = 0;
   bool _isAdmin = false;
   bool _isLoadingAdminStatus = true;
+  List<Widget> _pages = [];
 
-    final _pages = [const HomePage(), const MyNotesPage(), PublicFeeds(), AttendanceHistory14d(), const ProfilePage()];
+  @override
+  void initState() {
+    super.initState();
+    _checkAdminStatus();
+  }
+
+  Future<void> _checkAdminStatus() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final adminStatus = await AdminService.instance.isCurrentUserAdmin();
+        setState(() {
+          _isAdmin = adminStatus;
+          _isLoadingAdminStatus = false;
+          _updatePages();
+        });
+      } else {
+        setState(() {
+          _isLoadingAdminStatus = false;
+          _updatePages();
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isLoadingAdminStatus = false;
+        _updatePages();
+      });
+    }
+  }
+
+  void _updatePages() {
+    if (_isAdmin) {
+      _pages = [
+        const AdminHomePage(), // Users tab
+        const AdminPublicFeeds(), // Content tab
+        const AttendanceAdminPage(), // Attendance tab
+        const ProfilePage(), // Profile tab
+      ];
+    } else {
+      _pages = [
+        const HomePage(),
+        const MyNotesPage(),
+        PublicFeeds(),
+        AttendanceHistory14d(),
+        const ProfilePage(),
+      ];
+    }
+  }
+
+  List<NavigationDestination> _buildNavigationDestinations() {
+    if (_isAdmin) {
+      return [
+        const NavigationDestination(icon: Icon(Icons.people), label: 'Users'),
+        const NavigationDestination(
+          icon: Icon(Icons.content_copy),
+          label: 'Content',
+        ),
+        const NavigationDestination(
+          icon: Icon(Icons.assessment),
+          label: 'Attendance',
+        ),
+        const NavigationDestination(
+          icon: Icon(Icons.person_outline),
+          label: 'Profile',
+        ),
+      ];
+    } else {
+      return [
+        const NavigationDestination(icon: Icon(Icons.home), label: 'Home'),
+        const NavigationDestination(
+          icon: Icon(Icons.event_note),
+          label: 'Notes',
+        ),
+        const NavigationDestination(
+          icon: Icon(Icons.public),
+          label: 'Public Feeds',
+        ),
+        const NavigationDestination(
+          icon: Icon(Icons.history),
+          label: 'Attendance',
+        ),
+        const NavigationDestination(
+          icon: Icon(Icons.person_outline),
+          label: 'Profile',
+        ),
+      ];
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,23 +129,7 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
           body: _pages[_index],
           bottomNavigationBar: NavigationBar(
             selectedIndex: _index,
-            destinations: const [
-              NavigationDestination(icon: Icon(Icons.home), label: 'Home'),
-              NavigationDestination(
-                icon: Icon(Icons.event_note),
-                label: 'Notes',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.public),
-                label: 'public feeds'),
-              NavigationDestination(
-                icon: Icon(Icons.history),
-                label: 'Attendance'),
-              NavigationDestination(
-                icon: Icon(Icons.person_outline),
-                label: 'Profile',
-              ),
-            ],
+            destinations: _buildNavigationDestinations(),
             onDestinationSelected: (i) => setState(() => _index = i),
           ),
         );
