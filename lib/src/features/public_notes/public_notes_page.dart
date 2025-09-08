@@ -33,7 +33,7 @@ class _PublicFeedsState extends State<PublicFeeds> {
       status = "Early";
     } else if (now.isAfter(eightThirty) &&
         now.isBefore(DateTime(now.year, now.month, now.day, 16))) {
-      status = "Late";
+      status = "Late!";
       final reason = await _askLateReason();
       if (reason == null || reason.trim().isEmpty) {
         _showSnack("Late reason required.");
