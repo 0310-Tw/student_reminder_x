@@ -31,7 +31,8 @@ class _PublicFeedsState extends State<PublicFeeds> {
     String status;
     if (now.isAfter(eightAM) && now.isBefore(eightThirty)) {
       status = "Early";
-    } else if (now.isAfter(eightThirty) && now.isBefore(DateTime(now.year, now.month, now.day, 16))) {
+    } else if (now.isAfter(eightThirty) &&
+        now.isBefore(DateTime(now.year, now.month, now.day, 16))) {
       status = "Late";
       final reason = await _askLateReason();
       if (reason == null || reason.trim().isEmpty) {
@@ -46,14 +47,15 @@ class _PublicFeedsState extends State<PublicFeeds> {
 
     // 🔥 Save to Firestore here if needed
     await FirebaseFirestore.instance.collection('attendance').add({
-  'uid': uid,
-  'clockInAt': Timestamp.now(),
-  'location': GeoPoint(location.latitude, location.longitude),
-  'status': status,
-});
+      'uid': uid,
+      'clockInAt': Timestamp.now(),
+      'location': GeoPoint(location.latitude, location.longitude),
+      'status': status,
+    });
 
-
-    _showSnack("Clocked in: $status at ${location.latitude}, ${location.longitude}");
+    _showSnack(
+      "Clocked in: $status at ${location.latitude}, ${location.longitude}",
+    );
   }
 
   Future<Position> _getLocation() async {
@@ -61,14 +63,18 @@ class _PublicFeedsState extends State<PublicFeeds> {
     if (!serviceEnabled) throw 'Location services disabled';
 
     LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
       permission = await Geolocator.requestPermission();
-      if (permission != LocationPermission.whileInUse && permission != LocationPermission.always) {
+      if (permission != LocationPermission.whileInUse &&
+          permission != LocationPermission.always) {
         throw 'Location permission denied';
       }
     }
 
-    return await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    return await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
   }
 
   Future<String?> _askLateReason() async {
@@ -83,8 +89,14 @@ class _PublicFeedsState extends State<PublicFeeds> {
           decoration: InputDecoration(hintText: 'Why are you late?'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel')),
-          ElevatedButton(onPressed: () => Navigator.pop(ctx, reason), child: Text('Submit.')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, reason),
+            child: Text('Submit.'),
+          ),
         ],
       ),
     );
@@ -103,11 +115,19 @@ class _PublicFeedsState extends State<PublicFeeds> {
         content: TextField(
           autofocus: true,
           onChanged: (value) => reason = value,
-          decoration: InputDecoration(hintText: 'Why are you reporting this note?'),
+          decoration: InputDecoration(
+            hintText: 'Why are you reporting this note?',
+          ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel')),
-          ElevatedButton(onPressed: () => Navigator.pop(ctx, reason), child: Text('Submit')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, reason),
+            child: Text('Submit'),
+          ),
         ],
       ),
     );
@@ -147,7 +167,9 @@ class _PublicFeedsState extends State<PublicFeeds> {
                 final docs = snap.data!.docs;
                 if (docs.isEmpty) {
                   return const Center(
-                    child: Text('No notes to show. Click the + button to add a note.'),
+                    child: Text(
+                      'No notes to show. Click the + button to add a note.',
+                    ),
                   );
                 }
 
@@ -164,7 +186,9 @@ class _PublicFeedsState extends State<PublicFeeds> {
                     final body = (data['body'] ?? '').toString();
 
                     final likes = (data['likesCount'] ?? 0) as int;
-                    final likedBy = Map<String, dynamic>.from(data['likedBy'] ?? const {});
+                    final likedBy = Map<String, dynamic>.from(
+                      data['likedBy'] ?? const {},
+                    );
                     final bool isLiked = likedBy[uid] == true;
 
                     return ListTile(
@@ -181,16 +205,22 @@ class _PublicFeedsState extends State<PublicFeeds> {
                           Text(likes.toString()),
                           IconButton(
                             tooltip: isLiked ? 'Unlike' : 'Like',
-                            icon: Icon(isLiked ? Icons.favorite : Icons.favorite_border),
+                            icon: Icon(
+                              isLiked ? Icons.favorite : Icons.favorite_border,
+                            ),
                             onPressed: () {
-                              NotesService.instance.toggleLike(noteRef: ref, uid: uid);
+                              NotesService.instance.toggleLike(
+                                noteRef: ref,
+                                uid: uid,
+                              );
                             },
                           ),
                           PopupMenuButton<String>(
                             onSelected: (v) async {
                               if (v == 'report') {
                                 final reason = await askReportReason(context);
-                                if (reason != null && reason.trim().isNotEmpty) {
+                                if (reason != null &&
+                                    reason.trim().isNotEmpty) {
                                   await NotesService.instance.reportNote(
                                     noteRef: ref,
                                     uid: uid,
@@ -199,14 +229,23 @@ class _PublicFeedsState extends State<PublicFeeds> {
                                   _showSnack('Thanks — report submitted.');
                                 }
                               } else if (v == 'unreport') {
-                                await NotesService.instance.unreportNote(noteRef: ref, uid: uid);
+                                await NotesService.instance.unreportNote(
+                                  noteRef: ref,
+                                  uid: uid,
+                                );
                                 _showSnack('Your report was removed.');
                               }
                             },
                             itemBuilder: (BuildContext context) {
                               return const [
-                                PopupMenuItem(value: 'report', child: Text('Report')),
-                                PopupMenuItem(value: 'unreport', child: Text('Undo report')),
+                                PopupMenuItem(
+                                  value: 'report',
+                                  child: Text('Report'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'unreport',
+                                  child: Text('Undo report'),
+                                ),
                               ];
                             },
                           ),
