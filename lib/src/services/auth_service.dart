@@ -51,8 +51,21 @@ class AuthService {
 
   //Logout CODE
   Future<void> logout() async {
-    await _auth.signOut();
-    await SessionManager.clear();
+    try {
+      // Clear session first to prevent race conditions
+      await SessionManager.clear();
+      // Then sign out from Firebase
+      await _auth.signOut();
+    } catch (e) {
+      print('Error during logout: $e');
+      // Ensure we still sign out even if session clearing fails
+      try {
+        await _auth.signOut();
+      } catch (signOutError) {
+        print('Error signing out: $signOutError');
+        rethrow;
+      }
+    }
   }
 
   // Password Reset CODE

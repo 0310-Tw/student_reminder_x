@@ -206,16 +206,39 @@ class AttendanceService {
   static Future<void> adminMarkPresent(
     String adminUid,
     String targetUid,
-    String yyyyMMdd,
+    String dateId, // Changed from yyyyMMdd to dateId (YYYY-MM-DD format)
   ) async {
     try {
+      // Get admin and target user info for notifications
+      final adminUserDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(adminUid)
+          .get();
+
+      final targetUserDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(targetUid)
+          .get();
+
+      final adminData = adminUserDoc.data() ?? {};
+      final targetData = targetUserDoc.data() ?? {};
+
+      final adminName =
+          '${adminData['firstName'] ?? ''} ${adminData['lastName'] ?? ''}'
+              .trim();
+      final adminEmail = adminData['email'] ?? 'Admin';
+      final targetName =
+          '${targetData['firstName'] ?? ''} ${targetData['lastName'] ?? ''}'
+              .trim();
+      final targetEmail = targetData['email'] ?? '';
+
       await FirebaseFirestore.instance.runTransaction((transaction) async {
         // Reference to the attendance day document
         final dayRef = FirebaseFirestore.instance
             .collection('attendance')
             .doc(targetUid)
             .collection('days')
-            .doc(yyyyMMdd);
+            .doc(dateId);
 
         // Reference to the event document
         final eventRef = FirebaseFirestore.instance
@@ -225,9 +248,22 @@ class AttendanceService {
             .doc();
 
         // Update attendance day with merge option to preserve existing fields
+        // Include check-in information to reflect as if user checked in
+        final checkInTime = JmTime.onDate(DateTime.parse(dateId), 8, 0); // Default to 8:00 AM for admin-marked attendance
+        
         transaction.set(dayRef, {
-          'dayId': yyyyMMdd,
+          'dayId': dateId,
           'status': 'present',
+          'clockInTiming': 'early', // Admin-marked attendance is considered on-time
+          'inAt': Timestamp.fromDate(checkInTime),
+          'clockInAt': Timestamp.fromDate(checkInTime), // backward compatibility
+          'inLoc': {'lat': 0.0, 'lng': 0.0}, // Default location for admin-marked
+          'clockInLoc': {'lat': 0.0, 'lng': 0.0}, // backward compatibility
+          'adminMarked': true,
+          'markedByAdmin': adminUid,
+          'markedByAdminEmail': adminEmail,
+          'markedByAdminName': adminName,
+          'markedAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
 
@@ -237,10 +273,40 @@ class AttendanceService {
           'at': FieldValue.serverTimestamp(),
           'meta': {
             'adminId': adminUid,
+            'adminName': adminName,
+            'adminEmail': adminEmail,
             'action': 'mark_present',
-            'targetDate': yyyyMMdd,
+            'targetDate': dateId,
+            'targetUserId': targetUid,
+            'targetUserName': targetName,
+            'targetUserEmail': targetEmail,
           },
         });
+      });
+
+      // Send notification to the user after successful update
+      await _sendAdminActionNotification(
+        targetUid: targetUid,
+        adminUid: adminUid,
+        action: 'marked_present',
+        title: 'Attendance Updated',
+        body:
+            'Your attendance for $dateId has been marked as Present by admin ($adminName)',
+        dateId: dateId,
+      );
+
+      // Log comprehensive admin action for audit trail
+      await FirebaseFirestore.instance.collection('adminActions').add({
+        'action': 'mark_present',
+        'adminId': adminUid,
+        'adminName': adminName,
+        'adminEmail': adminEmail,
+        'targetUserId': targetUid,
+        'targetUserName': targetName,
+        'targetUserEmail': targetEmail,
+        'attendanceDate': dateId,
+        'timestamp': FieldValue.serverTimestamp(),
+        'details': 'Admin manually marked user as present for $dateId',
       });
     } catch (e) {
       throw Exception('Failed to mark student present: $e');
@@ -251,17 +317,40 @@ class AttendanceService {
   static Future<void> adminMarkAbsent(
     String adminUid,
     String targetUid,
-    String yyyyMMdd, {
+    String dateId, {
     String? reason,
   }) async {
     try {
+      // Get admin and target user info for notifications
+      final adminUserDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(adminUid)
+          .get();
+
+      final targetUserDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(targetUid)
+          .get();
+
+      final adminData = adminUserDoc.data() ?? {};
+      final targetData = targetUserDoc.data() ?? {};
+
+      final adminName =
+          '${adminData['firstName'] ?? ''} ${adminData['lastName'] ?? ''}'
+              .trim();
+      final adminEmail = adminData['email'] ?? 'Admin';
+      final targetName =
+          '${targetData['firstName'] ?? ''} ${targetData['lastName'] ?? ''}'
+              .trim();
+      final targetEmail = targetData['email'] ?? '';
+
       await FirebaseFirestore.instance.runTransaction((transaction) async {
         // Reference to the attendance day document
         final dayRef = FirebaseFirestore.instance
             .collection('attendance')
             .doc(targetUid)
             .collection('days')
-            .doc(yyyyMMdd);
+            .doc(dateId);
 
         // Reference to the event document
         final eventRef = FirebaseFirestore.instance
@@ -272,8 +361,13 @@ class AttendanceService {
 
         // Prepare update data
         Map<String, dynamic> updateData = {
-          'dayId': yyyyMMdd,
+          'dayId': dateId,
           'status': 'absent',
+          'adminMarked': true,
+          'markedByAdmin': adminUid,
+          'markedByAdminEmail': adminEmail,
+          'markedByAdminName': adminName,
+          'markedAt': FieldValue.serverTimestamp(),
           'inAt': null,
           'clockInAt': null,
           'inLoc': null,
@@ -287,6 +381,7 @@ class AttendanceService {
 
         if (reason != null) {
           updateData['lateReason'] = reason;
+          updateData['absentReason'] = reason;
         }
 
         // Update attendance day
@@ -295,8 +390,13 @@ class AttendanceService {
         // Create audit event
         Map<String, dynamic> eventMeta = {
           'adminId': adminUid,
+          'adminName': adminName,
+          'adminEmail': adminEmail,
           'action': 'mark_absent',
-          'targetDate': yyyyMMdd,
+          'targetDate': dateId,
+          'targetUserId': targetUid,
+          'targetUserName': targetName,
+          'targetUserEmail': targetEmail,
         };
 
         if (reason != null) {
@@ -309,6 +409,35 @@ class AttendanceService {
           'meta': eventMeta,
         });
       });
+
+      // Send notification to the user after successful update
+      final reasonText = reason != null ? ' Reason: $reason' : '';
+      await _sendAdminActionNotification(
+        targetUid: targetUid,
+        adminUid: adminUid,
+        action: 'marked_absent',
+        title: 'Attendance Updated',
+        body:
+            'Your attendance for $dateId has been marked as Absent by admin ($adminName).$reasonText',
+        dateId: dateId,
+      );
+
+      // Log comprehensive admin action for audit trail
+      await FirebaseFirestore.instance.collection('adminActions').add({
+        'action': 'mark_absent',
+        'adminId': adminUid,
+        'adminName': adminName,
+        'adminEmail': adminEmail,
+        'targetUserId': targetUid,
+        'targetUserName': targetName,
+        'targetUserEmail': targetEmail,
+        'attendanceDate': dateId,
+        'reason': reason,
+        'timestamp': FieldValue.serverTimestamp(),
+        'details': reason != null
+            ? 'Admin manually marked user as absent for $dateId with reason: $reason'
+            : 'Admin manually marked user as absent for $dateId',
+      });
     } catch (e) {
       throw Exception('Failed to mark student absent: $e');
     }
@@ -318,17 +447,40 @@ class AttendanceService {
   static Future<void> adminEditLateReason(
     String adminUid,
     String targetUid,
-    String yyyyMMdd,
+    String dateId,
     String lateReason,
   ) async {
     try {
+      // Get admin and target user info for notifications
+      final adminUserDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(adminUid)
+          .get();
+
+      final targetUserDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(targetUid)
+          .get();
+
+      final adminData = adminUserDoc.data() ?? {};
+      final targetData = targetUserDoc.data() ?? {};
+
+      final adminName =
+          '${adminData['firstName'] ?? ''} ${adminData['lastName'] ?? ''}'
+              .trim();
+      final adminEmail = adminData['email'] ?? 'Admin';
+      final targetName =
+          '${targetData['firstName'] ?? ''} ${targetData['lastName'] ?? ''}'
+              .trim();
+      final targetEmail = targetData['email'] ?? '';
+
       await FirebaseFirestore.instance.runTransaction((transaction) async {
         // Reference to the attendance day document
         final dayRef = FirebaseFirestore.instance
             .collection('attendance')
             .doc(targetUid)
             .collection('days')
-            .doc(yyyyMMdd);
+            .doc(dateId);
 
         // Reference to the event document
         final eventRef = FirebaseFirestore.instance
@@ -337,9 +489,12 @@ class AttendanceService {
             .collection('events')
             .doc();
 
-        // Update late reason
+        // Update late reason with admin tracking
         transaction.set(dayRef, {
           'lateReason': lateReason,
+          'lateReasonEditedBy': adminUid,
+          'lateReasonEditedByName': adminName,
+          'lateReasonEditedAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
 
@@ -349,11 +504,42 @@ class AttendanceService {
           'at': FieldValue.serverTimestamp(),
           'meta': {
             'adminId': adminUid,
+            'adminName': adminName,
+            'adminEmail': adminEmail,
             'action': 'edit_late_reason',
-            'targetDate': yyyyMMdd,
+            'targetDate': dateId,
+            'targetUserId': targetUid,
+            'targetUserName': targetName,
+            'targetUserEmail': targetEmail,
             'reason': lateReason,
           },
         });
+      });
+
+      // Send notification to the user after successful update
+      await _sendAdminActionNotification(
+        targetUid: targetUid,
+        adminUid: adminUid,
+        action: 'edited_late_reason',
+        title: 'Late Reason Updated',
+        body:
+            'Your late reason for $dateId has been updated by admin ($adminName): $lateReason',
+        dateId: dateId,
+      );
+
+      // Log comprehensive admin action for audit trail
+      await FirebaseFirestore.instance.collection('adminActions').add({
+        'action': 'edit_late_reason',
+        'adminId': adminUid,
+        'adminName': adminName,
+        'adminEmail': adminEmail,
+        'targetUserId': targetUid,
+        'targetUserName': targetName,
+        'targetUserEmail': targetEmail,
+        'attendanceDate': dateId,
+        'newLateReason': lateReason,
+        'timestamp': FieldValue.serverTimestamp(),
+        'details': 'Admin edited late reason for $dateId to: $lateReason',
       });
     } catch (e) {
       throw Exception('Failed to edit late reason: $e');
@@ -390,8 +576,9 @@ class AttendanceService {
     DateTime startDate,
     DateTime endDate,
   ) {
-    final startDateStr = _formatDateAdmin(startDate);
-    final endDateStr = _formatDateAdmin(endDate);
+    // Use JmTime.dateId format (YYYY-MM-DD) to match how attendance is stored
+    final startDateStr = JmTime.dateId(startDate);
+    final endDateStr = JmTime.dateId(endDate);
 
     return FirebaseFirestore.instance
         .collection('attendance')
@@ -403,9 +590,9 @@ class AttendanceService {
         .snapshots();
   }
 
-  /// Helper method to format date as YYYYMMDD for admin functions
+  /// Helper method to format date as YYYY-MM-DD for admin functions (matching JmTime.dateId)
   static String _formatDateAdmin(DateTime date) {
-    return '${date.year}${date.month.toString().padLeft(2, '0')}${date.day.toString().padLeft(2, '0')}';
+    return JmTime.dateId(date);
   }
 
   /// Get today's date as YYYYMMDD string
@@ -440,10 +627,11 @@ class AttendanceService {
         throw StateError('Already clocked in.');
       }
 
-      final status = statusFromClockIn(ts);
+      final clockInTiming = statusFromClockIn(ts);
       final write = <String, dynamic>{
         'dayId': JmTime.dateId(ts),
-        'status': status, // 'early'|'late'|'absent'|'in_progress'
+        'status': 'present', // Mark as present when user checks in
+        'clockInTiming': clockInTiming, // Keep timing info ('early'|'late')
         'inAt': Timestamp.fromDate(ts),
         'clockInAt': Timestamp.fromDate(ts), // backward compatibility
         'inLoc': {'lat': lat, 'lng': lng},
@@ -452,7 +640,7 @@ class AttendanceService {
         'clockOutAt': null, // backward compatibility
         'outLoc': null,
         'clockOutLoc': null, // backward compatibility
-        'lateReason': status == 'late' ? (lateReason ?? '') : null,
+        'lateReason': clockInTiming == 'late' ? (lateReason ?? '') : null,
         'createdAt': data?['createdAt'] ?? Timestamp.fromDate(ts),
         'updatedAt': Timestamp.fromDate(ts),
       };
@@ -544,6 +732,60 @@ class AttendanceService {
         'createdAt': Timestamp.fromDate(ts),
         'updatedAt': Timestamp.fromDate(ts),
       });
+    }
+  }
+
+  /// Send notification to user for admin actions on their attendance
+  static Future<void> _sendAdminActionNotification({
+    required String targetUid,
+    required String adminUid,
+    required String action,
+    required String title,
+    required String body,
+    String? dateId,
+  }) async {
+    try {
+      // Get user's FCM token from their user document
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(targetUid)
+          .get();
+
+      if (userDoc.exists) {
+        final userData = userDoc.data()!;
+        final fcmToken = userData['fcmToken'];
+
+        // Try to send push notification if FCM token exists
+        if (fcmToken != null && fcmToken.toString().isNotEmpty) {
+          try {
+            // TODO: Implement push notification when NotificationService is available
+            print('Would send push notification: $title - $body');
+          } catch (e) {
+            print('Push notification failed: $e');
+          }
+        }
+
+        // Always add to user's notifications subcollection for in-app notifications
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(targetUid)
+            .collection('notifications')
+            .add({
+              'title': title,
+              'body': body,
+              'type': 'attendance_update',
+              'priority': 'normal',
+              'read': false,
+              'actionBy': adminUid,
+              'action': action,
+              'attendanceDate': dateId,
+              'createdAt': FieldValue.serverTimestamp(),
+            });
+
+        print('In-app notification stored for user $targetUid');
+      }
+    } catch (e) {
+      print('Error sending admin action notification: $e');
     }
   }
 }

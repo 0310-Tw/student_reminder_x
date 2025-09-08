@@ -1,4 +1,5 @@
 // file: lib/src/admin/pages/attendance_admin_page.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -17,18 +18,56 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
   bool _isAdmin = false;
   bool _isLoading = true;
 
+  // Real-time synchronization
+  StreamSubscription<QuerySnapshot>? _attendanceSubscription;
+  Map<String, Map<String, dynamic>> _attendanceCache = {};
+
   @override
   void initState() {
     super.initState();
     _checkAdminRole();
   }
 
+  @override
+  void dispose() {
+    _attendanceSubscription?.cancel();
+    super.dispose();
+  }
+
   Future<void> _checkAdminRole() async {
     final isAdmin = await AttendanceService.isCurrentUserAdmin();
-    setState(() {
-      _isAdmin = isAdmin;
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _isAdmin = isAdmin;
+        _isLoading = false;
+      });
+
+      if (_isAdmin) {
+        _setupRealTimeSync();
+      }
+    }
+  }
+
+  void _setupRealTimeSync() {
+    // Listen to all attendance records for real-time updates
+    _attendanceSubscription = FirebaseFirestore.instance
+        .collection('attendance')
+        .snapshots()
+        .listen((snapshot) {
+          if (mounted) {
+            // Update the cache with new data
+            for (final change in snapshot.docChanges) {
+              final doc = change.doc;
+              final data = doc.data();
+              if (data != null) {
+                _attendanceCache[doc.id] = data;
+              }
+            }
+
+            // Refresh the UI
+            setState(() {});
+          }
+        });
   }
 
   @override
@@ -102,36 +141,6 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
         backgroundColor: Color(0xFF1A237E), // Deep indigo
         foregroundColor: Colors.white,
         elevation: 2,
-        actions: [
-          Container(
-            margin: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(
-              color: Color(0xFFE3F2FD), // Light blue background
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Color(0xFF1976D2), width: 1),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.admin_panel_settings,
-                  size: 16,
-                  color: Color(0xFF1976D2),
-                ),
-                SizedBox(width: 4),
-                Text(
-                  'ADMIN',
-                  style: TextStyle(
-                    color: Color(0xFF1976D2),
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
       backgroundColor: Color(0xFFF8F9FA), // Light gray background
       body: Column(
@@ -154,46 +163,6 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                   color: Colors.black.withOpacity(0.1),
                   blurRadius: 4,
                   offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.event_available,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Attendance Management',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Monitor student attendance records',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ],
             ),
@@ -406,8 +375,9 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     final data = doc?.data() as Map<String, dynamic>? ?? {};
     final dateStr = _formatDateString(date);
     final status = data['status'] ?? 'not_marked';
-    final clockInAt = data['clockInAt'] as Timestamp?;
-    final clockOutAt = data['clockOutAt'] as Timestamp?;
+    // Check both new format (inAt) and backward compatibility (clockInAt)
+    final clockInAt = (data['inAt'] ?? data['clockInAt']) as Timestamp?;
+    final clockOutAt = (data['outAt'] ?? data['clockOutAt']) as Timestamp?;
     final lateReason = data['lateReason'] as String?;
 
     return Container(
@@ -426,7 +396,10 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                   _formatDisplayDate(date),
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
-                _buildStatusChip(status),
+                _buildStatusChip(
+                  status,
+                  isRealTime: _attendanceSubscription != null,
+                ),
               ],
             ),
           ),
@@ -446,9 +419,26 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                     style: const TextStyle(fontSize: 12),
                   ),
                 if (lateReason != null)
-                  Text(
-                    'Reason: $lateReason',
-                    style: const TextStyle(fontSize: 12, color: Colors.orange),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Reason: $lateReason',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.orange,
+                        ),
+                      ),
+                      if (data['lateReasonEditedBy'] != null)
+                        Text(
+                          'Edited by: ${data['lateReasonEditedByName'] ?? 'Admin'}',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.purple,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                    ],
                   ),
               ],
             ),
@@ -493,7 +483,9 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                           _editLateReason(studentUid, dateStr, lateReason),
                       tooltip: 'Edit Reason',
                     ),
-                    if (data['clockInLoc'] != null ||
+                    if (data['inLoc'] != null ||
+                        data['outLoc'] != null ||
+                        data['clockInLoc'] != null ||
                         data['clockOutLoc'] != null)
                       IconButton(
                         icon: const Icon(
@@ -514,36 +506,71 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     );
   }
 
-  Widget _buildStatusChip(String status) {
+  Widget _buildStatusChip(String status, {bool isRealTime = false}) {
     Color color;
     String label;
+    IconData? icon;
 
     switch (status) {
       case 'present':
         color = Colors.green;
         label = 'Present';
+        icon = Icons.check_circle;
         break;
       case 'late':
         color = Colors.orange;
         label = 'Late';
+        icon = Icons.schedule;
         break;
       case 'early':
         color = Colors.blue;
         label = 'Early';
+        icon = Icons.fast_forward;
         break;
       case 'absent':
         color = Colors.red;
         label = 'Absent';
+        icon = Icons.cancel;
         break;
       default:
         color = Colors.grey;
         label = 'Not Marked';
+        icon = Icons.help_outline;
     }
 
-    return Chip(
-      label: Text(label, style: const TextStyle(fontSize: 12)),
-      backgroundColor: color.withOpacity(0.2),
-      labelStyle: TextStyle(color: color),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: color,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          if (isRealTime) ...[
+            const SizedBox(width: 4),
+            Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: Colors.green,
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -576,7 +603,9 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
       if (user == null) return;
 
       await AttendanceService.adminMarkPresent(user.uid, studentUid, dateStr);
-      _showSuccessSnackBar('Student marked as present');
+      _showSuccessSnackBar(
+        '✅ Student marked as present for $dateStr and notified',
+      );
     } catch (e) {
       _showErrorSnackBar('Failed to mark present: $e');
     }
@@ -628,7 +657,9 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
         dateStr,
         reason: reasonController.text.isNotEmpty ? reasonController.text : null,
       );
-      _showSuccessSnackBar('Student marked as absent');
+      _showSuccessSnackBar(
+        '✅ Student marked as absent for $dateStr and notified',
+      );
     } catch (e) {
       _showErrorSnackBar('Failed to mark absent: $e');
     }
@@ -677,55 +708,192 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
         dateStr,
         reasonController.text,
       );
-      _showSuccessSnackBar('Late reason updated');
+      _showSuccessSnackBar('✅ Late reason updated and user notified');
     } catch (e) {
       _showErrorSnackBar('Failed to update reason: $e');
     }
   }
 
   Future<void> _showLocationMap(Map<String, dynamic> data) async {
-    final clockInLoc = data['clockInLoc'] as GeoPoint?;
-    final clockOutLoc = data['clockOutLoc'] as GeoPoint?;
+    // Handle both new format (inLoc) and backward compatibility (clockInLoc)
+    dynamic clockInLocData = data['inLoc'] ?? data['clockInLoc'];
+    dynamic clockOutLocData = data['outLoc'] ?? data['clockOutLoc'];
+
+    // Convert location data to GeoPoint if it's in map format
+    GeoPoint? clockInLoc;
+    GeoPoint? clockOutLoc;
+
+    if (clockInLocData != null) {
+      if (clockInLocData is GeoPoint) {
+        clockInLoc = clockInLocData;
+      } else if (clockInLocData is Map) {
+        final lat = clockInLocData['lat']?.toDouble();
+        final lng = clockInLocData['lng']?.toDouble();
+        if (lat != null && lng != null) {
+          clockInLoc = GeoPoint(lat, lng);
+        }
+      }
+    }
+
+    if (clockOutLocData != null) {
+      if (clockOutLocData is GeoPoint) {
+        clockOutLoc = clockOutLocData;
+      } else if (clockOutLocData is Map) {
+        final lat = clockOutLocData['lat']?.toDouble();
+        final lng = clockOutLocData['lng']?.toDouble();
+        if (lat != null && lng != null) {
+          clockOutLoc = GeoPoint(lat, lng);
+        }
+      }
+    }
+
+    final clockInTime = data['inAt'] ?? data['clockInAt'] ?? data['clockIn'];
+    final clockOutTime =
+        data['outAt'] ?? data['clockOutAt'] ?? data['clockOut'];
+    final lateReason = data['lateReason'] as String?;
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Attendance Locations'),
+        title: const Row(
+          children: [
+            Icon(Icons.location_on, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Attendance Location Details'),
+          ],
+        ),
         content: SizedBox(
           width: double.maxFinite,
-          height: 300,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (clockInLoc != null) ...[
-                const Text(
-                  'Clock In Location:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                Text('Latitude: ${clockInLoc.latitude}'),
-                Text('Longitude: ${clockInLoc.longitude}'),
-                const SizedBox(height: 16),
+          height: 400,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (clockInLoc != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.green.shade200),
+                    ),
+                    width: double.infinity,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.login, color: Colors.green, size: 16),
+                            SizedBox(width: 4),
+                            Text(
+                              'Clock In Location:',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text('📍 Coordinates:'),
+                        Text(
+                          '   Latitude: ${clockInLoc.latitude.toStringAsFixed(6)}',
+                        ),
+                        Text(
+                          '   Longitude: ${clockInLoc.longitude.toStringAsFixed(6)}',
+                        ),
+                        if (clockInTime != null) ...[
+                          const SizedBox(height: 4),
+                          Text('🕐 Time: ${_formatTimestamp(clockInTime)}'),
+                        ],
+                        if (lateReason != null && lateReason.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text('📝 Late Reason: $lateReason'),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                if (clockOutLoc != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.shade200),
+                    ),
+                    width: double.infinity,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.logout, color: Colors.orange, size: 16),
+                            SizedBox(width: 4),
+                            Text(
+                              'Clock Out Location:',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text('📍 Coordinates:'),
+                        Text(
+                          '   Latitude: ${clockOutLoc.latitude.toStringAsFixed(6)}',
+                        ),
+                        Text(
+                          '   Longitude: ${clockOutLoc.longitude.toStringAsFixed(6)}',
+                        ),
+                        if (clockOutTime != null) ...[
+                          const SizedBox(height: 4),
+                          Text('🕐 Time: ${_formatTimestamp(clockOutTime)}'),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                if (clockInLoc == null && clockOutLoc == null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    width: double.infinity,
+                    child: const Column(
+                      children: [
+                        Icon(Icons.location_off, size: 48, color: Colors.grey),
+                        SizedBox(height: 8),
+                        Text(
+                          'No location data available',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          'This attendance record was created without location tracking.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+               
               ],
-              if (clockOutLoc != null) ...[
-                const Text(
-                  'Clock Out Location:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                Text('Latitude: ${clockOutLoc.latitude}'),
-                Text('Longitude: ${clockOutLoc.longitude}'),
-                const SizedBox(height: 16),
-              ],
-              const Text(
-                'Note: Install google_maps_flutter package to view locations on map.',
-                style: TextStyle(
-                  fontStyle: FontStyle.italic,
-                  color: Colors.grey,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
         actions: [
+          if (clockInLoc != null || clockOutLoc != null)
+            TextButton.icon(
+              onPressed: () {
+                final coords = clockInLoc ?? clockOutLoc!;
+                _showSuccessSnackBar(
+                  'Coordinates: ${coords.latitude.toStringAsFixed(6)}, ${coords.longitude.toStringAsFixed(6)}',
+                );
+              },
+              icon: const Icon(Icons.copy),
+              label: const Text('Copy Coords'),
+            ),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Close'),
@@ -733,6 +901,21 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
         ],
       ),
     );
+  }
+
+  String _formatTimestamp(dynamic timestamp) {
+    if (timestamp == null) return 'Unknown';
+
+    DateTime dateTime;
+    if (timestamp is Timestamp) {
+      dateTime = timestamp.toDate();
+    } else if (timestamp is DateTime) {
+      dateTime = timestamp;
+    } else {
+      return timestamp.toString();
+    }
+
+    return '${_formatDisplayDate(dateTime)} at ${_formatTime(dateTime)}';
   }
 
   Future<bool> _showConfirmationDialog(String title, String content) async {
@@ -794,7 +977,8 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
   }
 
   String _formatDateString(DateTime date) {
-    return '${date.year}${date.month.toString().padLeft(2, '0')}${date.day.toString().padLeft(2, '0')}';
+    // Use the same format as JmTime.dateId (YYYY-MM-DD)
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 
   String _formatTime(DateTime time) {

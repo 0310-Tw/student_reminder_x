@@ -25,36 +25,6 @@ class AdminPublicFeeds extends StatelessWidget {
         backgroundColor: Color(0xFF1A237E), // Deep indigo
         foregroundColor: Colors.white,
         elevation: 2,
-        actions: [
-          Container(
-            margin: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(
-              color: Color(0xFFE3F2FD), // Light blue background
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Color(0xFF1976D2), width: 1),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.admin_panel_settings,
-                  size: 16,
-                  color: Color(0xFF1976D2),
-                ),
-                SizedBox(width: 4),
-                Text(
-                  'ADMIN',
-                  style: TextStyle(
-                    color: Color(0xFF1976D2),
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
       body: Column(
         children: [
@@ -413,14 +383,19 @@ class AdminPublicFeeds extends StatelessWidget {
           break;
 
         case 'report':
-          final reason = await askReportReason(context);
-          if (reason != null && reason.trim().isNotEmpty) {
-            await NotesService.instance.reportNote(
-              noteRef: ref as DocumentReference<Map<String, dynamic>>,
-              uid: AuthService.instance.currentUser!.uid,
-              reason: reason.trim(),
-            );
-            displaySnackBar(context, 'Report submitted as admin');
+          final currentUser = AuthService.instance.currentUser;
+          if (currentUser != null) {
+            final reason = await askReportReason(context);
+            if (reason != null && reason.trim().isNotEmpty) {
+              await NotesService.instance.reportNote(
+                noteRef: ref as DocumentReference<Map<String, dynamic>>,
+                uid: currentUser.uid,
+                reason: reason.trim(),
+              );
+              displaySnackBar(context, 'Report submitted as admin');
+            }
+          } else {
+            displaySnackBar(context, 'Authentication required');
           }
           break;
 

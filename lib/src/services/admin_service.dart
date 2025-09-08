@@ -45,10 +45,15 @@ class AdminService {
     String status, {
     String? adminNotes,
   }) async {
+    final currentUser = AuthService.instance.currentUser;
+    if (currentUser == null) {
+      throw Exception('User not authenticated');
+    }
+
     final data = <String, dynamic>{
       'status': status,
       'reviewedAt': FieldValue.serverTimestamp(),
-      'reviewedBy': AuthService.instance.currentUser!.uid,
+      'reviewedBy': currentUser.uid,
     };
 
     if (adminNotes != null) {
@@ -78,10 +83,15 @@ class AdminService {
     String? reason,
     DateTime? until,
   }) async {
+    final currentUser = AuthService.instance.currentUser;
+    if (currentUser == null) {
+      throw Exception('User not authenticated');
+    }
+
     final data = <String, dynamic>{
       'status': 'suspended',
       'suspendedAt': FieldValue.serverTimestamp(),
-      'suspendedBy': AuthService.instance.currentUser!.uid,
+      'suspendedBy': currentUser.uid,
       'suspensionReason': reason,
     };
 
@@ -115,10 +125,15 @@ class AdminService {
 
   // Flag a user (warning level)
   Future<void> flagUser(String userId, String reason) async {
+    final currentUser = AuthService.instance.currentUser;
+    if (currentUser == null) {
+      throw Exception('User not authenticated');
+    }
+
     await _db.collection('users').doc(userId).update({
       'flagged': true,
       'flaggedAt': FieldValue.serverTimestamp(),
-      'flaggedBy': AuthService.instance.currentUser!.uid,
+      'flaggedBy': currentUser.uid,
       'flagReason': reason,
     });
 
@@ -234,6 +249,11 @@ class AdminService {
 
   // Flag a note
   Future<void> flagNote(String userId, String noteId, String reason) async {
+    final currentUser = AuthService.instance.currentUser;
+    if (currentUser == null) {
+      throw Exception('User not authenticated');
+    }
+
     await _db
         .collection('users')
         .doc(userId)
@@ -242,7 +262,7 @@ class AdminService {
         .update({
           'flagged': true,
           'flaggedAt': FieldValue.serverTimestamp(),
-          'flaggedBy': AuthService.instance.currentUser!.uid,
+          'flaggedBy': currentUser.uid,
           'flagReason': reason,
         });
 
@@ -256,6 +276,11 @@ class AdminService {
 
   // Suspend a note (hide from public view)
   Future<void> suspendNote(String userId, String noteId, String reason) async {
+    final currentUser = AuthService.instance.currentUser;
+    if (currentUser == null) {
+      throw Exception('User not authenticated');
+    }
+
     await _db
         .collection('users')
         .doc(userId)
@@ -264,7 +289,7 @@ class AdminService {
         .update({
           'suspended': true,
           'suspendedAt': FieldValue.serverTimestamp(),
-          'suspendedBy': AuthService.instance.currentUser!.uid,
+          'suspendedBy': currentUser.uid,
           'suspensionReason': reason,
           'visibility': 'private', // Force to private when suspended
         });
@@ -322,10 +347,15 @@ class AdminService {
     String actionType,
     Map<String, dynamic> details,
   ) async {
+    final currentUser = AuthService.instance.currentUser;
+    if (currentUser == null) {
+      throw Exception('User not authenticated');
+    }
+
     await _db.collection('adminActions').add({
       'actionType': actionType,
-      'adminId': AuthService.instance.currentUser!.uid,
-      'adminEmail': AuthService.instance.currentUser!.email,
+      'adminId': currentUser.uid,
+      'adminEmail': currentUser.email,
       'timestamp': FieldValue.serverTimestamp(),
       'details': details,
     });
@@ -361,12 +391,17 @@ class AdminService {
     String? description,
     Map<String, dynamic>? metadata,
   }) async {
+    final currentUser = AuthService.instance.currentUser;
+    if (currentUser == null) {
+      throw Exception('User not authenticated');
+    }
+
     await _db.collection('reports').add({
       'reportType': reportType,
       'targetId': targetId,
       'targetUserId': targetUserId,
-      'reporterId': AuthService.instance.currentUser!.uid,
-      'reporterEmail': AuthService.instance.currentUser!.email,
+      'reporterId': currentUser.uid,
+      'reporterEmail': currentUser.email,
       'reason': reason,
       'description': description,
       'metadata': metadata ?? {},
@@ -526,6 +561,11 @@ class AdminService {
         .collection('days')
         .doc(dateId);
 
+    final currentUser = AuthService.instance.currentUser;
+    if (currentUser == null) {
+      throw Exception('User not authenticated');
+    }
+
     await docRef.set({
       'dayId': dateId,
       'status': 'absent',
@@ -535,7 +575,7 @@ class AdminService {
       'outLoc': null,
       'lateReason': reason,
       'adminOverride': true,
-      'overrideBy': AuthService.instance.currentUser!.uid,
+      'overrideBy': currentUser.uid,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
@@ -555,11 +595,16 @@ class AdminService {
         .collection('days')
         .doc(dateId);
 
+    final currentUser = AuthService.instance.currentUser;
+    if (currentUser == null) {
+      throw Exception('User not authenticated');
+    }
+
     await docRef.update({
       'status': status,
       'lateReason': reason,
       'adminOverride': true,
-      'overrideBy': AuthService.instance.currentUser!.uid,
+      'overrideBy': currentUser.uid,
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }

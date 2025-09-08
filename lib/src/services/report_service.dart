@@ -14,12 +14,17 @@ class ReportService {
     required String reason,
     String? description,
   }) async {
+    final currentUser = AuthService.instance.currentUser;
+    if (currentUser == null) {
+      throw Exception('User not authenticated');
+    }
+
     await _db.collection('reports').add({
       'reportType': 'note',
       'targetId': noteId,
       'targetUserId': noteOwnerId,
-      'reporterId': AuthService.instance.currentUser!.uid,
-      'reporterEmail': AuthService.instance.currentUser!.email,
+      'reporterId': currentUser.uid,
+      'reporterEmail': currentUser.email,
       'reason': reason,
       'description': description,
       'status': 'pending',
@@ -34,12 +39,17 @@ class ReportService {
     required String reason,
     String? description,
   }) async {
+    final currentUser = AuthService.instance.currentUser;
+    if (currentUser == null) {
+      throw Exception('User not authenticated');
+    }
+
     await _db.collection('reports').add({
       'reportType': 'user',
       'targetId': userId,
       'targetUserId': userId,
-      'reporterId': AuthService.instance.currentUser!.uid,
-      'reporterEmail': AuthService.instance.currentUser!.email,
+      'reporterId': currentUser.uid,
+      'reporterEmail': currentUser.email,
       'reason': reason,
       'description': description,
       'status': 'pending',
@@ -55,12 +65,17 @@ class ReportService {
     String? targetUserId,
     Map<String, dynamic>? additionalData,
   }) async {
+    final currentUser = AuthService.instance.currentUser;
+    if (currentUser == null) {
+      throw Exception('User not authenticated');
+    }
+
     await _db.collection('reports').add({
       'reportType': 'behavior',
       'targetId': targetUserId ?? 'general',
       'targetUserId': targetUserId,
-      'reporterId': AuthService.instance.currentUser!.uid,
-      'reporterEmail': AuthService.instance.currentUser!.email,
+      'reporterId': currentUser.uid,
+      'reporterEmail': currentUser.email,
       'reason': reason,
       'description': description,
       'status': 'pending',
@@ -71,9 +86,14 @@ class ReportService {
 
   // Get user's own reports
   Stream<QuerySnapshot<Map<String, dynamic>>> getMyReports() {
+    final currentUser = AuthService.instance.currentUser;
+    if (currentUser == null) {
+      return const Stream.empty();
+    }
+
     return _db
         .collection('reports')
-        .where('reporterId', isEqualTo: AuthService.instance.currentUser!.uid)
+        .where('reporterId', isEqualTo: currentUser.uid)
         .orderBy('createdAt', descending: true)
         .snapshots();
   }

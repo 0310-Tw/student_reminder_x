@@ -34,24 +34,38 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
   Future<void> _checkAdminStatus() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final adminStatus = await AdminService.instance.isCurrentUserAdmin();
+
+      // Early exit if user is null or widget is not mounted
+      if (user == null || !mounted) {
+        if (mounted) {
+          setState(() {
+            _isAdmin = false;
+            _isLoadingAdminStatus = false;
+            _updatePages();
+          });
+        }
+        return;
+      }
+
+      final adminStatus = await AdminService.instance.isCurrentUserAdmin();
+
+      // Check again if widget is still mounted after async call
+      if (!mounted) return;
+
+      setState(() {
+        _isAdmin = adminStatus;
+        _isLoadingAdminStatus = false;
+        _updatePages();
+      });
+    } catch (e) {
+      print('Error checking admin status: $e');
+      if (mounted) {
         setState(() {
-          _isAdmin = adminStatus;
-          _isLoadingAdminStatus = false;
-          _updatePages();
-        });
-      } else {
-        setState(() {
+          _isAdmin = false;
           _isLoadingAdminStatus = false;
           _updatePages();
         });
       }
-    } catch (e) {
-      setState(() {
-        _isLoadingAdminStatus = false;
-        _updatePages();
-      });
     }
   }
 
