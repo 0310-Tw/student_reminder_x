@@ -25,12 +25,12 @@ class DefaultFirebaseOptions {
       case TargetPlatform.iOS:
         return ios;
       case TargetPlatform.macOS:
-        return macos;
-      case TargetPlatform.windows:
         throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
+          'DefaultFirebaseOptions have not been configured for macos - '
           'you can reconfigure this by running the FlutterFire CLI again.',
         );
+      case TargetPlatform.windows:
+        return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -61,15 +61,6 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyAqbuoXiEDUpRo_xG0_PSnudLkFfbaGrVk',
-    appId: '1:679398022451:ios:c678bafb7af4e62183b246',
-    messagingSenderId: '679398022451',
-    projectId: 'reminder-5cb70',
-    storageBucket: 'reminder-5cb70.firebasestorage.app',
-    iosBundleId: 'com.example.studentRemeinderApp',
-  );
-
-  static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyC_WShC-qKUCQe1RiuvOjXZforRk8OfvuE',
     appId: '1:562730922018:ios:5e009b8f62e42ce42d5a7b',
     messagingSenderId: '562730922018',
@@ -78,4 +69,12 @@ class DefaultFirebaseOptions {
     iosBundleId: 'com.example.studentRemeinderApp',
   );
 
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyCJHWjUJtZQjZjoZiWpQomrN0MVOicrVtk',
+    appId: '1:562730922018:windows:8fefad6d11fa775b2d5a7b',
+    messagingSenderId: '562730922018',
+    projectId: 'student-reminder-xx-16738',
+    authDomain: 'student-reminder-xx-16738.firebaseapp.com',
+    storageBucket: 'student-reminder-xx-16738.firebasestorage.app',
+  );
 }

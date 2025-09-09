@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:students_reminder/src/services/note_service.dart';
 import 'package:students_reminder/src/shared/misc.dart';
 import 'package:students_reminder/src/shared/validators_%20and_widgets.dart';
@@ -67,262 +68,320 @@ class _NoteEditorDialogState extends State<NoteEditorDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.9,
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        children: [
-          // Header
-          Row(
-            children: [
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: Icon(Icons.close),
-              ),
-              SizedBox(width: 8),
-              Text(
-                widget.noteId == null ? 'New Note' : 'Edit Note',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ],
-          ),
-          Divider(height: 3, color: Colors.grey[300]),
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.uid)
+          .snapshots(),
+      builder: (context, userSnapshot) {
+        // Check if user is suspended
+        if (userSnapshot.hasData) {
+          final userData = userSnapshot.data!.data() as Map<String, dynamic>?;
+          final isSuspended = userData?['status'] == 'suspended';
 
-          // Content
-          Expanded(
-            child: Padding(
-              padding: EdgeInsets.only(
-                left: 16,
-                right: 16,
-                top: 16,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+          if (isSuspended) {
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.4,
+              decoration: BoxDecoration(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
               ),
-              child: SingleChildScrollView(
-                child: Form(
-                  key: _globalKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      TextFormField(
-                        controller: _title,
-                        decoration: InputDecoration(
-                          labelText: 'Title',
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: validateNotEmpty,
-                      ),
-                      SizedBox(height: 16),
-                      LiveCharCounterTextField(
-                        controller: _body,
-                        labelText: 'Body',
-                        maxLines: 6,
-                        textInputAction: TextInputAction.newline,
-                        validator: validateNotEmpty,
-                        maxLength: 150,
-                      ),
-                      SizedBox(height: 16),
-                      // Tags Section
-                      Column(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.block, size: 64, color: Colors.red),
+                  SizedBox(height: 16),
+                  Text(
+                    'Access Restricted',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 24),
+                    child: Text(
+                      'Your account is suspended. You cannot create or edit notes.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                    ),
+                  ),
+                  SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text('Close'),
+                  ),
+                ],
+              ),
+            );
+          }
+        }
+
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.9,
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Header
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: Icon(Icons.close),
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    widget.noteId == null ? 'New Note' : 'Edit Note',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ],
+              ),
+              Divider(height: 3, color: Colors.grey[300]),
+
+              // Content
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    left: 16,
+                    right: 16,
+                    top: 16,
+                    bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+                  ),
+                  child: SingleChildScrollView(
+                    child: Form(
+                      key: _globalKey,
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Tags',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
+                          TextFormField(
+                            controller: _title,
+                            decoration: InputDecoration(
+                              labelText: 'Title',
+                              border: OutlineInputBorder(),
                             ),
+                            validator: validateNotEmpty,
                           ),
-                          SizedBox(height: 8),
-                          // Tag input
+                          SizedBox(height: 16),
+                          LiveCharCounterTextField(
+                            controller: _body,
+                            labelText: 'Body',
+                            maxLines: 6,
+                            textInputAction: TextInputAction.newline,
+                            validator: validateNotEmpty,
+                            maxLength: 150,
+                          ),
+                          SizedBox(height: 16),
+                          // Tags Section
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Tags',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              // Tag input
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextFormField(
+                                      controller: _tagController,
+                                      decoration: InputDecoration(
+                                        hintText: 'Add a tag',
+                                        border: OutlineInputBorder(),
+                                        isDense: true,
+                                        suffixIcon: IconButton(
+                                          onPressed: _addTag,
+                                          icon: Icon(Icons.add),
+                                        ),
+                                      ),
+                                      onFieldSubmitted: (_) => _addTag(),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: 8),
+                              // Tag chips
+                              if (_tags.isNotEmpty)
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 4,
+                                  children: _tags
+                                      .map(
+                                        (tag) => Chip(
+                                          label: Text(tag),
+                                          deleteIcon: Icon(
+                                            Icons.close,
+                                            size: 18,
+                                          ),
+                                          onDeleted: () => _removeTag(tag),
+                                        ),
+                                      )
+                                      .toList(),
+                                ),
+                            ],
+                          ),
+                          SizedBox(height: 16),
                           Row(
                             children: [
                               Expanded(
-                                child: TextFormField(
-                                  controller: _tagController,
-                                  decoration: InputDecoration(
-                                    hintText: 'Add a tag',
-                                    border: OutlineInputBorder(),
-                                    isDense: true,
-                                    suffixIcon: IconButton(
-                                      onPressed: _addTag,
-                                      icon: Icon(Icons.add),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Visibility:'),
+                                    SizedBox(height: 8),
+                                    DropdownButtonFormField<String>(
+                                      initialValue: _visibility,
+                                      decoration: InputDecoration(
+                                        border: OutlineInputBorder(),
+                                        contentPadding: EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 8,
+                                        ),
+                                      ),
+                                      items: [
+                                        DropdownMenuItem(
+                                          value: 'private',
+                                          child: Text('Private'),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: 'public',
+                                          child: Text('Public'),
+                                        ),
+                                      ],
+                                      onChanged: (v) => setState(
+                                        () => _visibility = v ?? 'private',
+                                      ),
                                     ),
-                                  ),
-                                  onFieldSubmitted: (_) => _addTag(),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Due Date:'),
+                                    SizedBox(height: 8),
+                                    TextFormField(
+                                      controller: _dueDateController,
+                                      decoration: InputDecoration(
+                                        hintText: 'Select due date',
+                                        border: OutlineInputBorder(),
+                                        contentPadding: EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 8,
+                                        ),
+                                        suffixIcon: IconButton(
+                                          onPressed: () async {
+                                            final now = DateTime.now();
+                                            final selDate =
+                                                await showDatePicker(
+                                                  context: context,
+                                                  firstDate: now,
+                                                  lastDate: now.add(
+                                                    Duration(days: 365 * 5),
+                                                  ),
+                                                  initialDate: _due ?? now,
+                                                );
+                                            if (selDate != null) {
+                                              setState(() {
+                                                _due = selDate;
+                                                _dueDateController.text =
+                                                    selDate
+                                                        .toString()
+                                                        .split(' ')
+                                                        .first;
+                                              });
+                                            }
+                                          },
+                                          icon: Icon(
+                                            Icons.calendar_today,
+                                            size: 18,
+                                          ),
+                                        ),
+                                      ),
+                                      readOnly: true,
+                                      validator: _validateDueDate,
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
                           ),
-                          SizedBox(height: 8),
-                          // Tag chips
-                          if (_tags.isNotEmpty)
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 4,
-                              children: _tags
-                                  .map(
-                                    (tag) => Chip(
-                                      label: Text(tag),
-                                      deleteIcon: Icon(Icons.close, size: 18),
-                                      onDeleted: () => _removeTag(tag),
-                                    ),
-                                  )
-                                  .toList(),
-                            ),
-                        ],
-                      ),
-                      SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Visibility:'),
-                                SizedBox(height: 8),
-                                DropdownButtonFormField<String>(
-                                  initialValue: _visibility,
-                                  decoration: InputDecoration(
-                                    border: OutlineInputBorder(),
-                                    contentPadding: EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 8,
-                                    ),
-                                  ),
-                                  items: [
-                                    DropdownMenuItem(
-                                      value: 'private',
-                                      child: Text('Private'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'public',
-                                      child: Text('Public'),
-                                    ),
-                                  ],
-                                  onChanged: (v) => setState(
-                                    () => _visibility = v ?? 'private',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Due Date:'),
-                                SizedBox(height: 8),
-                                TextFormField(
-                                  controller: _dueDateController,
-                                  decoration: InputDecoration(
-                                    hintText: 'Select due date',
-                                    border: OutlineInputBorder(),
-                                    contentPadding: EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 8,
-                                    ),
-                                    suffixIcon: IconButton(
-                                      onPressed: () async {
-                                        final now = DateTime.now();
-                                        final selDate = await showDatePicker(
-                                          context: context,
-                                          firstDate: now,
-                                          lastDate: now.add(
-                                            Duration(days: 365 * 5),
-                                          ),
-                                          initialDate: _due ?? now,
-                                        );
-                                        if (selDate != null) {
-                                          setState(() {
-                                            _due = selDate;
-                                            _dueDateController.text = selDate
-                                                .toString()
-                                                .split(' ')
-                                                .first;
-                                          });
-                                        }
-                                      },
-                                      icon: Icon(
-                                        Icons.calendar_today,
-                                        size: 18,
-                                      ),
-                                    ),
-                                  ),
-                                  readOnly: true,
-                                  validator: _validateDueDate,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
 
-                      SizedBox(height: 100), // Extra space for keyboard
-                    ],
+                          SizedBox(height: 100), // Extra space for keyboard
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
 
-          // Pinned Save Button
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              border: Border(
-                top: BorderSide(color: Colors.grey.shade300, width: 1),
-              ),
-            ),
-            child: ElevatedButton(
-              onPressed: () async {
-                if (_globalKey.currentState != null &&
-                    !_globalKey.currentState!.validate()) {
-                  return;
-                }
+              // Pinned Save Button
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  border: Border(
+                    top: BorderSide(color: Colors.grey.shade300, width: 1),
+                  ),
+                ),
+                child: ElevatedButton(
+                  onPressed: () async {
+                    if (_globalKey.currentState != null &&
+                        !_globalKey.currentState!.validate()) {
+                      return;
+                    }
 
-                if (widget.noteId == null) {
-                  await NotesService.instance.createNote(
-                    widget.uid,
-                    title: _title.text.trim(),
-                    body: _body.text.trim(),
-                    visibility: _visibility,
-                    dueDate: _due,
-                    tags: _tags,
-                  );
-                } else {
-                  await NotesService.instance.updateNote(
-                    widget.uid,
-                    widget.noteId!,
-                    title: _title.text.trim(),
-                    body: _body.text.trim(),
-                    visibility: _visibility,
-                    dueDate: _due,
-                    tags: _tags,
-                  );
-                }
-                if (mounted) Navigator.pop(context, true);
-                displaySnackBar(context, 'Note saved successfully');
-              },
-              style: ElevatedButton.styleFrom(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+                    if (widget.noteId == null) {
+                      await NotesService.instance.createNote(
+                        widget.uid,
+                        title: _title.text.trim(),
+                        body: _body.text.trim(),
+                        visibility: _visibility,
+                        dueDate: _due,
+                        tags: _tags,
+                      );
+                    } else {
+                      await NotesService.instance.updateNote(
+                        widget.uid,
+                        widget.noteId!,
+                        title: _title.text.trim(),
+                        body: _body.text.trim(),
+                        visibility: _visibility,
+                        dueDate: _due,
+                        tags: _tags,
+                      );
+                    }
+                    if (mounted) Navigator.pop(context, true);
+                    displaySnackBar(context, 'Note saved successfully');
+                  },
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    'Save Note',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
-              child: Text(
-                'Save Note',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
