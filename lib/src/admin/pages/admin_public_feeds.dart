@@ -6,8 +6,70 @@ import 'package:students_reminder/src/services/note_service.dart';
 import 'package:students_reminder/src/services/admin_service.dart';
 import 'package:students_reminder/src/shared/misc.dart';
 
-class AdminPublicFeeds extends StatelessWidget {
+class AdminPublicFeeds extends StatefulWidget {
   const AdminPublicFeeds({super.key});
+
+  @override
+  State<AdminPublicFeeds> createState() => _AdminPublicFeedsState();
+}
+
+class _AdminPublicFeedsState extends State<AdminPublicFeeds> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  // Helper method to filter documents based on search query
+  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _filterDocuments(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) async {
+    if (_searchQuery.isEmpty) {
+      return docs;
+    }
+
+    final List<QueryDocumentSnapshot<Map<String, dynamic>>> filtered = [];
+
+    for (final doc in docs) {
+      final data = doc.data();
+      final title = (data['title'] ?? '').toString().toLowerCase();
+      final noteOwnerId = doc.reference.parent.parent?.id ?? '';
+
+      // Check if title matches
+      bool titleMatches = title.contains(_searchQuery);
+
+      // Check if username matches (need to fetch user data)
+      bool usernameMatches = false;
+      try {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(noteOwnerId)
+            .get();
+        
+        if (userDoc.exists) {
+          final userData = userDoc.data() ?? {};
+          final firstName = (userData['firstName'] ?? '').toString().toLowerCase();
+          final lastName = (userData['lastName'] ?? '').toString().toLowerCase();
+          final fullName = '$firstName $lastName'.trim();
+          
+          usernameMatches = firstName.contains(_searchQuery) || 
+                           lastName.contains(_searchQuery) || 
+                           fullName.contains(_searchQuery);
+        }
+      } catch (e) {
+        // If user fetch fails, continue with title matching only
+      }
+
+      if (titleMatches || usernameMatches) {
+        filtered.add(doc);
+      }
+    }
+
+    return filtered;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,6 +90,38 @@ class AdminPublicFeeds extends StatelessWidget {
       ),
       body: Column(
         children: [
+          // Search Bar
+          Container(
+            padding: const EdgeInsets.all(16),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search by username or title...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          setState(() {
+                            _searchController.clear();
+                            _searchQuery = '';
+                          });
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: Colors.grey[50],
+              ),
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value.toLowerCase().trim();
+                });
+              },
+            ),
+          ),
           Expanded(
             child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: NotesService.instance.publicFeeds(),
@@ -44,11 +138,24 @@ class AdminPublicFeeds extends StatelessWidget {
                   return const Center(child: Text('No notes to show.'));
                 }
 
-                return ListView.separated(
-                  itemCount: docs.length,
-                  separatorBuilder: (_, __) => const Divider(height: 2),
-                  itemBuilder: (context, i) {
-                    final doc = docs[i];
+                return FutureBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+                  future: _filterDocuments(docs),
+                  builder: (context, filterSnapshot) {
+                    if (filterSnapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    final filteredDocs = filterSnapshot.data ?? docs;
+                    
+                    if (filteredDocs.isEmpty && _searchQuery.isNotEmpty) {
+                      return const Center(child: Text('No notes match your search.'));
+                    }
+
+                    return ListView.separated(
+                      itemCount: filteredDocs.length,
+                      separatorBuilder: (_, __) => const Divider(height: 2),
+                      itemBuilder: (context, i) {
+                        final doc = filteredDocs[i];
                     final data = doc.data();
                     final ref = doc.reference;
                     final noteId = ref.id;
@@ -315,6 +422,8 @@ class AdminPublicFeeds extends StatelessWidget {
                           ],
                         ),
                       ),
+                        );
+                      },
                     );
                   },
                 );
