@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 void displaySnackBar(
@@ -8,13 +9,24 @@ void displaySnackBar(
   Duration duration = const Duration(seconds: 5),
   SnackBarAction? action,
 }) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Center(child: Text(message, style: TextStyle(color: textColor))),
-      backgroundColor: backgroundColor,
-      duration: duration,
-    ),
-  );
+  // Check if the context is still mounted before trying to access ScaffoldMessenger
+  try {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Center(
+            child: Text(message, style: TextStyle(color: textColor)),
+          ),
+          backgroundColor: backgroundColor,
+          duration: duration,
+        ),
+      );
+    }
+  } catch (e) {
+    // If there's an error accessing the context, just ignore it
+    // This prevents crashes when the widget is disposed
+    debugPrint('Could not show snackbar: $e');
+  }
 }
 
 Color hexToColor(String hexCode) {

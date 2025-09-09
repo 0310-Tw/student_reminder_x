@@ -8,6 +8,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:students_reminder/src/services/attendance_service.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
+import 'package:students_reminder/src/shared/misc.dart';
+import 'package:students_reminder/src/widgets/suspension_check.dart';
 
 class AttendanceHistory14d extends StatefulWidget {
   const AttendanceHistory14d({super.key});
@@ -21,7 +23,14 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
 
   @override
   Widget build(BuildContext context) {
-    final uid = AuthService.instance.currentUser!.uid;
+    final currentUser = AuthService.instance.currentUser;
+    if (currentUser == null) {
+      return const Scaffold(
+        body: Center(child: Text('Please log in to view attendance')),
+      );
+    }
+
+    final uid = currentUser.uid;
     final now = JmTime.nowLocal();
     final end = DateTime(now.year, now.month, now.day);
 
@@ -36,57 +45,70 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Clock In / Clock Out buttons
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _clockIn(uid),
-                    icon: const Icon(Icons.login),
-                    label: const Text("Clock In"),
-                    style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
+      body: SuspensionCheck(
+        child: Column(
+          children: [
+            // Clock In / Clock Out buttons
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _clockIn(uid),
+                      icon: const Icon(Icons.login),
+                      label: const Text("Clock In"),
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 48),
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _clockOut(uid),
-                    icon: const Icon(Icons.logout),
-                    label: const Text("Clock Out"),
-                    style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _clockOut(uid),
+                      icon: const Icon(Icons.logout),
+                      label: const Text("Clock Out"),
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 48),
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          Expanded(
-            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: AttendanceService.streamLast14Days(uid),
-              builder: (context, snap) {
-                if (snap.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final docs = snap.data?.docs ?? <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-                final byDate = {for (final d in docs) (d.data()['dayId'] as String): d.data()};
+            Expanded(
+              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: AttendanceService.streamLast14Days(uid),
+                builder: (context, snap) {
+                  if (snap.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final docs =
+                      snap.data?.docs ??
+                      <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                  final byDate = {
+                    for (final d in docs)
+                      (d.data()['dayId'] as String): d.data(),
+                  };
 
-                final items = <_DayItem>[];
-                for (int i = 13; i >= 0; i--) {
-                  final day = end.subtract(Duration(days: i));
-                  final id = JmTime.dateId(day);
-                  items.add(_DayItem(date: day, dateId: id, data: byDate[id]));
-                }
+                  final items = <_DayItem>[];
+                  for (int i = 13; i >= 0; i--) {
+                    final day = end.subtract(Duration(days: i));
+                    final id = JmTime.dateId(day);
+                    items.add(
+                      _DayItem(date: day, dateId: id, data: byDate[id]),
+                    );
+                  }
 
-                return _showCalendar
-                    ? _CalendarGrid(uid: uid, days: items)
-                    : _HistoryList(uid: uid, days: items);
-              },
+                  return _showCalendar
+                      ? _CalendarGrid(uid: uid, days: items)
+                      : _HistoryList(uid: uid, days: items);
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -117,10 +139,21 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
         _showSnack("Late reason required.");
         return;
       }
-      status += " — Reason: $reason";
     } else {
       _showSnack("Too late to clock in.");
       return;
+    }
+
+    final attendanceData = {
+      'dayId': JmTime.dateId(now),
+      'inAt': Timestamp.fromDate(now),
+      'inLoc': GeoPoint(location.latitude, location.longitude),
+      'status': status,
+    };
+
+    // Add late reason as separate field if it exists
+    if (reason != null && reason.trim().isNotEmpty) {
+      attendanceData['lateReason'] = reason.trim();
     }
 
     await FirebaseFirestore.instance
@@ -128,14 +161,13 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
         .doc(uid)
         .collection('days')
         .doc(JmTime.dateId(now))
-        .set({
-      'dayId': JmTime.dateId(now),
-      'inAt': Timestamp.fromDate(now),
-      'inLoc': GeoPoint(location.latitude, location.longitude),
-      'status': status,
-    }, SetOptions(merge: true));
+        .set(attendanceData, SetOptions(merge: true));
 
-    _showSnack("Clocked in: $status at ${location.latitude}, ${location.longitude}");
+    final displayMessage = reason != null && reason.trim().isNotEmpty
+        ? "Clocked in: $status (Reason: $reason) at ${location.latitude}, ${location.longitude}"
+        : "Clocked in: $status at ${location.latitude}, ${location.longitude}";
+
+    _showSnack(displayMessage);
   }
 
   // ------------------ Clock Out ------------------
@@ -215,7 +247,7 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
   }
 
   void _showSnack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    displaySnackBar(context, msg);
   }
 }
 
@@ -230,6 +262,7 @@ class _DayItem {
   String get rawStatus => (data?['status'] ?? 'absent').toString();
 
   String get status {
+    if (rawStatus.toLowerCase().startsWith('present')) return 'present';
     if (rawStatus.toLowerCase().startsWith('early')) return 'early';
     if (rawStatus.toLowerCase().startsWith('late')) return 'late';
     if (rawStatus.toLowerCase().startsWith('in_progress')) return 'in_progress';
@@ -240,15 +273,32 @@ class _DayItem {
     if (rawStatus.contains('— Reason:')) {
       return rawStatus.split('— Reason:')[1].trim();
     }
-    return null;
+    return data?['lateReason'] as String?;
   }
 
-  DateTime? get inAt => (data?['inAt'] as Timestamp?)?.toDate();
-  DateTime? get outAt => (data?['outAt'] as Timestamp?)?.toDate();
+  DateTime? get inAt {
+    // Handle both new format (inAt) and backward compatibility (clockInAt)
+    final timestamp = data?['inAt'] ?? data?['clockInAt'];
+    return (timestamp as Timestamp?)?.toDate();
+  }
+
+  DateTime? get outAt {
+    // Handle both new format (outAt) and backward compatibility (clockOutAt)
+    final timestamp = data?['outAt'] ?? data?['clockOutAt'];
+    return (timestamp as Timestamp?)?.toDate();
+  }
+
+  // Admin tracking information
+  bool get isAdminMarked => data?['adminMarked'] == true;
+  String? get markedByAdminName => data?['markedByAdminName'] as String?;
+  String? get markedByAdminEmail => data?['markedByAdminEmail'] as String?;
+  DateTime? get markedAt => (data?['markedAt'] as Timestamp?)?.toDate();
 }
 
 Color _statusColor(String status) {
   switch (status) {
+    case 'present':
+      return Colors.green;
     case 'early':
       return Colors.green;
     case 'late':
@@ -261,18 +311,42 @@ Color _statusColor(String status) {
   }
 }
 
-Widget _statusBadge(String status, [String? reason]) {
+Widget _statusBadgeWithAdmin(_DayItem dayItem) {
+  final status = dayItem.status;
+  final reason = dayItem.reason;
   final c = _statusColor(status);
+
+  String displayText = status.toUpperCase();
+  if (reason != null && reason.isNotEmpty) {
+    displayText += '\n$reason';
+  }
+
+  if (dayItem.isAdminMarked) {
+    displayText += '\n👤Admin';
+    if (dayItem.markedByAdminName != null) {
+      displayText += ': ${dayItem.markedByAdminName}';
+    }
+  }
+
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
     decoration: BoxDecoration(
       color: c.withOpacity(0.12),
-      border: Border.all(color: c.withOpacity(0.6)),
+      border: Border.all(
+        color: dayItem.isAdminMarked
+            ? Colors.purple.withOpacity(0.8)
+            : c.withOpacity(0.6),
+        width: dayItem.isAdminMarked ? 2 : 1,
+      ),
       borderRadius: BorderRadius.circular(999),
     ),
     child: Text(
-      reason != null ? '$status\n$reason' : status.toUpperCase(),
-      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: c),
+      displayText,
+      style: TextStyle(
+        fontSize: 10,
+        fontWeight: FontWeight.w600,
+        color: dayItem.isAdminMarked ? Colors.purple.shade700 : c,
+      ),
       textAlign: TextAlign.center,
     ),
   );
@@ -338,11 +412,10 @@ class _HistoryList extends StatelessWidget {
                   padding: const EdgeInsets.only(right: 12),
                   child: Text('In: ${_fmtJM(d.inAt)}'),
                 ),
-              if (d.outAt != null)
-                Text('Out: ${_fmtJM(d.outAt)}'),
+              if (d.outAt != null) Text('Out: ${_fmtJM(d.outAt)}'),
             ],
           ),
-          trailing: _statusBadge(d.status, d.reason),
+          trailing: _statusBadgeWithAdmin(d),
           onTap: () => _openMapModal(context, uid: uid, dayId: d.dateId),
         );
       },
@@ -387,7 +460,8 @@ class _CalendarGrid extends StatelessWidget {
                 final d = days[i];
                 final dot = _statusColor(d.status);
                 return InkWell(
-                  onTap: () => _openMapModal(context, uid: uid, dayId: d.dateId),
+                  onTap: () =>
+                      _openMapModal(context, uid: uid, dayId: d.dateId),
                   child: Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
@@ -399,10 +473,20 @@ class _CalendarGrid extends StatelessWidget {
                       children: [
                         Text(
                           DateFormat('d').format(d.date),
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         const SizedBox(height: 6),
-                        Container(width: 12, height: 12, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: dot,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
                         const SizedBox(height: 6),
                         Text(
                           d.status,
@@ -433,7 +517,11 @@ class _Legend extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
         const SizedBox(width: 6),
         Text(label, style: const TextStyle(fontSize: 12)),
       ],
@@ -443,7 +531,11 @@ class _Legend extends StatelessWidget {
 
 // ------------------ Map Modal ------------------
 
-void _openMapModal(BuildContext context, {required String uid, required String dayId}) {
+void _openMapModal(
+  BuildContext context, {
+  required String uid,
+  required String dayId,
+}) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -491,10 +583,16 @@ class _DayMapModalState extends State<DayMapModal> {
     if (data != null) {
       setState(() {
         status = (data['status'] as String?) ?? 'absent';
-        inAt = (data['inAt'] as Timestamp?)?.toDate();
-        outAt = (data['outAt'] as Timestamp?)?.toDate();
-        _inLoc = _toLatLng(data['inLoc']);
-        _outLoc = _toLatLng(data['outLoc']);
+        // Handle both new format (inAt) and backward compatibility (clockInAt)
+        final inTimestamp = data['inAt'] ?? data['clockInAt'];
+        inAt = (inTimestamp as Timestamp?)?.toDate();
+        // Handle both new format (outAt) and backward compatibility (clockOutAt)
+        final outTimestamp = data['outAt'] ?? data['clockOutAt'];
+        outAt = (outTimestamp as Timestamp?)?.toDate();
+        // Handle both new format (inLoc) and backward compatibility (clockInLoc)
+        _inLoc = _toLatLng(data['inLoc'] ?? data['clockInLoc']);
+        // Handle both new format (outLoc) and backward compatibility (clockOutLoc)
+        _outLoc = _toLatLng(data['outLoc'] ?? data['clockOutLoc']);
         _mapReady = true;
       });
     }
@@ -502,12 +600,25 @@ class _DayMapModalState extends State<DayMapModal> {
 
   LatLng? _toLatLng(dynamic data) {
     if (data is GeoPoint) return LatLng(data.latitude, data.longitude);
+    if (data is Map<String, dynamic>) {
+      final lat = data['lat'] as double?;
+      final lng = data['lng'] as double?;
+      if (lat != null && lng != null) {
+        return LatLng(lat, lng);
+      }
+    }
     return null;
   }
 
   LatLngBounds _latLngBoundsFrom(LatLng a, LatLng b) {
-    final sw = LatLng(min(a.latitude, b.latitude), min(a.longitude, b.longitude));
-    final ne = LatLng(max(a.latitude, b.latitude), max(a.longitude, b.longitude));
+    final sw = LatLng(
+      min(a.latitude, b.latitude),
+      min(a.longitude, b.longitude),
+    );
+    final ne = LatLng(
+      max(a.latitude, b.latitude),
+      max(a.longitude, b.longitude),
+    );
     return LatLngBounds(southwest: sw, northeast: ne);
   }
 
@@ -515,14 +626,26 @@ class _DayMapModalState extends State<DayMapModal> {
   Widget build(BuildContext context) {
     final markers = <Marker>{
       if (_inLoc != null)
-        Marker(markerId: const MarkerId('in'), position: _inLoc!, infoWindow: InfoWindow(title: 'Clock In', snippet: _fmtJM(inAt))),
+        Marker(
+          markerId: const MarkerId('in'),
+          position: _inLoc!,
+          infoWindow: InfoWindow(title: 'Clock In', snippet: _fmtJM(inAt)),
+        ),
       if (_outLoc != null)
-        Marker(markerId: const MarkerId('out'), position: _outLoc!, infoWindow: InfoWindow(title: 'Clock Out', snippet: _fmtJM(outAt))),
+        Marker(
+          markerId: const MarkerId('out'),
+          position: _outLoc!,
+          infoWindow: InfoWindow(title: 'Clock Out', snippet: _fmtJM(outAt)),
+        ),
     };
 
     final polylines = <Polyline>{
       if (_inLoc != null && _outLoc != null)
-        Polyline(polylineId: const PolylineId('route'), points: [_inLoc!, _outLoc!], width: 4),
+        Polyline(
+          polylineId: const PolylineId('route'),
+          points: [_inLoc!, _outLoc!],
+          width: 4,
+        ),
     };
 
     final initial = _inLoc ?? _outLoc ?? const LatLng(18.0179, -76.8099);
@@ -539,7 +662,12 @@ class _DayMapModalState extends State<DayMapModal> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   children: [
-                    Expanded(child: Text('Attendance • ${widget.dayId}', style: Theme.of(context).textTheme.titleMedium)),
+                    Expanded(
+                      child: Text(
+                        'Attendance • ${widget.dayId}',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
                     _statusChip(status),
                   ],
                 ),
@@ -548,7 +676,10 @@ class _DayMapModalState extends State<DayMapModal> {
               Expanded(
                 child: _mapReady && !kIsWeb
                     ? GoogleMap(
-                        initialCameraPosition: CameraPosition(target: initial, zoom: initialZoom),
+                        initialCameraPosition: CameraPosition(
+                          target: initial,
+                          zoom: initialZoom,
+                        ),
                         markers: markers,
                         polylines: polylines,
                         myLocationButtonEnabled: false,
@@ -558,8 +689,12 @@ class _DayMapModalState extends State<DayMapModal> {
                           _controller = c;
                           if (_inLoc != null && _outLoc != null) {
                             final bounds = _latLngBoundsFrom(_inLoc!, _outLoc!);
-                            await Future.delayed(const Duration(milliseconds: 200));
-                            _controller?.animateCamera(CameraUpdate.newLatLngBounds(bounds, 60));
+                            await Future.delayed(
+                              const Duration(milliseconds: 200),
+                            );
+                            _controller?.animateCamera(
+                              CameraUpdate.newLatLngBounds(bounds, 60),
+                            );
                           }
                         },
                       )
@@ -569,7 +704,11 @@ class _DayMapModalState extends State<DayMapModal> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.map, size: 50, color: Colors.grey),
+                              const Icon(
+                                Icons.map,
+                                size: 50,
+                                color: Colors.grey,
+                              ),
                               const SizedBox(height: 10),
                               Text(
                                 (_inLoc != null || _outLoc != null)
@@ -588,9 +727,16 @@ class _DayMapModalState extends State<DayMapModal> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   children: [
-                    Expanded(child: _InfoTile(label: 'Clock In', value: _fmtJM(inAt))),
+                    Expanded(
+                      child: _InfoTile(label: 'Clock In', value: _fmtJM(inAt)),
+                    ),
                     const SizedBox(width: 12),
-                    Expanded(child: _InfoTile(label: 'Clock Out', value: _fmtJM(outAt))),
+                    Expanded(
+                      child: _InfoTile(
+                        label: 'Clock Out',
+                        value: _fmtJM(outAt),
+                      ),
+                    ),
                   ],
                 ),
               ),

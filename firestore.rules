@@ -1,0 +1,163 @@
+// file: firestore.rules
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+    }
+    
+    // Users collection rules
+    match /users/{uid} {
+      // Allow signed-in users to read and update their own user document
+      allow read, write: if isSignedIn() && isOwner(uid);
+      
+      // Allow users to read other users' profiles (for displaying classmates, etc.)
+      allow read: if isSignedIn();
+      
+      // Allow admins to read, update, and suspend/flag any user document
+      allow read, write: if isAdmin();
+      
+      // Allow users to create their own profile during signup
+      allow create: if isSignedIn() && isOwner(uid);
+
+      // Notes subcollection rules
+      match /notes/{noteId} {
+        // Allow users to create notes in their own collection
+        allow create: if isSignedIn() && isOwner(uid);
+        
+        // Allow users to read and write their own notes
+        allow read, write: if isSignedIn() && isOwner(uid);
+        
+        // Allow users to read public notes from any user
+        allow read: if isSignedIn() && resource.data.visibility == "public";
+        
+        // Allow users to update public notes for liking (likesCount and likedBy fields only)
+        allow update: if isSignedIn() && 
+          resource.data.visibility == "public" &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount', 'likedBy']);
+        
+        // Allow admins full access to any notes (read, write, delete, flag, suspend)
+        allow read, write, delete: if isAdmin();
+        
+        // Reports subcollection for note reports
+        match /reports/{reportId} {
+          // Allow users to create reports on public notes
+          allow create: if isSignedIn() && 
+            get(/databases/$(database)/documents/users/$(uid)/notes/$(noteId)).data.visibility == "public";
+          
+          // Allow users to read their own reports
+          allow read: if isSignedIn() && reportId == request.auth.uid;
+          
+          // Allow users to delete their own reports (for undo functionality)
+          allow delete: if isSignedIn() && reportId == request.auth.uid;
+          
+          // Allow admins full access to reports
+          allow read, write, delete: if isAdmin();
+        }
+      }
+
+      // Notifications subcollection rules
+      match /notifications/{notificationId} {
+        // Allow users to read their own notifications
+        allow read: if isSignedIn() && isOwner(uid);
+        
+        // Allow users to update their own notifications (mark as read, delete)
+        allow update, delete: if isSignedIn() && isOwner(uid);
+        
+        // Allow admins to create notifications for any user (for flagging, suspension, etc.)
+        allow create: if isAdmin();
+        
+        // Allow admins full access to any notifications
+        allow read, write, delete: if isAdmin();
+        
+        // Allow system to create notifications (for automated notifications)
+        // This is for Cloud Functions or other server-side operations
+        allow create: if request.auth.token.admin == true;
+      }
+    }
+    
+    // Reports collection - for user reports on notes and other users
+    match /reports/{reportId} {
+      // Allow users to create reports
+      allow create: if isSignedIn();
+      
+      // Allow users to read their own reports
+      allow read: if isSignedIn() && resource.data.reporterId == request.auth.uid;
+      
+      // Allow admins to read all reports and update their status
+      allow read, write: if isAdmin();
+    }
+    
+    // Admin actions collection - for tracking admin moderation actions
+    match /adminActions/{actionId} {
+      // Only admins can create and read admin actions
+      allow create, read: if isAdmin();
+      
+      // Allow admins to update action status
+      allow write: if isAdmin();
+    }
+    
+    // Flagged content collection - for content that needs admin review
+    match /flaggedContent/{flagId} {
+      // Only admins can access flagged content
+      allow read, write, create: if isAdmin();
+    }
+    
+    // Attendance collection rules
+    match /attendance/{uid} {
+      // Allow users to read their own attendance data
+      allow read: if isSignedIn() && isOwner(uid);
+      
+      // Allow admins to read any attendance data
+      allow read: if isAdmin();
+      
+      // Nested rules for attendance days
+      match /days/{dayId} {
+        // Allow students to create and update their own attendance days
+        allow create, update: if isSignedIn() && isOwner(uid);
+        
+        // Allow students to read their own attendance days
+        allow read: if isSignedIn() && isOwner(uid);
+        
+        // Allow admins full access to any attendance day
+        allow read, write, delete: if isAdmin();
+      }
+      
+      // Nested rules for attendance events (audit logs)
+      match /events/{eventId} {
+        // Allow students to create events under their own attendance
+        allow create: if isSignedIn() && isOwner(uid);
+        
+        // Allow students to read their own events
+        allow read: if isSignedIn() && isOwner(uid);
+        
+        // Allow admins full access to any attendance events
+        allow read, write, delete: if isAdmin();
+      }
+    }
+
+    // Collection group rules for notes (for public feeds)
+    match /{path=**}/notes/{noteId} {
+      // Allow reading public notes from any user's notes collection
+      allow read: if isSignedIn() && resource.data.visibility == "public";
+      
+      // Allow users to update public notes for liking (likesCount and likedBy fields only)
+      allow update: if isSignedIn() && 
+        resource.data.visibility == "public" &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount', 'likedBy']);
+      
+      // Allow admins to read any notes
+      allow read: if isAdmin();
+    }
+  }
+}

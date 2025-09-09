@@ -7,7 +7,7 @@ String? emailValidator(String? value) {
   if (!emailRegex.hasMatch(value)) {
     return 'Please enter a valid email';
   }
-
+  // dfdrfgv
   return null;
 }
 
