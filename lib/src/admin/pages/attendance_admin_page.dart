@@ -975,19 +975,11 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
   }
 
   void _showSuccessSnackBar(String message) {
-    displaySnackBar(
-      context,
-      message,
-      backgroundColor: Colors.green,
-    );
+    displaySnackBar(context, message, backgroundColor: Colors.green);
   }
 
   void _showErrorSnackBar(String message) {
-    displaySnackBar(
-      context,
-      message,
-      backgroundColor: Colors.red,
-    );
+    displaySnackBar(context, message, backgroundColor: Colors.red);
   }
 
   List<DateTime> _generateDateRange(DateTime start, DateTime end) {
