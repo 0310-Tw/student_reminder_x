@@ -2,14 +2,15 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:intl/intl.dart';
 import 'package:students_reminder/src/services/attendance_service.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/shared/misc.dart';
 import 'package:students_reminder/src/widgets/suspension_check.dart';
+
 
 class AttendanceHistory14d extends StatefulWidget {
   const AttendanceHistory14d({super.key});
@@ -85,11 +86,9 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
                     return const Center(child: CircularProgressIndicator());
                   }
                   final docs =
-                      snap.data?.docs ??
-                      <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                      snap.data?.docs ?? <QueryDocumentSnapshot<Map<String, dynamic>>>[];
                   final byDate = {
-                    for (final d in docs)
-                      (d.data()['dayId'] as String): d.data(),
+                    for (final d in docs) (d.data()['dayId'] as String): d.data(),
                   };
 
                   final items = <_DayItem>[];
@@ -151,7 +150,6 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
       'status': status,
     };
 
-    // Add late reason as separate field if it exists
     if (reason != null && reason.trim().isNotEmpty) {
       attendanceData['lateReason'] = reason.trim();
     }
@@ -277,18 +275,15 @@ class _DayItem {
   }
 
   DateTime? get inAt {
-    // Handle both new format (inAt) and backward compatibility (clockInAt)
     final timestamp = data?['inAt'] ?? data?['clockInAt'];
     return (timestamp as Timestamp?)?.toDate();
   }
 
   DateTime? get outAt {
-    // Handle both new format (outAt) and backward compatibility (clockOutAt)
     final timestamp = data?['outAt'] ?? data?['clockOutAt'];
     return (timestamp as Timestamp?)?.toDate();
   }
 
-  // Admin tracking information
   bool get isAdminMarked => data?['adminMarked'] == true;
   String? get markedByAdminName => data?['markedByAdminName'] as String?;
   String? get markedByAdminEmail => data?['markedByAdminEmail'] as String?;
@@ -583,194 +578,102 @@ class _DayMapModalState extends State<DayMapModal> {
     if (data != null) {
       setState(() {
         status = (data['status'] as String?) ?? 'absent';
-        // Handle both new format (inAt) and backward compatibility (clockInAt)
         final inTimestamp = data['inAt'] ?? data['clockInAt'];
         inAt = (inTimestamp as Timestamp?)?.toDate();
-        // Handle both new format (outAt) and backward compatibility (clockOutAt)
         final outTimestamp = data['outAt'] ?? data['clockOutAt'];
         outAt = (outTimestamp as Timestamp?)?.toDate();
-        // Handle both new format (inLoc) and backward compatibility (clockInLoc)
         _inLoc = _toLatLng(data['inLoc'] ?? data['clockInLoc']);
-        // Handle both new format (outLoc) and backward compatibility (clockOutLoc)
         _outLoc = _toLatLng(data['outLoc'] ?? data['clockOutLoc']);
         _mapReady = true;
       });
     }
   }
 
-  LatLng? _toLatLng(dynamic data) {
-    if (data is GeoPoint) return LatLng(data.latitude, data.longitude);
-    if (data is Map<String, dynamic>) {
-      final lat = data['lat'] as double?;
-      final lng = data['lng'] as double?;
-      if (lat != null && lng != null) {
-        return LatLng(lat, lng);
-      }
+  LatLng? _toLatLng(dynamic v) {
+    if (v is GeoPoint) return LatLng(v.latitude, v.longitude);
+    if (v is Map<String, dynamic> && v.containsKey('latitude')) {
+      return LatLng(v['latitude'], v['longitude']);
     }
     return null;
   }
 
   LatLngBounds _latLngBoundsFrom(LatLng a, LatLng b) {
-    final sw = LatLng(
+    final southWest = LatLng(
       min(a.latitude, b.latitude),
       min(a.longitude, b.longitude),
     );
-    final ne = LatLng(
+    final northEast = LatLng(
       max(a.latitude, b.latitude),
       max(a.longitude, b.longitude),
     );
-    return LatLngBounds(southwest: sw, northeast: ne);
+    return LatLngBounds(southwest: southWest, northeast: northEast);
   }
 
   @override
   Widget build(BuildContext context) {
-    final markers = <Marker>{
-      if (_inLoc != null)
+    if (!_mapReady) {
+      return const SizedBox(
+        height: 300,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final markers = <Marker>{};
+    if (_inLoc != null) {
+      markers.add(
         Marker(
           markerId: const MarkerId('in'),
           position: _inLoc!,
-          infoWindow: InfoWindow(title: 'Clock In', snippet: _fmtJM(inAt)),
+          infoWindow: InfoWindow(
+            title: 'Clock In',
+            snippet: inAt != null ? DateFormat.jm().format(inAt!) : null,
+          ),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
         ),
-      if (_outLoc != null)
+      );
+    }
+    if (_outLoc != null) {
+      markers.add(
         Marker(
           markerId: const MarkerId('out'),
           position: _outLoc!,
-          infoWindow: InfoWindow(title: 'Clock Out', snippet: _fmtJM(outAt)),
-        ),
-    };
-
-    final polylines = <Polyline>{
-      if (_inLoc != null && _outLoc != null)
-        Polyline(
-          polylineId: const PolylineId('route'),
-          points: [_inLoc!, _outLoc!],
-          width: 4,
-        ),
-    };
-
-    final initial = _inLoc ?? _outLoc ?? const LatLng(18.0179, -76.8099);
-    final initialZoom = (_inLoc != null && _outLoc != null) ? 12.5 : 15.0;
-
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: SizedBox(
-          height: 420,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Attendance • ${widget.dayId}',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ),
-                    _statusChip(status),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-              Expanded(
-                child: _mapReady && !kIsWeb
-                    ? GoogleMap(
-                        initialCameraPosition: CameraPosition(
-                          target: initial,
-                          zoom: initialZoom,
-                        ),
-                        markers: markers,
-                        polylines: polylines,
-                        myLocationButtonEnabled: false,
-                        zoomControlsEnabled: true,
-                        mapToolbarEnabled: false,
-                        onMapCreated: (c) async {
-                          _controller = c;
-                          if (_inLoc != null && _outLoc != null) {
-                            final bounds = _latLngBoundsFrom(_inLoc!, _outLoc!);
-                            await Future.delayed(
-                              const Duration(milliseconds: 200),
-                            );
-                            _controller?.animateCamera(
-                              CameraUpdate.newLatLngBounds(bounds, 60),
-                            );
-                          }
-                        },
-                      )
-                    : Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(20.0),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.map,
-                                size: 50,
-                                color: Colors.grey,
-                              ),
-                              const SizedBox(height: 10),
-                              Text(
-                                (_inLoc != null || _outLoc != null)
-                                    ? 'Map not supported. Showing coordinates below.'
-                                    : 'No location data available.',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(fontSize: 16),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-              ),
-              const SizedBox(height: 8),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _InfoTile(label: 'Clock In', value: _fmtJM(inAt)),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _InfoTile(
-                        label: 'Clock Out',
-                        value: _fmtJM(outAt),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
+          infoWindow: InfoWindow(
+            title: 'Clock Out',
+            snippet: outAt != null ? DateFormat.jm().format(outAt!) : null,
           ),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
         ),
-      ),
+      );
+    }
+
+    CameraPosition initialCam = const CameraPosition(
+      target: LatLng(18.005611, -76.744127),
+      zoom: 12,
     );
-  }
-}
+    if (_inLoc != null) {
+      initialCam = CameraPosition(target: _inLoc!, zoom: 15);
+    }
 
-// ------------------ Info Tile ------------------
-
-class _InfoTile extends StatelessWidget {
-  const _InfoTile({required this.label, required this.value});
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-          const SizedBox(height: 4),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
-        ],
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.6,
+      child: GoogleMap(
+        onMapCreated: (c) async {
+          _controller = c;
+          if (_inLoc != null && _outLoc != null) {
+            final bounds = _latLngBoundsFrom(_inLoc!, _outLoc!);
+            await _controller!.animateCamera(
+              CameraUpdate.newLatLngBounds(bounds, 50),
+            );
+          } else if (_inLoc != null) {
+            await _controller!.animateCamera(
+              CameraUpdate.newLatLngZoom(_inLoc!, 15),
+            );
+          }
+        },
+        initialCameraPosition: initialCam,
+        markers: markers,
+        myLocationEnabled: true,
+        myLocationButtonEnabled: true,
       ),
     );
   }
