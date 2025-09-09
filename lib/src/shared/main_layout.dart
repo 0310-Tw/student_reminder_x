@@ -182,6 +182,9 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
         return Scaffold(
           body: _pages[_index],
           bottomNavigationBar: NavigationBar(
+            indicatorShape: CircleBorder(),
+            indicatorColor: Colors.white,
+            backgroundColor: Colors.tealAccent,
             selectedIndex: _index,
             destinations: _buildNavigationDestinations(),
             onDestinationSelected: (i) => setState(() => _index = i),

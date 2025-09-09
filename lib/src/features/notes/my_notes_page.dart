@@ -47,7 +47,7 @@ class _MyNotesPageState extends State<MyNotesPage> {
     final uid = user.uid;
 
     return Scaffold(
-      backgroundColor: Colors.lightBlue,
+      backgroundColor: Colors.lightBlue[100],
       appBar: AppBar(
         backgroundColor: Colors.tealAccent,
         automaticallyImplyLeading: false,
