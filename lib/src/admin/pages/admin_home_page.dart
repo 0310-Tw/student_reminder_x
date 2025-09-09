@@ -7,6 +7,7 @@ import 'package:students_reminder/src/services/notification_service.dart';
 import 'package:students_reminder/src/widgets/group_filter.dart';
 import 'package:students_reminder/src/widgets/user_banner_notifications.dart';
 import 'package:students_reminder/src/widgets/suspension_check.dart';
+import 'package:students_reminder/src/shared/misc.dart';
 
 class AdminHomePage extends StatefulWidget {
   const AdminHomePage({super.key});
@@ -361,14 +362,18 @@ class _AdminHomePageState extends State<AdminHomePage> {
 
                 if (mounted) {
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('$userName has been deleted')),
+                  displaySnackBar(
+                    context,
+                    '$userName has been deleted',
+                    backgroundColor: Colors.green,
                   );
                 }
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error deleting user: $e')),
+                  displaySnackBar(
+                    context,
+                    'Error deleting user: $e',
+                    backgroundColor: Colors.red,
                   );
                 }
               }
@@ -413,8 +418,10 @@ class _AdminHomePageState extends State<AdminHomePage> {
             onPressed: () async {
               if (reasonController.text.trim().isEmpty) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Please provide a reason')),
+                  displaySnackBar(
+                    context,
+                    'Please provide a reason',
+                    backgroundColor: Colors.orange,
                   );
                 }
                 return;
@@ -422,24 +429,11 @@ class _AdminHomePageState extends State<AdminHomePage> {
 
               try {
                 // Show loading indicator
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Row(
-                      children: [
-                        SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        ),
-                        SizedBox(width: 12),
-                        Text('Flagging $userName and sending notification...'),
-                      ],
-                    ),
-                    duration: Duration(seconds: 2),
-                  ),
+                displaySnackBar(
+                  context,
+                  'Flagging $userName and sending notification...',
+                  backgroundColor: Colors.blue,
+                  duration: Duration(seconds: 2),
                 );
 
                 await AdminService.instance.flagUser(
@@ -454,32 +448,18 @@ class _AdminHomePageState extends State<AdminHomePage> {
 
                 if (mounted) {
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Row(
-                        children: [
-                          Icon(Icons.check_circle, color: Colors.white),
-                          SizedBox(width: 8),
-                          Text('$userName has been flagged and notified'),
-                        ],
-                      ),
-                      backgroundColor: Colors.green,
-                    ),
+                  displaySnackBar(
+                    context,
+                    '$userName has been flagged and notified',
+                    backgroundColor: Colors.green,
                   );
                 }
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Row(
-                        children: [
-                          Icon(Icons.error, color: Colors.white),
-                          SizedBox(width: 8),
-                          Text('Error flagging user: $e'),
-                        ],
-                      ),
-                      backgroundColor: Colors.red,
-                    ),
+                  displaySnackBar(
+                    context,
+                    'Error flagging user: $e',
+                    backgroundColor: Colors.red,
                   );
                 }
               }
@@ -515,14 +495,18 @@ class _AdminHomePageState extends State<AdminHomePage> {
 
                 if (mounted) {
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('$userName has been unflagged')),
+                  displaySnackBar(
+                    context,
+                    '$userName has been unflagged',
+                    backgroundColor: Colors.green,
                   );
                 }
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error unflagging user: $e')),
+                  displaySnackBar(
+                    context,
+                    'Error unflagging user: $e',
+                    backgroundColor: Colors.red,
                   );
                 }
               }
@@ -593,8 +577,10 @@ class _AdminHomePageState extends State<AdminHomePage> {
               onPressed: () async {
                 if (reasonController.text.trim().isEmpty) {
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Please provide a reason')),
+                    displaySnackBar(
+                      context,
+                      'Please provide a reason',
+                      backgroundColor: Colors.orange,
                     );
                   }
                   return;
@@ -602,26 +588,11 @@ class _AdminHomePageState extends State<AdminHomePage> {
 
                 try {
                   // Show loading indicator
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Row(
-                        children: [
-                          SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          ),
-                          SizedBox(width: 12),
-                          Text(
-                            'Suspending $userName and sending notification...',
-                          ),
-                        ],
-                      ),
-                      duration: Duration(seconds: 3),
-                    ),
+                  displaySnackBar(
+                    context,
+                    'Suspending $userName and sending notification...',
+                    backgroundColor: Colors.blue,
+                    duration: Duration(seconds: 3),
                   );
 
                   await AdminService.instance.suspendUser(
@@ -642,33 +613,19 @@ class _AdminHomePageState extends State<AdminHomePage> {
 
                   if (mounted) {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Row(
-                          children: [
-                            Icon(Icons.block, color: Colors.white),
-                            SizedBox(width: 8),
-                            Text('$userName has been suspended and notified'),
-                          ],
-                        ),
-                        backgroundColor: Colors.red.shade700,
-                        duration: Duration(seconds: 4),
-                      ),
+                    displaySnackBar(
+                      context,
+                      '$userName has been suspended and notified',
+                      backgroundColor: Colors.red.shade700,
+                      duration: Duration(seconds: 4),
                     );
                   }
                 } catch (e) {
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Row(
-                          children: [
-                            Icon(Icons.error, color: Colors.white),
-                            SizedBox(width: 8),
-                            Text('Error suspending user: $e'),
-                          ],
-                        ),
-                        backgroundColor: Colors.red,
-                      ),
+                    displaySnackBar(
+                      context,
+                      'Error suspending user: $e',
+                      backgroundColor: Colors.red,
                     );
                   }
                 }
@@ -705,14 +662,18 @@ class _AdminHomePageState extends State<AdminHomePage> {
 
                 if (mounted) {
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('$userName has been unsuspended')),
+                  displaySnackBar(
+                    context,
+                    '$userName has been unsuspended',
+                    backgroundColor: Colors.green,
                   );
                 }
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error unsuspending user: $e')),
+                  displaySnackBar(
+                    context,
+                    'Error unsuspending user: $e',
+                    backgroundColor: Colors.red,
                   );
                 }
               }

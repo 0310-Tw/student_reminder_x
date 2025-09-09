@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/attendance_service.dart';
+import '../../shared/misc.dart';
 
 class AttendanceAdminPage extends StatefulWidget {
   const AttendanceAdminPage({super.key});
@@ -974,22 +975,18 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
   }
 
   void _showSuccessSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-        behavior: SnackBarBehavior.floating,
-      ),
+    displaySnackBar(
+      context,
+      message,
+      backgroundColor: Colors.green,
     );
   }
 
   void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        behavior: SnackBarBehavior.floating,
-      ),
+    displaySnackBar(
+      context,
+      message,
+      backgroundColor: Colors.red,
     );
   }
 

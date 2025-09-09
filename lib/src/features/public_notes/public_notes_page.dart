@@ -187,6 +187,7 @@ import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/note_service.dart';
 import 'package:students_reminder/src/services/notification_service.dart';
 import 'package:students_reminder/src/widgets/suspension_check.dart';
+import 'package:students_reminder/src/shared/misc.dart';
 
 class PublicFeeds extends StatelessWidget {
   const PublicFeeds({super.key});
@@ -341,14 +342,10 @@ class PublicFeeds extends StatelessWidget {
                                           uid: uid,
                                           reason: reason.trim(),
                                         );
-                                        ScaffoldMessenger.of(
+                                        displaySnackBar(
                                           context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'Thanks — report submitted.',
-                                            ),
-                                          ),
+                                          'Thanks — report submitted.',
+                                          backgroundColor: Colors.green,
                                         );
                                       }
                                     } else if (v == 'unreport') {
@@ -356,14 +353,10 @@ class PublicFeeds extends StatelessWidget {
                                         noteRef: ref,
                                         uid: uid,
                                       );
-                                      ScaffoldMessenger.of(
+                                      displaySnackBar(
                                         context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'Your report was removed.',
-                                          ),
-                                        ),
+                                        'Your report was removed.',
+                                        backgroundColor: Colors.blue,
                                       );
                                     }
                                   },

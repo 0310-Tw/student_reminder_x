@@ -8,6 +8,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:students_reminder/src/services/attendance_service.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
+import 'package:students_reminder/src/shared/misc.dart';
 
 class AttendanceHistory14d extends StatefulWidget {
   const AttendanceHistory14d({super.key});
@@ -232,7 +233,7 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
   }
 
   void _showSnack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    displaySnackBar(context, msg);
   }
 }
 
