@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/user_service.dart';
+import 'package:students_reminder/src/shared/list.dart';
 import 'package:students_reminder/src/widgets/group_filter.dart';
 import 'package:students_reminder/src/widgets/user_banner_notifications.dart';
 import 'package:students_reminder/src/widgets/suspension_check.dart';
@@ -21,7 +22,11 @@ class _HomePageState extends State<HomePage> {
     final uid = AuthService.instance.currentUser?.uid;
 
     return Scaffold(
-      appBar: AppBar(title: Text('Home')),
+      backgroundColor: Colors.lightBlue,
+      appBar: AppBar(
+        backgroundColor: Colors.teal,
+        automaticallyImplyLeading: false,
+        title: Text('Home')),
       body: SuspensionCheck(
         child: Column(
           children: [
@@ -60,6 +65,20 @@ class _HomePageState extends State<HomePage> {
                             .trim();
                     final course = (data['courseGroup'] ?? '').toString();
                     return ListTile(
+                      leading: // User Avatar
+                                CircleAvatar(
+                                  radius: 20,
+                                  backgroundColor: getInitialColor(name),
+                                  child: Text(
+                                    name.isNotEmpty
+                                        ? name[0].toUpperCase()
+                                        : '?',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
                       title: Text(name),
                       subtitle: Text(
                         course == 'mobile'

@@ -203,7 +203,11 @@ class PublicFeeds extends StatelessWidget {
     final uid = user.uid;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Public Feeds')),
+      backgroundColor: Colors.lightBlue,
+      appBar: AppBar(
+        backgroundColor: Colors.teal,
+        automaticallyImplyLeading: false,
+        title: const Text('Public Feeds')),
       body: SuspensionCheck(
         restrictWriteAccess: true,
         child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
