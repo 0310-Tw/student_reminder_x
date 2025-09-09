@@ -36,9 +36,9 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
     final end = DateTime(now.year, now.month, now.day);
 
     return Scaffold(
-      backgroundColor: Colors.lightBlue,
+      backgroundColor: Colors.lightBlue.shade100,
       appBar: AppBar(
-        backgroundColor: Colors.teal,
+        backgroundColor: Colors.tealAccent,
         automaticallyImplyLeading: false,
         title: const Text('Attendance • Last 14 days'),
         actions: [

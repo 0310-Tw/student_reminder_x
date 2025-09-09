@@ -49,7 +49,7 @@ class _MyNotesPageState extends State<MyNotesPage> {
     return Scaffold(
       backgroundColor: Colors.lightBlue,
       appBar: AppBar(
-        backgroundColor: Colors.teal,
+        backgroundColor: Colors.tealAccent,
         automaticallyImplyLeading: false,
         title: Text('My Notes'),
         actions: [

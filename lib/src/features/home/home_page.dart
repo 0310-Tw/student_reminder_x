@@ -22,9 +22,9 @@ class _HomePageState extends State<HomePage> {
     final uid = AuthService.instance.currentUser?.uid;
 
     return Scaffold(
-      backgroundColor: Colors.lightBlue,
+      backgroundColor: Colors.lightBlue.shade100,
       appBar: AppBar(
-        backgroundColor: Colors.teal,
+        backgroundColor: Colors.tealAccent,
         automaticallyImplyLeading: false,
         title: Text('Home')),
       body: SuspensionCheck(

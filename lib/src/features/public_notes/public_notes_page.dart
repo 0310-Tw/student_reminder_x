@@ -203,9 +203,9 @@ class PublicFeeds extends StatelessWidget {
     final uid = user.uid;
 
     return Scaffold(
-      backgroundColor: Colors.lightBlue,
+      backgroundColor: Colors.lightBlue.shade100,
       appBar: AppBar(
-        backgroundColor: Colors.teal,
+        backgroundColor: Colors.tealAccent,
         automaticallyImplyLeading: false,
         title: const Text('Public Feeds')),
       body: SuspensionCheck(
