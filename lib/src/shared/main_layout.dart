@@ -180,13 +180,10 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
         final user = snap.data;
         if (user == null) return LoginPage();
         return Scaffold(
-          
           body: _pages[_index],
           bottomNavigationBar: NavigationBar(
-            indicatorShape: _isAdmin 
-                ? RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  )
+            indicatorShape: _isAdmin
+                ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
                 : const CircleBorder(),
             indicatorColor: _isAdmin ? null : Colors.white,
             backgroundColor: _isAdmin ? null : Colors.tealAccent,
