@@ -1,6 +1,6 @@
 import 'dart:math';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+//import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -347,6 +347,7 @@ Widget _statusBadgeWithAdmin(_DayItem dayItem) {
   );
 }
 
+// ignore: unused_element
 Widget _statusChip(String status, [String? reason]) {
   Color c;
   String label = status.toUpperCase();
