@@ -482,18 +482,57 @@ class _AdminPublicFeedsState extends State<AdminPublicFeeds> {
     try {
       switch (action) {
         case 'flag':
-          final reason = await _askActionReason(
-            context,
-            'Flag Note',
-            'Why are you flagging this note?',
-          );
-          if (reason != null && reason.trim().isNotEmpty) {
-            await AdminService.instance.flagNote(
-              noteOwnerId,
-              noteId,
-              reason.trim(),
+          // Check if note is already flagged
+          final noteDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(noteOwnerId)
+              .collection('notes')
+              .doc(noteId)
+              .get();
+
+          final isFlagged = noteDoc.data()?['flagged'] == true;
+
+          if (isFlagged) {
+            // Unflag the note
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: Text('Unflag Note'),
+                content: Text(
+                  'Are you sure you want to remove the flag from this note?',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: Text('Unflag'),
+                  ),
+                ],
+              ),
             );
-            displaySnackBar(context, 'Note flagged successfully');
+
+            if (confirmed == true) {
+              await AdminService.instance.unflagNote(noteOwnerId, noteId);
+              displaySnackBar(context, 'Note unflagged successfully');
+            }
+          } else {
+            // Flag the note
+            final reason = await _askActionReason(
+              context,
+              'Flag Note',
+              'Why are you flagging this note?',
+            );
+            if (reason != null && reason.trim().isNotEmpty) {
+              await AdminService.instance.flagNote(
+                noteOwnerId,
+                noteId,
+                reason.trim(),
+              );
+              displaySnackBar(context, 'Note flagged successfully');
+            }
           }
           break;
 

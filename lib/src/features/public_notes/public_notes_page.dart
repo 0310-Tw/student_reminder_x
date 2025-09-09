@@ -218,7 +218,7 @@ class PublicFeeds extends StatelessWidget {
 
             final docs = snap.data!.docs;
             if (docs.isEmpty) {
-              return const Center(
+              return  Center(
                 child: Text(
                   'No notes to show. Click the + button to add a note.',
                 ),

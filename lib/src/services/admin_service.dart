@@ -279,6 +279,29 @@ class AdminService {
     });
   }
 
+  // Unflag a note
+  Future<void> unflagNote(String userId, String noteId) async {
+    final currentUser = AuthService.instance.currentUser;
+    if (currentUser == null) {
+      throw Exception('User not authenticated');
+    }
+
+    await _db
+        .collection('users')
+        .doc(userId)
+        .collection('notes')
+        .doc(noteId)
+        .update({
+          'flagged': false,
+          'unflaggedAt': FieldValue.serverTimestamp(),
+          'unflaggedBy': currentUser.uid,
+          'flagReason': FieldValue.delete(), // Remove the flag reason
+        });
+
+    // Log admin action
+    await _logAdminAction('note_unflag', {'userId': userId, 'noteId': noteId});
+  }
+
   // Suspend a note (hide from public view)
   Future<void> suspendNote(String userId, String noteId, String reason) async {
     final currentUser = AuthService.instance.currentUser;

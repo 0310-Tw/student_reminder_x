@@ -180,8 +180,12 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
         final user = snap.data;
         if (user == null) return LoginPage();
         return Scaffold(
+          
           body: _pages[_index],
           bottomNavigationBar: NavigationBar(
+            indicatorShape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
             selectedIndex: _index,
             destinations: _buildNavigationDestinations(),
             onDestinationSelected: (i) => setState(() => _index = i),
