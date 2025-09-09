@@ -613,6 +613,4 @@ class AdminService {
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
-
-
 }
