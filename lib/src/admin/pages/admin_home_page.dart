@@ -357,11 +357,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
             onPressed: () async {
               try {
                 await AdminService.instance.deleteUser(userId);
-                await _sendUserNotification(
-                  userId,
-                  'Account Deleted',
-                  'Your account has been permanently deleted by an administrator.',
-                );
+                // Note: No notification sent as user document is deleted
 
                 if (mounted) {
                   Navigator.pop(context);
@@ -513,8 +509,8 @@ class _AdminHomePageState extends State<AdminHomePage> {
                 await AdminService.instance.unflagUser(userId);
                 await _sendUserNotification(
                   userId,
-                  'Account Unflagged',
-                  'Your account flag has been removed.',
+                  'Account Flag Removed',
+                  'The flag on your account has been removed.',
                 );
 
                 if (mounted) {

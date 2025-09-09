@@ -1,110 +1,71 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendEveningReminder = exports.sendMorningReminder = exports.sendTopicNotification = exports.sendPushNotification = void 0;
-const functions = require("firebase-functions");
-const admin = require("firebase-admin");
+const {onRequest} = require("firebase-functions/v2/https");
+const logger = require("firebase-functions/logger");
+const admin = require('firebase-admin');
+
 admin.initializeApp();
-// Send notification to a single device
-exports.sendPushNotification = functions.runWith({
-    memory: '256MB',
-    timeoutSeconds: 60
-}).https.onRequest(async (req, res) => {
-    // Enable CORS for web testing
-    res.set('Access-Control-Allow-Origin', '*');
-    res.set('Access-Control-Allow-Methods', 'GET, POST');
-    res.set('Access-Control-Allow-Headers', 'Content-Type');
-    if (req.method === 'OPTIONS') {
-        res.status(204).send('');
-        return;
-    }
-    const { title, body, token } = req.body;
+
+// Simple test function
+exports.helloWorld = onRequest((request, response) => {
+  logger.info("Hello logs!", {structuredData: true});
+  response.send("Hello from Firebase!");
+});
+
+// Enhanced notification sending function for testing
+exports.sendFCMNotification = onRequest(async (request, response) => {
+  try {
+    const { token, title, body, type } = request.body;
+    
     if (!token || !title || !body) {
-        res.status(400).send({ success: false, error: "Missing title, body, or token" });
-        return;
+      response.status(400).send({ error: 'Missing required fields: token, title, body' });
+      return;
     }
-    const message = {
-        notification: { title, body },
-        token,
-    };
-    console.log("sendPushNotification called with:", { title, body, token });
-    try {
-        const response = await admin.messaging().send(message);
-        res.send({ success: true, response });
-    }
-    catch (error) {
-        res.status(500).send({
-            success: false,
-            error: "Failed to send notification",
-            details: error.message || error,
-        });
-    }
-});
-// Send notification to a topic
-exports.sendTopicNotification = functions.https.onRequest(async (req, res) => {
-    // Enable CORS for web testing
-    res.set('Access-Control-Allow-Origin', '*');
-    res.set('Access-Control-Allow-Methods', 'GET, POST');
-    res.set('Access-Control-Allow-Headers', 'Content-Type');
-    if (req.method === 'OPTIONS') {
-        res.status(204).send('');
-        return;
-    }
-    const { title, body, topic } = req.body;
-    if (!topic || !title || !body) {
-        res.status(400).send({ success: false, error: "Missing title, body, or topic" });
-        return;
-    }
-    const message = {
-        notification: { title, body },
-        topic,
-    };
-    console.log("sendTopicNotification called with:", { title, body, topic });
-    try {
-        const response = await admin.messaging().send(message);
-        res.send({ success: true, response });
-    }
-    catch (error) {
-        res.status(500).send({
-            success: false,
-            error: "Failed to send topic notification",
-            details: error.message || error,
-        });
-    }
-});
-// Scheduled functions for daily reminders
-exports.sendMorningReminder = functions.pubsub.schedule('0 8 * * 1-5')
-    .timeZone('America/New_York') // Adjust to your timezone
-    .onRun(async (context) => {
-    const message = {
+
+    // Construct the FCM payload with enhanced foreground support
+    const payload = {
+      token: token,
+      notification: {
+        title: title,
+        body: body,
+      },
+      data: {
+        type: type || 'admin_action',
+        timestamp: Date.now().toString(),
+      },
+      // Enhanced options for foreground delivery
+      android: {
+        priority: 'high',
         notification: {
-            title: 'Time to Check In!',
-            body: "Don't forget to mark your attendance for today.",
+          channelId: 'admin_actions',
+          priority: 'high',
+          defaultSound: true,
+          defaultVibrateTimings: true,
         },
-        topic: 'morning_reminders',
-    };
-    try {
-        const response = await admin.messaging().send(message);
-        console.log('Morning reminder sent:', response);
-    }
-    catch (error) {
-        console.error('Error sending morning reminder:', error);
-    }
-});
-exports.sendEveningReminder = functions.pubsub.schedule('55 15 * * 1-5')
-    .timeZone('America/New_York') // Adjust to your timezone
-    .onRun(async (context) => {
-    const message = {
-        notification: {
-            title: 'Time to Check Out!',
-            body: "Don't forget to mark your departure for today.",
+      },
+      apns: {
+        payload: {
+          aps: {
+            alert: {
+              title: title,
+              body: body,
+            },
+            sound: 'default',
+            badge: 1,
+            'content-available': 1,
+          },
         },
-        topic: 'evening_reminders',
+        headers: {
+          'apns-priority': '10',
+        },
+      },
     };
-    try {
-        const response = await admin.messaging().send(message);
-        console.log('Evening reminder sent:', response);
-    }
-    catch (error) {
-        console.error('Error sending evening reminder:', error);
-    }
+
+    // Send the message
+    const messageId = await admin.messaging().send(payload);
+    console.log('Successfully sent message:', messageId);
+
+    response.send({ success: true, messageId: messageId });
+  } catch (error) {
+    console.error('Error sending FCM message:', error);
+    response.status(500).send({ error: error.message });
+  }
 });

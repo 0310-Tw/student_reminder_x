@@ -143,6 +143,11 @@ class AdminService {
 
   // Unflag a user
   Future<void> unflagUser(String userId) async {
+    final currentUser = AuthService.instance.currentUser;
+    if (currentUser == null) {
+      throw Exception('User not authenticated');
+    }
+
     await _db.collection('users').doc(userId).update({
       'flagged': FieldValue.delete(),
       'flaggedAt': FieldValue.delete(),
@@ -608,4 +613,6 @@ class AdminService {
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
+
+
 }

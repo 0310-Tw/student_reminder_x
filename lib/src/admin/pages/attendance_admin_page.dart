@@ -20,7 +20,6 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
 
   // Real-time synchronization
   StreamSubscription<QuerySnapshot>? _attendanceSubscription;
-  Map<String, Map<String, dynamic>> _attendanceCache = {};
 
   @override
   void initState() {
@@ -55,16 +54,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
         .snapshots()
         .listen((snapshot) {
           if (mounted) {
-            // Update the cache with new data
-            for (final change in snapshot.docChanges) {
-              final doc = change.doc;
-              final data = doc.data();
-              if (data != null) {
-                _attendanceCache[doc.id] = data;
-              }
-            }
-
-            // Refresh the UI
+            // Refresh the UI when attendance data changes
             setState(() {});
           }
         });
@@ -375,6 +365,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     final data = doc?.data() as Map<String, dynamic>? ?? {};
     final dateStr = _formatDateString(date);
     final status = data['status'] ?? 'not_marked';
+    final timingStatus = data['timingStatus'] as String?; // New timing info
     // Check both new format (inAt) and backward compatibility (clockInAt)
     final clockInAt = (data['inAt'] ?? data['clockInAt']) as Timestamp?;
     final clockOutAt = (data['outAt'] ?? data['clockOutAt']) as Timestamp?;
@@ -396,9 +387,17 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                   _formatDisplayDate(date),
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
-                _buildStatusChip(
-                  status,
-                  isRealTime: _attendanceSubscription != null,
+                Row(
+                  children: [
+                    _buildStatusChip(
+                      status,
+                      isRealTime: _attendanceSubscription != null,
+                    ),
+                    if (timingStatus != null && status == 'present') ...[
+                      const SizedBox(width: 8),
+                      _buildTimingBadge(timingStatus),
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -570,6 +569,42 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildTimingBadge(String timingStatus) {
+    Color color;
+    String label;
+
+    switch (timingStatus) {
+      case 'early':
+        color = Colors.blue;
+        label = 'Early';
+        break;
+      case 'late':
+        color = Colors.orange;
+        label = 'Late';
+        break;
+      default:
+        color = Colors.grey;
+        label = timingStatus;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.4), width: 0.5),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w500,
+          color: color.withOpacity(0.8),
+        ),
       ),
     );
   }
@@ -877,7 +912,6 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                     ),
                   ),
                 ],
-               
               ],
             ),
           ),

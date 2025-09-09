@@ -247,20 +247,11 @@ class _DayItem {
   String get rawStatus => (data?['status'] ?? 'absent').toString();
 
   String get status {
-    // Handle new present status with timing info
-    if (rawStatus.toLowerCase() == 'present') {
-      final clockInTiming = data?['clockInTiming'] as String?;
-      if (clockInTiming != null) {
-        return clockInTiming; // Return 'early' or 'late'
-      }
-      return 'present'; // Fallback for admin-marked present without timing
-    }
-    
-    // Legacy status handling
+    if (rawStatus.toLowerCase().startsWith('present')) return 'present';
     if (rawStatus.toLowerCase().startsWith('early')) return 'early';
     if (rawStatus.toLowerCase().startsWith('late')) return 'late';
     if (rawStatus.toLowerCase().startsWith('in_progress')) return 'in_progress';
-    return rawStatus.toLowerCase() == 'absent' ? 'absent' : rawStatus.toLowerCase();
+    return 'absent';
   }
 
   String? get reason {
@@ -270,8 +261,17 @@ class _DayItem {
     return data?['lateReason'] as String?;
   }
 
-  DateTime? get inAt => (data?['inAt'] as Timestamp?)?.toDate();
-  DateTime? get outAt => (data?['outAt'] as Timestamp?)?.toDate();
+  DateTime? get inAt {
+    // Handle both new format (inAt) and backward compatibility (clockInAt)
+    final timestamp = data?['inAt'] ?? data?['clockInAt'];
+    return (timestamp as Timestamp?)?.toDate();
+  }
+
+  DateTime? get outAt {
+    // Handle both new format (outAt) and backward compatibility (clockOutAt)
+    final timestamp = data?['outAt'] ?? data?['clockOutAt'];
+    return (timestamp as Timestamp?)?.toDate();
+  }
 
   // Admin tracking information
   bool get isAdminMarked => data?['adminMarked'] == true;
@@ -282,12 +282,12 @@ class _DayItem {
 
 Color _statusColor(String status) {
   switch (status) {
+    case 'present':
+      return Colors.green;
     case 'early':
       return Colors.green;
     case 'late':
       return Colors.orange;
-    case 'present':
-      return Colors.green; // Present should be green like early
     case 'in_progress':
       return Colors.blue;
     case 'absent':
@@ -346,10 +346,6 @@ Widget _statusChip(String status, [String? reason]) {
       break;
     case 'late':
       c = Colors.orange;
-      break;
-    case 'present':
-      c = Colors.green;
-      label = 'PRESENT';
       break;
     case 'in_progress':
       c = Colors.blue;
@@ -572,10 +568,16 @@ class _DayMapModalState extends State<DayMapModal> {
     if (data != null) {
       setState(() {
         status = (data['status'] as String?) ?? 'absent';
-        inAt = (data['inAt'] as Timestamp?)?.toDate();
-        outAt = (data['outAt'] as Timestamp?)?.toDate();
-        _inLoc = _toLatLng(data['inLoc']);
-        _outLoc = _toLatLng(data['outLoc']);
+        // Handle both new format (inAt) and backward compatibility (clockInAt)
+        final inTimestamp = data['inAt'] ?? data['clockInAt'];
+        inAt = (inTimestamp as Timestamp?)?.toDate();
+        // Handle both new format (outAt) and backward compatibility (clockOutAt)
+        final outTimestamp = data['outAt'] ?? data['clockOutAt'];
+        outAt = (outTimestamp as Timestamp?)?.toDate();
+        // Handle both new format (inLoc) and backward compatibility (clockInLoc)
+        _inLoc = _toLatLng(data['inLoc'] ?? data['clockInLoc']);
+        // Handle both new format (outLoc) and backward compatibility (clockOutLoc)
+        _outLoc = _toLatLng(data['outLoc'] ?? data['clockOutLoc']);
         _mapReady = true;
       });
     }
@@ -583,6 +585,13 @@ class _DayMapModalState extends State<DayMapModal> {
 
   LatLng? _toLatLng(dynamic data) {
     if (data is GeoPoint) return LatLng(data.latitude, data.longitude);
+    if (data is Map<String, dynamic>) {
+      final lat = data['lat'] as double?;
+      final lng = data['lng'] as double?;
+      if (lat != null && lng != null) {
+        return LatLng(lat, lng);
+      }
+    }
     return null;
   }
 

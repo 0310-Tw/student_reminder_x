@@ -247,23 +247,34 @@ class AttendanceService {
             .collection('events')
             .doc();
 
-        // Update attendance day with merge option to preserve existing fields
-        // Include check-in information to reflect as if user checked in
-        final checkInTime = JmTime.onDate(DateTime.parse(dateId), 8, 0); // Default to 8:00 AM for admin-marked attendance
-        
+        // Update attendance day with same structure as clockIn
+        // Get existing data to preserve timing info if it exists
+        final existingDoc = await transaction.get(dayRef);
+        final existingData = existingDoc.data() ?? {};
+
         transaction.set(dayRef, {
           'dayId': dateId,
           'status': 'present',
-          'clockInTiming': 'early', // Admin-marked attendance is considered on-time
-          'inAt': Timestamp.fromDate(checkInTime),
-          'clockInAt': Timestamp.fromDate(checkInTime), // backward compatibility
-          'inLoc': {'lat': 0.0, 'lng': 0.0}, // Default location for admin-marked
-          'clockInLoc': {'lat': 0.0, 'lng': 0.0}, // backward compatibility
+          'timingStatus':
+              existingData['timingStatus'], // Preserve existing timing
+          'inAt': existingData['inAt'] ?? FieldValue.serverTimestamp(),
+          'clockInAt':
+              existingData['clockInAt'] ??
+              FieldValue.serverTimestamp(), // backward compatibility
+          'inLoc': existingData['inLoc'],
+          'clockInLoc': existingData['clockInLoc'], // backward compatibility
+          'outAt': existingData['outAt'], // Preserve if exists
+          'clockOutAt': existingData['clockOutAt'], // backward compatibility
+          'outLoc': existingData['outLoc'], // Preserve if exists
+          'clockOutLoc': existingData['clockOutLoc'], // backward compatibility
+          'lateReason': existingData['lateReason'], // Preserve existing reason
           'adminMarked': true,
           'markedByAdmin': adminUid,
           'markedByAdminEmail': adminEmail,
           'markedByAdminName': adminName,
           'markedAt': FieldValue.serverTimestamp(),
+          'createdAt':
+              existingData['createdAt'] ?? FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
 
@@ -359,23 +370,30 @@ class AttendanceService {
             .collection('events')
             .doc();
 
-        // Prepare update data
+        // Get existing data to preserve some fields if they exist
+        final existingDoc = await transaction.get(dayRef);
+        final existingData = existingDoc.data() ?? {};
+
+        // Prepare update data - mark absent but preserve timing info if user had checked in
         Map<String, dynamic> updateData = {
           'dayId': dateId,
           'status': 'absent',
+          'timingStatus': null, // Clear timing status when marked absent
+          'inAt': null, // Clear check-in when marked absent
+          'clockInAt': null, // backward compatibility
+          'inLoc': null, // Clear location when marked absent
+          'clockInLoc': null, // backward compatibility
+          'outAt': null, // Clear check-out when marked absent
+          'clockOutAt': null, // backward compatibility
+          'outLoc': null, // Clear location when marked absent
+          'clockOutLoc': null, // backward compatibility
           'adminMarked': true,
           'markedByAdmin': adminUid,
           'markedByAdminEmail': adminEmail,
           'markedByAdminName': adminName,
           'markedAt': FieldValue.serverTimestamp(),
-          'inAt': null,
-          'clockInAt': null,
-          'inLoc': null,
-          'clockInLoc': null,
-          'outAt': null,
-          'clockOutAt': null,
-          'outLoc': null,
-          'clockOutLoc': null,
+          'createdAt':
+              existingData['createdAt'] ?? FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
         };
 
@@ -627,11 +645,11 @@ class AttendanceService {
         throw StateError('Already clocked in.');
       }
 
-      final clockInTiming = statusFromClockIn(ts);
+      final timingStatus = statusFromClockIn(ts); // 'early' or 'late'
       final write = <String, dynamic>{
         'dayId': JmTime.dateId(ts),
-        'status': 'present', // Mark as present when user checks in
-        'clockInTiming': clockInTiming, // Keep timing info ('early'|'late')
+        'status': 'present', // Always mark as present when user checks in
+        'timingStatus': timingStatus, // Keep timing info for admin reference
         'inAt': Timestamp.fromDate(ts),
         'clockInAt': Timestamp.fromDate(ts), // backward compatibility
         'inLoc': {'lat': lat, 'lng': lng},
@@ -640,7 +658,13 @@ class AttendanceService {
         'clockOutAt': null, // backward compatibility
         'outLoc': null,
         'clockOutLoc': null, // backward compatibility
-        'lateReason': clockInTiming == 'late' ? (lateReason ?? '') : null,
+        'lateReason': timingStatus == 'late' ? (lateReason ?? '') : null,
+        // Preserve admin marking info if it exists
+        'adminMarked': data?['adminMarked'],
+        'markedByAdmin': data?['markedByAdmin'],
+        'markedByAdminEmail': data?['markedByAdminEmail'],
+        'markedByAdminName': data?['markedByAdminName'],
+        'markedAt': data?['markedAt'],
         'createdAt': data?['createdAt'] ?? Timestamp.fromDate(ts),
         'updatedAt': Timestamp.fromDate(ts),
       };
@@ -754,12 +778,57 @@ class AttendanceService {
       if (userDoc.exists) {
         final userData = userDoc.data()!;
         final fcmToken = userData['fcmToken'];
+        final userName =
+            '${userData['firstName'] ?? ''} ${userData['lastName'] ?? ''}'
+                .trim();
 
-        // Try to send push notification if FCM token exists
+        // Enhanced notification data for foreground handling
+        final notificationData = {
+          'type': 'attendance_update',
+          'userId': targetUid,
+          'title': title,
+          'body': body,
+          'action': action,
+          'adminId': adminUid,
+          'attendanceDate': dateId,
+          'timestamp': DateTime.now().toIso8601String(),
+          'priority': 'high',
+          'show_in_foreground': 'true', // Key flag for foreground display
+        };
+
+        // Send enhanced push notification using FCM Messages collection
         if (fcmToken != null && fcmToken.toString().isNotEmpty) {
           try {
-            // TODO: Implement push notification when NotificationService is available
-            print('Would send push notification: $title - $body');
+            await FirebaseFirestore.instance.collection('fcm_messages').add({
+              'token': fcmToken,
+              'notification': {'title': title, 'body': body},
+              'data': notificationData,
+              'android': {
+                'notification': {
+                  'channel_id': 'admin_actions',
+                  'priority': 'high',
+                  'notification_priority': 'PRIORITY_HIGH',
+                  'visibility': 'public',
+                  'default_sound': true,
+                  'default_vibrate_timings': true,
+                  'show_when': true,
+                },
+              },
+              'apns': {
+                'payload': {
+                  'aps': {
+                    'alert': {'title': title, 'body': body},
+                    'badge': 1,
+                    'sound': 'default',
+                    'content-available':
+                        1, // Ensures delivery even in foreground
+                    'mutable-content': 1,
+                  },
+                },
+              },
+            });
+
+            print('Enhanced push notification sent successfully to $userName');
           } catch (e) {
             print('Push notification failed: $e');
           }
@@ -774,15 +843,16 @@ class AttendanceService {
               'title': title,
               'body': body,
               'type': 'attendance_update',
-              'priority': 'normal',
+              'priority': 'high',
               'read': false,
               'actionBy': adminUid,
               'action': action,
               'attendanceDate': dateId,
+              'data': notificationData,
               'createdAt': FieldValue.serverTimestamp(),
             });
 
-        print('In-app notification stored for user $targetUid');
+        print('Enhanced notification sent and stored for user $userName');
       }
     } catch (e) {
       print('Error sending admin action notification: $e');

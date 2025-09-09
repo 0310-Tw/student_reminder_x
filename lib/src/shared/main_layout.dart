@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:students_reminder/src/features/auth/login_page.dart';
 import 'package:students_reminder/src/features/home/home_page.dart';
 import 'package:students_reminder/src/features/notes/my_notes_page.dart';
@@ -8,6 +9,7 @@ import 'package:students_reminder/src/features/public_notes/public_notes_page.da
 import 'package:students_reminder/src/history/attendance_history.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/admin_service.dart';
+import 'package:students_reminder/src/services/notification_service.dart';
 import 'package:students_reminder/src/admin/pages/admin_home_page.dart';
 import 'package:students_reminder/src/admin/pages/admin_public_feeds.dart';
 import 'package:students_reminder/src/admin/pages/attendance_admin_page.dart';
@@ -29,6 +31,44 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
   void initState() {
     super.initState();
     _checkAdminStatus();
+    _initializeNotifications();
+  }
+
+  // Initialize notifications for logged-in users
+  Future<void> _initializeNotifications() async {
+    try {
+      await NotificationService.initialize();
+      print('Foreground notifications initialized for logged-in user');
+
+      // Update FCM token for this user
+      final token = await NotificationService.getToken();
+      if (token != null) {
+        await _updateUserFCMToken(token);
+      }
+
+      // Listen for token refresh
+      NotificationService.onTokenRefresh((newToken) {
+        _updateUserFCMToken(newToken);
+      });
+    } catch (e) {
+      print('Failed to initialize foreground notifications: $e');
+    }
+  }
+
+  // Update user's FCM token in Firestore
+  Future<void> _updateUserFCMToken(String token) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update({'fcmToken': token});
+        print('FCM token updated for logged-in user');
+      }
+    } catch (e) {
+      print('Failed to update FCM token: $e');
+    }
   }
 
   Future<void> _checkAdminStatus() async {
