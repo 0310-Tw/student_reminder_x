@@ -9,6 +9,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:students_reminder/src/services/attendance_service.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/shared/misc.dart';
+import 'package:students_reminder/src/widgets/suspension_check.dart';
 
 class AttendanceHistory14d extends StatefulWidget {
   const AttendanceHistory14d({super.key});
@@ -44,65 +45,70 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Clock In / Clock Out buttons
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _clockIn(uid),
-                    icon: const Icon(Icons.login),
-                    label: const Text("Clock In"),
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 48),
+      body: SuspensionCheck(
+        child: Column(
+          children: [
+            // Clock In / Clock Out buttons
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _clockIn(uid),
+                      icon: const Icon(Icons.login),
+                      label: const Text("Clock In"),
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 48),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _clockOut(uid),
-                    icon: const Icon(Icons.logout),
-                    label: const Text("Clock Out"),
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 48),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _clockOut(uid),
+                      icon: const Icon(Icons.logout),
+                      label: const Text("Clock Out"),
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 48),
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          Expanded(
-            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: AttendanceService.streamLast14Days(uid),
-              builder: (context, snap) {
-                if (snap.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final docs =
-                    snap.data?.docs ??
-                    <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-                final byDate = {
-                  for (final d in docs) (d.data()['dayId'] as String): d.data(),
-                };
+            Expanded(
+              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: AttendanceService.streamLast14Days(uid),
+                builder: (context, snap) {
+                  if (snap.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final docs =
+                      snap.data?.docs ??
+                      <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                  final byDate = {
+                    for (final d in docs)
+                      (d.data()['dayId'] as String): d.data(),
+                  };
 
-                final items = <_DayItem>[];
-                for (int i = 13; i >= 0; i--) {
-                  final day = end.subtract(Duration(days: i));
-                  final id = JmTime.dateId(day);
-                  items.add(_DayItem(date: day, dateId: id, data: byDate[id]));
-                }
+                  final items = <_DayItem>[];
+                  for (int i = 13; i >= 0; i--) {
+                    final day = end.subtract(Duration(days: i));
+                    final id = JmTime.dateId(day);
+                    items.add(
+                      _DayItem(date: day, dateId: id, data: byDate[id]),
+                    );
+                  }
 
-                return _showCalendar
-                    ? _CalendarGrid(uid: uid, days: items)
-                    : _HistoryList(uid: uid, days: items);
-              },
+                  return _showCalendar
+                      ? _CalendarGrid(uid: uid, days: items)
+                      : _HistoryList(uid: uid, days: items);
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

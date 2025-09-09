@@ -112,204 +112,260 @@ class _AdminHomePageState extends State<AdminHomePage> {
                           vertical: 12,
                         ),
                         color: isFlagged ? Colors.orange.shade50 : Colors.white,
-                        child: Row(
+                        child: Column(
                           children: [
-                            // User Avatar
-                            CircleAvatar(
-                              radius: 20,
-                              backgroundColor: _getInitialColor(name),
-                              child: Text(
-                                name.isNotEmpty ? name[0].toUpperCase() : '?',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
+                            Row(
+                              children: [
+                                // User Avatar
+                                CircleAvatar(
+                                  radius: 20,
+                                  backgroundColor: _getInitialColor(name),
+                                  child: Text(
+                                    name.isNotEmpty
+                                        ? name[0].toUpperCase()
+                                        : '?',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
-                            SizedBox(width: 12),
+                                SizedBox(width: 12),
 
-                            // User Info
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
+                                // User Info
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      Expanded(
-                                        child: Text(
-                                          name,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 16,
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              name,
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 16,
+                                              ),
+                                            ),
                                           ),
+                                          if (isFlagged)
+                                            Container(
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal: 8,
+                                                vertical: 2,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.orange,
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                              child: Text(
+                                                'FLAGGED',
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                      SizedBox(height: 2),
+                                      Text(
+                                        course == 'mobile'
+                                            ? 'Mobile App Development'
+                                            : 'Web App Development',
+                                        style: TextStyle(
+                                          color: Colors.grey.shade600,
+                                          fontSize: 14,
                                         ),
                                       ),
-                                      if (isFlagged)
-                                        Container(
-                                          padding: EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 2,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Colors.orange,
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            'FLAGGED',
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
+                                      Text(
+                                        email,
+                                        style: TextStyle(
+                                          color: Colors.grey.shade500,
+                                          fontSize: 12,
                                         ),
+                                      ),
                                     ],
                                   ),
-                                  SizedBox(height: 2),
-                                  Text(
-                                    course == 'mobile'
-                                        ? 'Mobile App Development'
-                                        : 'Web App Development',
-                                    style: TextStyle(
-                                      color: Colors.grey.shade600,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  Text(
-                                    email,
-                                    style: TextStyle(
-                                      color: Colors.grey.shade500,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                                ),
 
-                            // Action Buttons (Right Side)
-                            if (!isMe) ...[
-                              PopupMenuButton<String>(
-                                onSelected: (value) {
-                                  switch (value) {
-                                    case 'flag':
-                                      if (isFlagged) {
-                                        _showUnflagDialog(doc.id, name);
-                                      } else {
-                                        _showFlagDialog(doc.id, name);
+                                // Action Buttons (Right Side)
+                                if (!isMe) ...[
+                                  PopupMenuButton<String>(
+                                    onSelected: (value) {
+                                      switch (value) {
+                                        case 'flag':
+                                          if (isFlagged) {
+                                            _showUnflagDialog(doc.id, name);
+                                          } else {
+                                            _showFlagDialog(doc.id, name);
+                                          }
+                                          break;
+                                        case 'suspend':
+                                          if (isSuspended) {
+                                            _showUnsuspendDialog(doc.id, name);
+                                          } else {
+                                            _showSuspendDialog(doc.id, name);
+                                          }
+                                          break;
+                                        case 'profile':
+                                          Navigator.pushNamed(
+                                            context,
+                                            '/student/${doc.id}',
+                                          );
+                                          break;
+                                        case 'notifications':
+                                          _showNotificationHistory(
+                                            doc.id,
+                                            name,
+                                          );
+                                          break;
+                                        case 'delete':
+                                          _showDeleteDialog(doc.id, name);
+                                          break;
                                       }
-                                      break;
-                                    case 'suspend':
-                                      if (isSuspended) {
-                                        _showUnsuspendDialog(doc.id, name);
-                                      } else {
-                                        _showSuspendDialog(doc.id, name);
-                                      }
-                                      break;
-                                    case 'profile':
-                                      Navigator.pushNamed(
-                                        context,
-                                        '/student/${doc.id}',
-                                      );
-                                      break;
-                                    case 'notifications':
-                                      _showNotificationHistory(doc.id, name);
-                                      break;
-                                    case 'delete':
-                                      _showDeleteDialog(doc.id, name);
-                                      break;
-                                  }
-                                },
-                                itemBuilder: (context) => [
-                                  PopupMenuItem(
-                                    value: 'flag',
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          isFlagged
-                                              ? Icons.flag_outlined
-                                              : Icons.flag,
-                                          color: Colors.orange,
-                                          size: 20,
+                                    },
+                                    itemBuilder: (context) => [
+                                      PopupMenuItem(
+                                        value: 'flag',
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              isFlagged
+                                                  ? Icons.flag_outlined
+                                                  : Icons.flag,
+                                              color: Colors.orange,
+                                              size: 20,
+                                            ),
+                                            SizedBox(width: 12),
+                                            Text(
+                                              isFlagged
+                                                  ? 'Unflag User'
+                                                  : 'Flag User',
+                                            ),
+                                          ],
                                         ),
-                                        SizedBox(width: 12),
-                                        Text(
-                                          isFlagged
-                                              ? 'Unflag User'
-                                              : 'Flag User',
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'suspend',
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              isSuspended
+                                                  ? Icons.check_circle
+                                                  : Icons.block,
+                                              color: isSuspended
+                                                  ? Colors.green
+                                                  : Colors.red,
+                                              size: 20,
+                                            ),
+                                            SizedBox(width: 12),
+                                            Text(
+                                              isSuspended
+                                                  ? 'Unsuspend User'
+                                                  : 'Suspend User',
+                                            ),
+                                          ],
                                         ),
-                                      ],
-                                    ),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'suspend',
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          isSuspended
-                                              ? Icons.check_circle
-                                              : Icons.block,
-                                          color: isSuspended
-                                              ? Colors.green
-                                              : Colors.red,
-                                          size: 20,
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'profile',
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.person,
+                                              color: Colors.blue,
+                                              size: 20,
+                                            ),
+                                            SizedBox(width: 12),
+                                            Text('View Profile'),
+                                          ],
                                         ),
-                                        SizedBox(width: 12),
-                                        Text(
-                                          isSuspended
-                                              ? 'Unsuspend User'
-                                              : 'Suspend User',
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'notifications',
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.history,
+                                              color: Colors.purple,
+                                              size: 20,
+                                            ),
+                                            SizedBox(width: 12),
+                                            Text('Notification History'),
+                                          ],
                                         ),
-                                      ],
-                                    ),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'profile',
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.person,
-                                          color: Colors.blue,
-                                          size: 20,
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'delete',
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.delete,
+                                              color: Colors.red,
+                                              size: 20,
+                                            ),
+                                            SizedBox(width: 12),
+                                            Text('Delete User'),
+                                          ],
                                         ),
-                                        SizedBox(width: 12),
-                                        Text('View Profile'),
-                                      ],
-                                    ),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'notifications',
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.history,
-                                          color: Colors.purple,
-                                          size: 20,
-                                        ),
-                                        SizedBox(width: 12),
-                                        Text('Notification History'),
-                                      ],
-                                    ),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'delete',
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.delete,
-                                          color: Colors.red,
-                                          size: 20,
-                                        ),
-                                        SizedBox(width: 12),
-                                        Text('Delete User'),
-                                      ],
+                                      ),
+                                    ],
+                                    child: Icon(
+                                      Icons.more_vert,
+                                      color: Colors.grey.shade600,
                                     ),
                                   ),
                                 ],
-                                child: Icon(
-                                  Icons.more_vert,
-                                  color: Colors.grey.shade600,
+                              ],
+                            ),
+                            // Status indicator at bottom center
+                            if (isFlagged || isSuspended) ...[
+                              SizedBox(height: 8),
+                              Center(
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isSuspended
+                                        ? Colors.red.shade100
+                                        : Colors.orange.shade100,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: isSuspended
+                                          ? Colors.red.shade300
+                                          : Colors.orange.shade300,
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        isSuspended ? Icons.block : Icons.flag,
+                                        size: 14,
+                                        color: isSuspended
+                                            ? Colors.red.shade700
+                                            : Colors.orange.shade700,
+                                      ),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        isSuspended ? 'SUSPENDED' : 'FLAGGED',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: isSuspended
+                                              ? Colors.red.shade700
+                                              : Colors.orange.shade700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ],
@@ -393,21 +449,26 @@ class _AdminHomePageState extends State<AdminHomePage> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Flag User'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Flag $userName?'),
-            SizedBox(height: 16),
-            TextField(
-              controller: reasonController,
-              decoration: InputDecoration(
-                labelText: 'Reason for flagging',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 3,
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Flag $userName?'),
+                SizedBox(height: 16),
+                TextField(
+                  controller: reasonController,
+                  decoration: InputDecoration(
+                    labelText: 'Reason for flagging',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 3,
+                ),
+              ],
             ),
-          ],
+          ),
         ),
         actions: [
           TextButton(
@@ -528,45 +589,50 @@ class _AdminHomePageState extends State<AdminHomePage> {
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
           title: Text('Suspend User'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Suspend $userName?'),
-              SizedBox(height: 16),
-              TextField(
-                controller: reasonController,
-                decoration: InputDecoration(
-                  labelText: 'Reason for suspension',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 3,
-              ),
-              SizedBox(height: 16),
-              Row(
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Suspend until: '),
-                  TextButton(
-                    onPressed: () async {
-                      final date = await showDatePicker(
-                        context: context,
-                        initialDate: DateTime.now().add(Duration(days: 7)),
-                        firstDate: DateTime.now(),
-                        lastDate: DateTime.now().add(Duration(days: 365)),
-                      );
-                      if (date != null) {
-                        setState(() => suspendUntil = date);
-                      }
-                    },
-                    child: Text(
-                      suspendUntil != null
-                          ? '${suspendUntil!.day}/${suspendUntil!.month}/${suspendUntil!.year}'
-                          : 'Select Date',
+                  Text('Suspend $userName?'),
+                  SizedBox(height: 16),
+                  TextField(
+                    controller: reasonController,
+                    decoration: InputDecoration(
+                      labelText: 'Reason for suspension',
+                      border: OutlineInputBorder(),
                     ),
+                    maxLines: 3,
+                  ),
+                  SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Text('Suspend until: '),
+                      TextButton(
+                        onPressed: () async {
+                          final date = await showDatePicker(
+                            context: context,
+                            initialDate: DateTime.now().add(Duration(days: 7)),
+                            firstDate: DateTime.now(),
+                            lastDate: DateTime.now().add(Duration(days: 365)),
+                          );
+                          if (date != null) {
+                            setState(() => suspendUntil = date);
+                          }
+                        },
+                        child: Text(
+                          suspendUntil != null
+                              ? '${suspendUntil!.day}/${suspendUntil!.month}/${suspendUntil!.year}'
+                              : 'Select Date',
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
           actions: [
             TextButton(

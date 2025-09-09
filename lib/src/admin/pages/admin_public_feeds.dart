@@ -48,16 +48,21 @@ class _AdminPublicFeedsState extends State<AdminPublicFeeds> {
             .collection('users')
             .doc(noteOwnerId)
             .get();
-        
+
         if (userDoc.exists) {
           final userData = userDoc.data() ?? {};
-          final firstName = (userData['firstName'] ?? '').toString().toLowerCase();
-          final lastName = (userData['lastName'] ?? '').toString().toLowerCase();
+          final firstName = (userData['firstName'] ?? '')
+              .toString()
+              .toLowerCase();
+          final lastName = (userData['lastName'] ?? '')
+              .toString()
+              .toLowerCase();
           final fullName = '$firstName $lastName'.trim();
-          
-          usernameMatches = firstName.contains(_searchQuery) || 
-                           lastName.contains(_searchQuery) || 
-                           fullName.contains(_searchQuery);
+
+          usernameMatches =
+              firstName.contains(_searchQuery) ||
+              lastName.contains(_searchQuery) ||
+              fullName.contains(_searchQuery);
         }
       } catch (e) {
         // If user fetch fails, continue with title matching only
@@ -138,17 +143,22 @@ class _AdminPublicFeedsState extends State<AdminPublicFeeds> {
                   return const Center(child: Text('No notes to show.'));
                 }
 
-                return FutureBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+                return FutureBuilder<
+                  List<QueryDocumentSnapshot<Map<String, dynamic>>>
+                >(
                   future: _filterDocuments(docs),
                   builder: (context, filterSnapshot) {
-                    if (filterSnapshot.connectionState == ConnectionState.waiting) {
+                    if (filterSnapshot.connectionState ==
+                        ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
                     }
 
                     final filteredDocs = filterSnapshot.data ?? docs;
-                    
+
                     if (filteredDocs.isEmpty && _searchQuery.isNotEmpty) {
-                      return const Center(child: Text('No notes match your search.'));
+                      return const Center(
+                        child: Text('No notes match your search.'),
+                      );
                     }
 
                     return ListView.separated(
@@ -156,272 +166,287 @@ class _AdminPublicFeedsState extends State<AdminPublicFeeds> {
                       separatorBuilder: (_, __) => const Divider(height: 2),
                       itemBuilder: (context, i) {
                         final doc = filteredDocs[i];
-                    final data = doc.data();
-                    final ref = doc.reference;
-                    final noteId = ref.id;
-                    final noteOwnerId = ref.parent.parent?.id ?? '';
+                        final data = doc.data();
+                        final ref = doc.reference;
+                        final noteId = ref.id;
+                        final noteOwnerId = ref.parent.parent?.id ?? '';
 
-                    final visible = (data['visibility'] ?? 'private') as String;
-                    final title = (data['title'] ?? '').toString();
-                    final body = (data['body'] ?? '').toString();
-                    final isFlagged = data['flagged'] == true;
+                        final visible =
+                            (data['visibility'] ?? 'private') as String;
+                        final title = (data['title'] ?? '').toString();
+                        final body = (data['body'] ?? '').toString();
+                        final isFlagged = data['flagged'] == true;
 
-                    final likes = (data['likesCount'] ?? 0) as int;
-                    final likedBy = Map<String, dynamic>.from(
-                      data['likedBy'] ?? const {},
-                    );
-                    final bool isLiked = likedBy[uid] == true;
+                        final likes = (data['likesCount'] ?? 0) as int;
+                        final likedBy = Map<String, dynamic>.from(
+                          data['likedBy'] ?? const {},
+                        );
+                        final bool isLiked = likedBy[uid] == true;
 
-                    return Card(
-                      margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      color: isFlagged ? Colors.red.shade50 : null,
-                      child: Padding(
-                        padding: EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Fetch and display user's actual name
-                            Row(
+                        return Card(
+                          margin: EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          color: isFlagged ? Colors.red.shade50 : null,
+                          child: Padding(
+                            padding: EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(
-                                  Icons.person,
-                                  size: 16,
-                                  color: Colors.grey,
+                                // Fetch and display user's actual name
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.person,
+                                      size: 16,
+                                      color: Colors.grey,
+                                    ),
+                                    SizedBox(width: 4),
+                                    FutureBuilder<DocumentSnapshot>(
+                                      future: FirebaseFirestore.instance
+                                          .collection('users')
+                                          .doc(noteOwnerId)
+                                          .get(),
+                                      builder: (context, userSnapshot) {
+                                        if (userSnapshot.connectionState ==
+                                            ConnectionState.waiting) {
+                                          return Text(
+                                            'Loading user...',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey,
+                                            ),
+                                          );
+                                        }
+
+                                        if (!userSnapshot.hasData ||
+                                            !userSnapshot.data!.exists) {
+                                          return Text(
+                                            'Unknown User',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey,
+                                            ),
+                                          );
+                                        }
+
+                                        final userData =
+                                            userSnapshot.data!.data()
+                                                as Map<String, dynamic>? ??
+                                            {};
+                                        final firstName =
+                                            userData['firstName'] ?? '';
+                                        final lastName =
+                                            userData['lastName'] ?? '';
+                                        final fullName = '$firstName $lastName'
+                                            .trim();
+
+                                        return Text(
+                                          'User: ${fullName.isNotEmpty ? fullName : 'Unknown User'}',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
                                 ),
-                                SizedBox(width: 4),
-                                FutureBuilder<DocumentSnapshot>(
-                                  future: FirebaseFirestore.instance
-                                      .collection('users')
-                                      .doc(noteOwnerId)
-                                      .get(),
-                                  builder: (context, userSnapshot) {
-                                    if (userSnapshot.connectionState ==
-                                        ConnectionState.waiting) {
-                                      return Text(
-                                        'Loading user...',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey,
+                                SizedBox(height: 8),
+
+                                // Header with visibility and admin info
+                                Row(
+                                  children: [
+                                    Chip(
+                                      label: Text(visible),
+                                      backgroundColor: isFlagged
+                                          ? Colors.red.shade200
+                                          : null,
+                                    ),
+                                    if (isFlagged) ...[
+                                      SizedBox(width: 8),
+                                      Chip(
+                                        label: Text(
+                                          'FLAGGED',
+                                          style: TextStyle(fontSize: 10),
                                         ),
-                                      );
-                                    }
-
-                                    if (!userSnapshot.hasData ||
-                                        !userSnapshot.data!.exists) {
-                                      return Text(
-                                        'Unknown User',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey,
+                                        backgroundColor: Colors.red,
+                                        labelStyle: TextStyle(
+                                          color: Colors.white,
                                         ),
-                                      );
-                                    }
-
-                                    final userData =
-                                        userSnapshot.data!.data()
-                                            as Map<String, dynamic>? ??
-                                        {};
-                                    final firstName =
-                                        userData['firstName'] ?? '';
-                                    final lastName = userData['lastName'] ?? '';
-                                    final fullName = '$firstName $lastName'
-                                        .trim();
-
-                                    return Text(
-                                      'User: ${fullName.isNotEmpty ? fullName : 'Unknown User'}',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey,
-                                        fontWeight: FontWeight.bold,
                                       ),
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: 8),
+                                    ],
+                                    SizedBox(width: 8),
 
-                            // Header with visibility and admin info
-                            Row(
-                              children: [
-                                Chip(
-                                  label: Text(visible),
-                                  backgroundColor: isFlagged
-                                      ? Colors.red.shade200
-                                      : null,
-                                ),
-                                if (isFlagged) ...[
-                                  SizedBox(width: 8),
-                                  Chip(
-                                    label: Text(
-                                      'FLAGGED',
-                                      style: TextStyle(fontSize: 10),
+                                    // Reports count indicator
+                                    StreamBuilder<QuerySnapshot>(
+                                      stream: ref
+                                          .collection('reports')
+                                          .snapshots(),
+                                      builder: (context, reportsSnapshot) {
+                                        if (!reportsSnapshot.hasData) {
+                                          return SizedBox.shrink();
+                                        }
+                                        final reportsCount =
+                                            reportsSnapshot.data!.docs.length;
+                                        if (reportsCount == 0) {
+                                          return SizedBox.shrink();
+                                        }
+
+                                        return Chip(
+                                          label: Text(
+                                            '$reportsCount Report${reportsCount > 1 ? 's' : ''}',
+                                            style: TextStyle(fontSize: 10),
+                                          ),
+                                          backgroundColor:
+                                              Colors.orange.shade200,
+                                          labelStyle: TextStyle(
+                                            color: Colors.orange.shade900,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        );
+                                      },
                                     ),
-                                    backgroundColor: Colors.red,
-                                    labelStyle: TextStyle(color: Colors.white),
+                                    Spacer(),
+                                  ],
+                                ),
+
+                                SizedBox(height: 8),
+
+                                // Note content
+                                if (title.isNotEmpty) ...[
+                                  Text(
+                                    title,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.bold),
                                   ),
+                                  SizedBox(height: 4),
                                 ],
-                                SizedBox(width: 8),
 
-                                // Reports count indicator
-                                StreamBuilder<QuerySnapshot>(
-                                  stream: ref.collection('reports').snapshots(),
-                                  builder: (context, reportsSnapshot) {
-                                    if (!reportsSnapshot.hasData) {
-                                      return SizedBox.shrink();
-                                    }
-                                    final reportsCount =
-                                        reportsSnapshot.data!.docs.length;
-                                    if (reportsCount == 0) {
-                                      return SizedBox.shrink();
-                                    }
-
-                                    return Chip(
-                                      label: Text(
-                                        '$reportsCount Report${reportsCount > 1 ? 's' : ''}',
-                                        style: TextStyle(fontSize: 10),
-                                      ),
-                                      backgroundColor: Colors.orange.shade200,
-                                      labelStyle: TextStyle(
-                                        color: Colors.orange.shade900,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    );
-                                  },
+                                Text(
+                                  body,
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                Spacer(),
-                              ],
-                            ),
 
-                            SizedBox(height: 8),
+                                SizedBox(height: 8),
 
-                            // Note content
-                            if (title.isNotEmpty) ...[
-                              Text(
-                                title,
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.bold),
-                              ),
-                              SizedBox(height: 4),
-                            ],
-
-                            Text(
-                              body,
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-
-                            SizedBox(height: 8),
-
-                            // User info section
-                            Row(
-                              children: [
-                                // Spacer(),
-                                // Admin actions for user
-                                if (noteOwnerId != uid) ...[
-                                  TextButton(
-                                    onPressed: () => _showUserAdminActions(
-                                      context,
-                                      noteOwnerId,
-                                    ),
-                                    child: Text(
-                                      'Manage User',
-                                      style: TextStyle(fontSize: 12),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-
-                            SizedBox(height: 12),
-
-                            // Actions row
-                            Row(
-                              children: [
-                                // Like section
-                                IconButton(
-                                  tooltip: isLiked ? 'Unlike' : 'Like',
-                                  icon: Icon(
-                                    isLiked
-                                        ? Icons.favorite
-                                        : Icons.favorite_border,
-                                    color: isLiked ? Colors.red : null,
-                                  ),
-                                  onPressed: () {
-                                    NotesService.instance.toggleLike(
-                                      noteRef: ref,
-                                      uid: uid,
-                                    );
-                                  },
+                                // User info section
+                                Row(
+                                  children: [
+                                    // Spacer(),
+                                    // Admin actions for user
+                                    if (noteOwnerId != uid) ...[
+                                      TextButton(
+                                        onPressed: () => _showUserAdminActions(
+                                          context,
+                                          noteOwnerId,
+                                        ),
+                                        child: Text(
+                                          'Manage User',
+                                          style: TextStyle(fontSize: 12),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
-                                Text('$likes'),
 
-                                Spacer(),
+                                SizedBox(height: 12),
 
-                                // Admin actions for note
-                                PopupMenuButton<String>(
-                                  icon: Icon(
-                                    Icons.admin_panel_settings,
-                                    color: Colors.red.shade700,
-                                  ),
-                                  onSelected: (action) =>
-                                      _handleNoteAdminAction(
-                                        context,
-                                        action,
-                                        ref,
-                                        noteId,
-                                        noteOwnerId,
-                                        title,
+                                // Actions row
+                                Row(
+                                  children: [
+                                    // Like section
+                                    IconButton(
+                                      tooltip: isLiked ? 'Unlike' : 'Like',
+                                      icon: Icon(
+                                        isLiked
+                                            ? Icons.favorite
+                                            : Icons.favorite_border,
+                                        color: isLiked ? Colors.red : null,
                                       ),
-                                  itemBuilder: (context) => [
-                                    PopupMenuItem(
-                                      value: 'flag',
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Icons.flag,
-                                            color: Colors.orange,
-                                          ),
-                                          SizedBox(width: 8),
-                                          Text(
-                                            isFlagged
-                                                ? 'Unflag Note'
-                                                : 'Flag Note',
-                                          ),
-                                        ],
-                                      ),
+                                      onPressed: () {
+                                        NotesService.instance.toggleLike(
+                                          noteRef: ref,
+                                          uid: uid,
+                                        );
+                                      },
                                     ),
-                                    PopupMenuItem(
-                                      value: 'delete',
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.delete, color: Colors.red),
-                                          SizedBox(width: 8),
-                                          Text('Delete Note'),
-                                        ],
-                                      ),
-                                    ),
+                                    Text('$likes'),
 
-                                    PopupMenuItem(
-                                      value: 'view_reports',
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Icons.visibility,
-                                            color: Colors.purple,
-                                          ),
-                                          SizedBox(width: 8),
-                                          Text('View Reports'),
-                                        ],
+                                    Spacer(),
+
+                                    // Admin actions for note
+                                    PopupMenuButton<String>(
+                                      icon: Icon(
+                                        Icons.admin_panel_settings,
+                                        color: Colors.red.shade700,
                                       ),
+                                      onSelected: (action) =>
+                                          _handleNoteAdminAction(
+                                            context,
+                                            action,
+                                            ref,
+                                            noteId,
+                                            noteOwnerId,
+                                            title,
+                                          ),
+                                      itemBuilder: (context) => [
+                                        PopupMenuItem(
+                                          value: 'flag',
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.flag,
+                                                color: Colors.orange,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text(
+                                                isFlagged
+                                                    ? 'Unflag Note'
+                                                    : 'Flag Note',
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        PopupMenuItem(
+                                          value: 'delete',
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.delete,
+                                                color: Colors.red,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text('Delete Note'),
+                                            ],
+                                          ),
+                                        ),
+
+                                        PopupMenuItem(
+                                          value: 'view_reports',
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.visibility,
+                                                color: Colors.purple,
+                                              ),
+                                              SizedBox(width: 8),
+                                              Text('View Reports'),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
                               ],
                             ),
-                          ],
-                        ),
-                      ),
+                          ),
                         );
                       },
                     );
