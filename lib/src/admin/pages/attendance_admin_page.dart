@@ -365,8 +365,29 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
   ) {
     final data = doc?.data() as Map<String, dynamic>? ?? {};
     final dateStr = _formatDateString(date);
-    final status = data['status'] ?? 'not_marked';
-    final timingStatus = data['timingStatus'] as String?; // New timing info
+    final rawStatus = data['status'] ?? 'not_marked';
+    
+    // Normalize status - if user has checked in (early/late), they are present
+    String status;
+    String? timingStatus;
+    
+    if (rawStatus.toString().toLowerCase().startsWith('early')) {
+      status = 'present';
+      timingStatus = 'early';
+    } else if (rawStatus.toString().toLowerCase().startsWith('late')) {
+      status = 'present';  
+      timingStatus = 'late';
+    } else if (rawStatus == 'present') {
+      status = 'present';
+      timingStatus = data['timingStatus'] as String?; // Check for explicit timing info
+    } else if (rawStatus == 'absent') {
+      status = 'absent';
+      timingStatus = null;
+    } else {
+      status = 'not_marked';
+      timingStatus = null;
+    }
+    
     // Check both new format (inAt) and backward compatibility (clockInAt)
     final clockInAt = (data['inAt'] ?? data['clockInAt']) as Timestamp?;
     final clockOutAt = (data['outAt'] ?? data['clockOutAt']) as Timestamp?;
