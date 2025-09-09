@@ -133,10 +133,21 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
         _showSnack("Late reason required.");
         return;
       }
-      status += " — Reason: $reason";
     } else {
       _showSnack("Too late to clock in.");
       return;
+    }
+
+    final attendanceData = {
+      'dayId': JmTime.dateId(now),
+      'inAt': Timestamp.fromDate(now),
+      'inLoc': GeoPoint(location.latitude, location.longitude),
+      'status': status,
+    };
+
+    // Add late reason as separate field if it exists
+    if (reason != null && reason.trim().isNotEmpty) {
+      attendanceData['lateReason'] = reason.trim();
     }
 
     await FirebaseFirestore.instance
@@ -144,16 +155,13 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
         .doc(uid)
         .collection('days')
         .doc(JmTime.dateId(now))
-        .set({
-          'dayId': JmTime.dateId(now),
-          'inAt': Timestamp.fromDate(now),
-          'inLoc': GeoPoint(location.latitude, location.longitude),
-          'status': status,
-        }, SetOptions(merge: true));
+        .set(attendanceData, SetOptions(merge: true));
 
-    _showSnack(
-      "Clocked in: $status at ${location.latitude}, ${location.longitude}",
-    );
+    final displayMessage = reason != null && reason.trim().isNotEmpty
+        ? "Clocked in: $status (Reason: $reason) at ${location.latitude}, ${location.longitude}"
+        : "Clocked in: $status at ${location.latitude}, ${location.longitude}";
+
+    _showSnack(displayMessage);
   }
 
   // ------------------ Clock Out ------------------

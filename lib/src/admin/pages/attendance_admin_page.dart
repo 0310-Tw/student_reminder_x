@@ -366,20 +366,21 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     final data = doc?.data() as Map<String, dynamic>? ?? {};
     final dateStr = _formatDateString(date);
     final rawStatus = data['status'] ?? 'not_marked';
-    
+
     // Normalize status - if user has checked in (early/late), they are present
     String status;
     String? timingStatus;
-    
+
     if (rawStatus.toString().toLowerCase().startsWith('early')) {
       status = 'present';
       timingStatus = 'early';
     } else if (rawStatus.toString().toLowerCase().startsWith('late')) {
-      status = 'present';  
+      status = 'present';
       timingStatus = 'late';
     } else if (rawStatus == 'present') {
       status = 'present';
-      timingStatus = data['timingStatus'] as String?; // Check for explicit timing info
+      timingStatus =
+          data['timingStatus'] as String?; // Check for explicit timing info
     } else if (rawStatus == 'absent') {
       status = 'absent';
       timingStatus = null;
@@ -387,11 +388,20 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
       status = 'not_marked';
       timingStatus = null;
     }
-    
+
     // Check both new format (inAt) and backward compatibility (clockInAt)
     final clockInAt = (data['inAt'] ?? data['clockInAt']) as Timestamp?;
     final clockOutAt = (data['outAt'] ?? data['clockOutAt']) as Timestamp?;
-    final lateReason = data['lateReason'] as String?;
+
+    // Get late reason from separate field or extract from status for backward compatibility
+    String? lateReason = data['lateReason'] as String?;
+    if (lateReason == null && rawStatus.contains('— Reason:')) {
+      // Extract reason from old format: "late — Reason: text"
+      final parts = rawStatus.split('— Reason:');
+      if (parts.length > 1) {
+        lateReason = parts[1].trim();
+      }
+    }
 
     return Container(
       padding: const EdgeInsets.all(16),
