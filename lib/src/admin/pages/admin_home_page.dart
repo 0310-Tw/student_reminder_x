@@ -4,6 +4,7 @@ import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/user_service.dart';
 import 'package:students_reminder/src/services/admin_service.dart';
 import 'package:students_reminder/src/services/notification_service.dart';
+import 'package:students_reminder/src/shared/list.dart';
 import 'package:students_reminder/src/widgets/group_filter.dart';
 import 'package:students_reminder/src/widgets/user_banner_notifications.dart';
 import 'package:students_reminder/src/widgets/suspension_check.dart';
@@ -19,21 +20,7 @@ class AdminHomePage extends StatefulWidget {
 class _AdminHomePageState extends State<AdminHomePage> {
   String _group = 'mobile'; //default
 
-  Color _getInitialColor(String name) {
-    final colors = [
-      Colors.blue,
-      Colors.green,
-      Colors.orange,
-      Colors.purple,
-      Colors.teal,
-      Colors.indigo,
-      Colors.pink,
-      Colors.cyan,
-    ];
-
-    if (name.isEmpty) return Colors.grey;
-    return colors[name.codeUnitAt(0) % colors.length];
-  }
+  
 
   @override
   Widget build(BuildContext context) {
@@ -119,7 +106,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
                                 // User Avatar
                                 CircleAvatar(
                                   radius: 20,
-                                  backgroundColor: _getInitialColor(name),
+                                  backgroundColor: getInitialColor(name),
                                   child: Text(
                                     name.isNotEmpty
                                         ? name[0].toUpperCase()

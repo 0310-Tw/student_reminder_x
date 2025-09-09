@@ -183,9 +183,13 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
           
           body: _pages[_index],
           bottomNavigationBar: NavigationBar(
-            indicatorShape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
+            indicatorShape: _isAdmin 
+                ? RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  )
+                : const CircleBorder(),
+            indicatorColor: _isAdmin ? null : Colors.white,
+            backgroundColor: _isAdmin ? null : Colors.tealAccent,
             selectedIndex: _index,
             destinations: _buildNavigationDestinations(),
             onDestinationSelected: (i) => setState(() => _index = i),

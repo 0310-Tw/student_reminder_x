@@ -419,15 +419,14 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                   _formatDisplayDate(date),
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Row(
                   children: [
                     _buildStatusChip(
                       status,
                       isRealTime: _attendanceSubscription != null,
                     ),
                     if (timingStatus != null && status == 'present') ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(width: 8),
                       _buildTimingBadge(timingStatus),
                     ],
                   ],
@@ -483,12 +482,20 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      icon: Icon(Icons.check, color: Colors.green, size: 20),
+                      icon: const Icon(
+                        Icons.check,
+                        color: Colors.green,
+                        size: 20,
+                      ),
                       onPressed: () => _markPresent(studentUid, dateStr),
                       tooltip: 'Mark Present',
                     ),
                     IconButton(
-                      icon: Icon(Icons.close, color: Colors.red, size: 20),
+                      icon: const Icon(
+                        Icons.close,
+                        color: Colors.red,
+                        size: 20,
+                      ),
                       onPressed: () => _markAbsent(studentUid, dateStr),
                       tooltip: 'Mark Absent',
                     ),
@@ -498,7 +505,11 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      icon: Icon(Icons.edit, color: Colors.blue, size: 20),
+                      icon: const Icon(
+                        Icons.edit,
+                        color: Colors.blue,
+                        size: 20,
+                      ),
                       onPressed: () =>
                           _editLateReason(studentUid, dateStr, lateReason),
                       tooltip: 'Edit Reason',
@@ -508,7 +519,11 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                         data['clockInLoc'] != null ||
                         data['clockOutLoc'] != null)
                       IconButton(
-                        icon: Icon(Icons.map, color: Colors.purple, size: 20),
+                        icon: const Icon(
+                          Icons.map,
+                          color: Colors.purple,
+                          size: 20,
+                        ),
                         onPressed: () => _showLocationMap(data),
                         tooltip: 'View Location',
                       ),
@@ -555,7 +570,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     }
 
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
@@ -565,7 +580,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 14, color: color),
-          SizedBox(width: 4),
+          const SizedBox(width: 4),
           Text(
             label,
             style: TextStyle(
@@ -575,7 +590,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
             ),
           ),
           if (isRealTime) ...[
-            SizedBox(width: 4),
+            const SizedBox(width: 4),
             Container(
               width: 6,
               height: 6,
@@ -609,7 +624,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     }
 
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: color.withOpacity(0.2),
         borderRadius: BorderRadius.circular(8),
@@ -629,8 +644,8 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
   Future<void> _showDateRangePicker() async {
     final DateTimeRange? picked = await showDateRangePicker(
       context: context,
-      firstDate: DateTime.now().subtract(Duration(days: 365)),
-      lastDate: DateTime.now().add(Duration(days: 30)),
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 30)),
       initialDateRange: DateTimeRange(start: _startDate, end: _endDate),
     );
 
@@ -668,15 +683,15 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Mark Absent'),
+        title: const Text('Mark Absent'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text('Mark this student as absent for $dateStr?'),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             TextField(
               controller: reasonController,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'Reason (optional)',
                 border: OutlineInputBorder(),
               ),
@@ -687,11 +702,11 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text('Mark Absent'),
+            child: const Text('Mark Absent'),
           ),
         ],
       ),
@@ -726,10 +741,10 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Edit Late Reason'),
+        title: const Text('Edit Late Reason'),
         content: TextField(
           controller: reasonController,
-          decoration: InputDecoration(
+          decoration: const InputDecoration(
             labelText: 'Late Reason',
             border: OutlineInputBorder(),
           ),
@@ -738,11 +753,11 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text('Save'),
+            child: const Text('Save'),
           ),
         ],
       ),
@@ -807,7 +822,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Row(
+        title: const Row(
           children: [
             Icon(Icons.location_on, color: Colors.red),
             SizedBox(width: 8),
@@ -823,7 +838,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
               children: [
                 if (clockInLoc != null) ...[
                   Container(
-                    padding: EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: Colors.green.shade50,
                       borderRadius: BorderRadius.circular(8),
@@ -833,7 +848,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        const Row(
                           children: [
                             Icon(Icons.login, color: Colors.green, size: 16),
                             SizedBox(width: 4),
@@ -843,7 +858,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                             ),
                           ],
                         ),
-                        SizedBox(height: 8),
+                        const SizedBox(height: 8),
                         Text('📍 Coordinates:'),
                         Text(
                           '   Latitude: ${clockInLoc.latitude.toStringAsFixed(6)}',
@@ -852,21 +867,21 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                           '   Longitude: ${clockInLoc.longitude.toStringAsFixed(6)}',
                         ),
                         if (clockInTime != null) ...[
-                          SizedBox(height: 4),
+                          const SizedBox(height: 4),
                           Text('🕐 Time: ${_formatTimestamp(clockInTime)}'),
                         ],
                         if (lateReason != null && lateReason.isNotEmpty) ...[
-                          SizedBox(height: 4),
+                          const SizedBox(height: 4),
                           Text('📝 Late Reason: $lateReason'),
                         ],
                       ],
                     ),
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                 ],
                 if (clockOutLoc != null) ...[
                   Container(
-                    padding: EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: Colors.orange.shade50,
                       borderRadius: BorderRadius.circular(8),
@@ -876,7 +891,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        const Row(
                           children: [
                             Icon(Icons.logout, color: Colors.orange, size: 16),
                             SizedBox(width: 4),
@@ -886,7 +901,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                             ),
                           ],
                         ),
-                        SizedBox(height: 8),
+                        const SizedBox(height: 8),
                         Text('📍 Coordinates:'),
                         Text(
                           '   Latitude: ${clockOutLoc.latitude.toStringAsFixed(6)}',
@@ -895,24 +910,24 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                           '   Longitude: ${clockOutLoc.longitude.toStringAsFixed(6)}',
                         ),
                         if (clockOutTime != null) ...[
-                          SizedBox(height: 4),
+                          const SizedBox(height: 4),
                           Text('🕐 Time: ${_formatTimestamp(clockOutTime)}'),
                         ],
                       ],
                     ),
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                 ],
                 if (clockInLoc == null && clockOutLoc == null) ...[
                   Container(
-                    padding: EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: Colors.grey.shade300),
                     ),
                     width: double.infinity,
-                    child: Column(
+                    child: const Column(
                       children: [
                         Icon(Icons.location_off, size: 48, color: Colors.grey),
                         SizedBox(height: 8),
@@ -942,12 +957,12 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                   'Coordinates: ${coords.latitude.toStringAsFixed(6)}, ${coords.longitude.toStringAsFixed(6)}',
                 );
               },
-              icon: Icon(Icons.copy),
-              label: Text('Copy Coords'),
+              icon: const Icon(Icons.copy),
+              label: const Text('Copy Coords'),
             ),
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Close'),
+            child: const Text('Close'),
           ),
         ],
       ),
@@ -978,11 +993,11 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel'),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text('Confirm'),
+            child: const Text('Confirm'),
           ),
         ],
       ),
@@ -1005,7 +1020,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
 
     while (!current.isAfter(endDate)) {
       dates.add(current);
-      current = current.add(Duration(days: 1));
+      current = current.add(const Duration(days: 1));
     }
 
     return dates;

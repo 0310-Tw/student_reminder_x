@@ -203,7 +203,11 @@ class PublicFeeds extends StatelessWidget {
     final uid = user.uid;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Public Feeds')),
+      backgroundColor: Colors.lightBlue.shade100,
+      appBar: AppBar(
+        backgroundColor: Colors.tealAccent,
+        automaticallyImplyLeading: false,
+        title: const Text('Public Feeds')),
       body: SuspensionCheck(
         restrictWriteAccess: true,
         child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -218,7 +222,7 @@ class PublicFeeds extends StatelessWidget {
 
             final docs = snap.data!.docs;
             if (docs.isEmpty) {
-              return  Center(
+              return const Center(
                 child: Text(
                   'No notes to show. Click the + button to add a note.',
                 ),
