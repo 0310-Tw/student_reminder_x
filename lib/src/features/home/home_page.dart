@@ -22,11 +22,13 @@ class _HomePageState extends State<HomePage> {
     final uid = AuthService.instance.currentUser?.uid;
 
     return Scaffold(
-      backgroundColor: Colors.lightBlue.shade100,
+      backgroundColor: Color(0xFFF8F9FA),
       appBar: AppBar(
-        backgroundColor: Colors.tealAccent,
+        backgroundColor: Color(0xFF1A237E),
+        foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
-        title: Text('Home')),
+        title: Text('Home'),
+      ),
       body: SuspensionCheck(
         child: Column(
           children: [
@@ -37,72 +39,70 @@ class _HomePageState extends State<HomePage> {
               onChanged: (val) => setState(() => _group = val),
             ),
             Expanded(
-            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: UserService.instance.watchUserByCourseGroup(_group),
-              builder: (context, snap) {
-                if (snap.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator());
-                }
+              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: UserService.instance.watchUserByCourseGroup(_group),
+                builder: (context, snap) {
+                  if (snap.connectionState == ConnectionState.waiting) {
+                    return Center(child: CircularProgressIndicator());
+                  }
 
-                if (snap.hasError) {
-                  return Center(child: Text('Error Detected: ${snap.error}'));
-                }
-                final docs = snap.data?.docs ?? [];
-                // if (docs.isEmpty) {
-                //   return Center(
-                //     child: Text('There are no students in this group'),
-                //   );
-                // }
+                  if (snap.hasError) {
+                    return Center(child: Text('Error Detected: ${snap.error}'));
+                  }
+                  final docs = snap.data?.docs ?? [];
+                  // if (docs.isEmpty) {
+                  //   return Center(
+                  //     child: Text('There are no students in this group'),
+                  //   );
+                  // }
 
-                return ListView.separated(
-                  separatorBuilder: (_, _) => Divider(height: 1),
-                  itemCount: docs.length,
-                  itemBuilder: (context, i) {
-                    final data = docs[i];
-                    final isMe = data.id == uid;
-                    final name =
-                        '${data['firstName'] ?? ''} ${data['lastName'] ?? ''}'
-                            .trim();
-                    final course = (data['courseGroup'] ?? '').toString();
-                    return ListTile(
-                      leading: // User Avatar
-                                CircleAvatar(
-                                  radius: 20,
-                                  backgroundColor: getInitialColor(name),
-                                  child: Text(
-                                    name.isNotEmpty
-                                        ? name[0].toUpperCase()
-                                        : '?',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                      title: Text(name),
-                      subtitle: Text(
-                        course == 'mobile'
-                            ? 'Mobile App Development'
-                            : 'Web App Development',
-                      ),
-                      trailing: isMe
-                          ? Text(
-                              'Your Profile',
-                              style: TextStyle(fontStyle: FontStyle.italic),
-                            )
-                          : null,
-                      onTap: () {
-                        //Open the Student Profile
-                        Navigator.pushNamed(context, '/student/${data.id}');
-                      },
-                    );
-                  },
-                );
-              },
+                  return ListView.separated(
+                    separatorBuilder: (_, _) => Divider(height: 1),
+                    itemCount: docs.length,
+                    itemBuilder: (context, i) {
+                      final data = docs[i];
+                      final isMe = data.id == uid;
+                      final name =
+                          '${data['firstName'] ?? ''} ${data['lastName'] ?? ''}'
+                              .trim();
+                      final course = (data['courseGroup'] ?? '').toString();
+                      return ListTile(
+                        leading: // User Avatar
+                        CircleAvatar(
+                          radius: 20,
+                          backgroundColor: getInitialColor(name),
+                          child: Text(
+                            name.isNotEmpty ? name[0].toUpperCase() : '?',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        title: Text(name),
+                        subtitle: Text(
+                          course == 'mobile'
+                              ? 'Mobile App Development'
+                              : 'Web App Development',
+                        ),
+                        trailing: isMe
+                            ? Text(
+                                'Your Profile',
+                                style: TextStyle(fontStyle: FontStyle.italic),
+                              )
+                            : null,
+                        onTap: () {
+                          //Open the Student Profile
+                          Navigator.pushNamed(context, '/student/${data.id}');
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }

@@ -152,11 +152,11 @@ class AttendanceService {
   static Future<void> adminMarkPresent(
     String adminUid,
     String targetUid,
-    String dateId, // Changed from yyyyMMdd to dateId (YYYY-MM-DD format)
+    String dateId, 
   ) async {
     try {
       // Get admin and target user info for notifications
-      final adminUserDoc = await FirebaseFirestore.instance
+      final appUserDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(adminUid)
           .get();
@@ -166,7 +166,7 @@ class AttendanceService {
           .doc(targetUid)
           .get();
 
-      final adminData = adminUserDoc.data() ?? {};
+      final adminData = appUserDoc.data() ?? {};
       final targetData = targetUserDoc.data() ?? {};
 
       final adminName =
@@ -279,7 +279,7 @@ class AttendanceService {
   }) async {
     try {
       // Get admin and target user info for notifications
-      final adminUserDoc = await FirebaseFirestore.instance
+      final appUserDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(adminUid)
           .get();
@@ -289,7 +289,7 @@ class AttendanceService {
           .doc(targetUid)
           .get();
 
-      final adminData = adminUserDoc.data() ?? {};
+      final adminData = appUserDoc.data() ?? {};
       final targetData = targetUserDoc.data() ?? {};
 
       final adminName =
@@ -324,15 +324,15 @@ class AttendanceService {
         Map<String, dynamic> updateData = {
           'dayId': dateId,
           'status': 'absent',
-          'timingStatus': null, // Clear timing status when marked absent
-          'inAt': null, // Clear check-in when marked absent
-          'clockInAt': null, // backward compatibility
-          'inLoc': null, // Clear location when marked absent
-          'clockInLoc': null, // backward compatibility
-          'outAt': null, // Clear check-out when marked absent
-          'clockOutAt': null, // backward compatibility
-          'outLoc': null, // Clear location when marked absent
-          'clockOutLoc': null, // backward compatibility
+          'timingStatus': null, 
+          'inAt': null, 
+          'clockInAt': null, 
+          'inLoc': null,
+          'clockInLoc': null, 
+          'outAt': null,
+          'clockOutAt': null,
+          'outLoc': null,
+          'clockOutLoc': null,
           'adminMarked': true,
           'markedByAdmin': adminUid,
           'markedByAdminEmail': adminEmail,
@@ -416,7 +416,7 @@ class AttendanceService {
   ) async {
     try {
       // Get admin and target user info for notifications
-      final adminUserDoc = await FirebaseFirestore.instance
+      final appUserDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(adminUid)
           .get();
@@ -426,7 +426,7 @@ class AttendanceService {
           .doc(targetUid)
           .get();
 
-      final adminData = adminUserDoc.data() ?? {};
+      final adminData = appUserDoc.data() ?? {};
       final targetData = targetUserDoc.data() ?? {};
 
       final adminName =

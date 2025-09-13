@@ -203,11 +203,13 @@ class PublicFeeds extends StatelessWidget {
     final uid = user.uid;
 
     return Scaffold(
-      backgroundColor: Colors.lightBlue.shade100,
+      backgroundColor: Color(0xFFF8F9FA),
       appBar: AppBar(
-        backgroundColor: Colors.tealAccent,
+        backgroundColor: Color(0xFF1A237E),
+        foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
-        title: const Text('Public Feeds')),
+        title: const Text('Public Feeds'),
+      ),
       body: SuspensionCheck(
         restrictWriteAccess: true,
         child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -360,7 +362,7 @@ class PublicFeeds extends StatelessWidget {
                                       displaySnackBar(
                                         context,
                                         'Your report was removed.',
-                                        backgroundColor: Colors.blue,
+                                        backgroundColor: Color(0xFF1976D2),
                                       );
                                     }
                                   },

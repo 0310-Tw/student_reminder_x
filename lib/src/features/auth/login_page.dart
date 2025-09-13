@@ -32,31 +32,50 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Student Login')),
+      backgroundColor: Color(0xFFF8F9FA),
+      appBar: AppBar(
+        backgroundColor: Color(0xFF1A237E),
+        foregroundColor: Colors.white,
+        title: Text('Student Login'),
+      ),
       body: Padding(
         padding: EdgeInsetsGeometry.all(16),
         child: Center(
           child: Column(
             children: [
               //Email
-              TextField(controller: _email, decoration: InputDecoration(labelText: 'Email'),),
-              SizedBox(height: 12,),
+              TextField(
+                controller: _email,
+                decoration: InputDecoration(labelText: 'Email'),
+              ),
+              SizedBox(height: 12),
               //Password
-              TextField(controller: _password, decoration: InputDecoration(labelText: 'Password'), obscureText: true,),
-              SizedBox(height: 20,),
+              TextField(
+                controller: _password,
+                decoration: InputDecoration(labelText: 'Password'),
+                obscureText: true,
+              ),
+              SizedBox(height: 20),
               ElevatedButton(
-                onPressed: _busy ? null : _login, 
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFF1976D2),
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: _busy ? null : _login,
                 child: _busy ? CircularProgressIndicator() : Text('Login'),
-                ),
-              SizedBox(height: 12,),
+              ),
+              SizedBox(height: 12),
               OutlinedButton(
-                onPressed: () => Navigator.pushNamed(context, AppRoutes.register), 
-                child: _busy ? CircularProgressIndicator() : Text('No Account? Register'),
-                ),
+                onPressed: () =>
+                    Navigator.pushNamed(context, AppRoutes.register),
+                child: _busy
+                    ? CircularProgressIndicator()
+                    : Text('No Account? Register'),
+              ),
             ],
           ),
         ),
-        ),
+      ),
     );
   }
 }

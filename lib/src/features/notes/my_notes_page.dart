@@ -47,9 +47,10 @@ class _MyNotesPageState extends State<MyNotesPage> {
     final uid = user.uid;
 
     return Scaffold(
-      backgroundColor: Colors.lightBlue[100],
+      backgroundColor: Color(0xFFF8F9FA),
       appBar: AppBar(
-        backgroundColor: Colors.tealAccent,
+        backgroundColor: Color(0xFF1A237E),
+        foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
         title: Text('My Notes'),
         actions: [
@@ -64,6 +65,8 @@ class _MyNotesPageState extends State<MyNotesPage> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
+        backgroundColor: Color(0xFF1976D2),
+        foregroundColor: Colors.white,
         onPressed: () async {
           await showModalBottomSheet(
             context: context,
@@ -160,7 +163,7 @@ class _MyNotesPageState extends State<MyNotesPage> {
                               'Tag: $tag',
                               style: TextStyle(fontSize: 10),
                             ),
-                            backgroundColor: Colors.blue[100],
+                            backgroundColor: Color(0xFF1976D2).withOpacity(0.1),
                             deleteIcon: Icon(Icons.close, size: 14),
                             onDeleted: () =>
                                 setState(() => _selectedTags.remove(tag)),
@@ -382,8 +385,9 @@ class _MyNotesPageState extends State<MyNotesPage> {
                                                     fontSize: 10,
                                                   ),
                                                 ),
-                                                backgroundColor:
-                                                    Colors.blue[50],
+                                                backgroundColor: Color(
+                                                  0xFFF8F9FA,
+                                                ),
                                                 materialTapTargetSize:
                                                     MaterialTapTargetSize
                                                         .shrinkWrap,
@@ -510,12 +514,14 @@ class _MyNotesPageState extends State<MyNotesPage> {
                                       Icon(
                                         Icons.edit,
                                         size: 16,
-                                        color: Colors.blue,
+                                        color: Color(0xFF1976D2),
                                       ),
                                       SizedBox(width: 4),
                                       Text(
                                         'Edit',
-                                        style: TextStyle(color: Colors.blue),
+                                        style: TextStyle(
+                                          color: Color(0xFF1976D2),
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -652,8 +658,8 @@ class _MyNotesPageState extends State<MyNotesPage> {
                                 });
                               },
                               backgroundColor: Colors.grey[200],
-                              selectedColor: Colors.blue[100],
-                              checkmarkColor: Colors.blue[700],
+                              selectedColor: Color(0xFF1976D2).withOpacity(0.1),
+                              checkmarkColor: Color(0xFF1976D2),
                             );
                           }).toList(),
                         ),

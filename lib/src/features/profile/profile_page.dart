@@ -180,7 +180,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     _uploadCroppedImage(croppedData);
                   },
                   aspectRatio: 1.0, // Square aspect ratio
-                  baseColor: Colors.blue.shade50,
+                  baseColor: Color(0xFFF8F9FA),
                   maskColor: Colors.black.withOpacity(0.5),
                   radius: 0,
                   interactive: true,
@@ -402,6 +402,8 @@ class _ProfilePageState extends State<ProfilePage> {
           slivers: [
             // Collapsible cover image with SliverAppBar
             SliverAppBar(
+              backgroundColor: Color(0xFF1A237E),
+              foregroundColor: Colors.white,
               expandedHeight: 250.0,
               floating: false,
               pinned: true,
@@ -451,8 +453,8 @@ class _ProfilePageState extends State<ProfilePage> {
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: [
-                            Colors.transparent,
-                            Colors.black.withOpacity(0.3),
+                            Color(0xFF1A237E).withOpacity(0.3),
+                            Colors.black.withOpacity(0.5),
                           ],
                         ),
                       ),
@@ -463,8 +465,8 @@ class _ProfilePageState extends State<ProfilePage> {
                       right: 16,
                       child: FloatingActionButton(
                         mini: true,
-                        backgroundColor: Colors.white,
-                        foregroundColor: Theme.of(context).primaryColor,
+                        backgroundColor: Color(0xFF1976D2),
+                        foregroundColor: Colors.white,
                         onPressed: _coverBusy ? null : _onPickCoverImage,
                         child: _coverBusy
                             ? SizedBox(

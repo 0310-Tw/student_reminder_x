@@ -70,7 +70,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     if (!_isAdmin) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Access Denied'),
+          title:  Text('Access Denied'),
           backgroundColor: Color(0xFF1A237E),
           foregroundColor: Colors.white,
         ),
@@ -129,14 +129,14 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Attendance'),
-        backgroundColor: Color(0xFF1A237E), // Deep indigo
+        backgroundColor: Color(0xFF1A237E), 
         foregroundColor: Colors.white,
         elevation: 2,
       ),
-      backgroundColor: Color(0xFFF8F9FA), // Light gray background
+      backgroundColor: Color(0xFFF8F9FA), 
       body: Column(
         children: [
-          // Professional header
+
           Container(
             width: double.infinity,
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -145,7 +145,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                 colors: [
                   Color(0xFF3F51B5),
                   Color(0xFF1A237E),
-                ], // Indigo gradient
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -254,7 +254,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
         final students = allUsers.where((doc) {
           final userData = doc.data() as Map<String, dynamic>;
           final userRole = userData['role'] as String?;
-          return userRole != 'admin'; // Exclude admin users
+          return userRole != 'admin'; //minus admin users
         }).toList();
 
         if (students.isEmpty) {
@@ -327,7 +327,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Padding(
-            padding: const EdgeInsets.all(16),
+            padding:  EdgeInsets.all(16),
             child: Text('Error loading attendance: ${snapshot.error}'),
           );
         }

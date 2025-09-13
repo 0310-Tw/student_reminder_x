@@ -14,7 +14,7 @@ class AuthService {
   Future<UserCredential> register({
     required String firstName,
     required String lastName,
-    required String courseGroup, // 'web' | 'mobile'
+    required String courseGroup,
     required String email,
     required String phone,
     required String password,
@@ -72,3 +72,7 @@ class AuthService {
   Future<void> sendPasswordReset(String email) =>
       _auth.sendPasswordResetEmail(email: email);
 }
+//   // Password Reset CODE
+//   Future<void> sendPasswordReset(String email) =>
+//       _auth.sendPasswordResetEmail(email: email);
+// }

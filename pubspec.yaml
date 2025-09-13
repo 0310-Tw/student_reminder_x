@@ -48,4 +48,32 @@ flutter:
 
   uses-material-design: true
 
-  
+  assets:
+    - assests/
+
+
+    # Configure flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  image_path: "assests/logo12.png"
+  min_sdk_android: 21 # android min sdk min:16, default 21
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assests/logo12.png"
+  adaptive_icon_round: true
+  web:
+    generate: true
+    image_path: "assests/logo12.png"
+    background_color: "#2196F3"
+    theme_color: "#1976D2"
+  windows:
+    generate: true
+    image_path: "assests/logo12.png"
+    icon_size: 48 # min:48, max:256, default: 48
+  macos:
+    generate: true
+    image_path: "assests/logo12.png"
+
+
+ 

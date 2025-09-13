@@ -38,7 +38,7 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
   Future<void> _initializeNotifications() async {
     try {
       await NotificationService.initialize();
-      print('Foreground notifications initialized for logged-in user');
+      // print('Foreground notifications initialized for logged-in user');
 
       // Update FCM token for this user
       final token = await NotificationService.getToken();
@@ -112,10 +112,10 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
   void _updatePages() {
     if (_isAdmin) {
       _pages = [
-        const AdminHomePage(), // Users tab
-        const AdminPublicFeeds(), // Content tab
-        const AttendanceAdminPage(), // Attendance tab
-        const ProfilePage(), // Profile tab
+        const AdminHomePage(),
+        const AdminPublicFeeds(),
+        const AttendanceAdminPage(),
+        const ProfilePage(),
       ];
     } else {
       _pages = [
@@ -185,8 +185,8 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
             indicatorShape: _isAdmin
                 ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
                 : const CircleBorder(),
-            indicatorColor: _isAdmin ? null : Colors.white,
-            backgroundColor: _isAdmin ? null : Colors.tealAccent,
+            indicatorColor: _isAdmin ? null : Color(0xFF1976D2),
+            backgroundColor: _isAdmin ? null : Color(0xFF1A237E),
             selectedIndex: _index,
             destinations: _buildNavigationDestinations(),
             onDestinationSelected: (i) => setState(() => _index = i),

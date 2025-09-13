@@ -41,7 +41,12 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Student Registration')),
+      backgroundColor: Color(0xFFF8F9FA),
+      appBar: AppBar(
+        backgroundColor: Color(0xFF1A237E),
+        foregroundColor: Colors.white,
+        title: Text('Student Registration'),
+      ),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(16),
         child: Column(
@@ -81,6 +86,10 @@ class _RegisterPageState extends State<RegisterPage> {
             ),
             SizedBox(height: 12),
             ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF1976D2),
+                foregroundColor: Colors.white,
+              ),
               onPressed: _busy ? null : _register,
               child: _busy
                   ? CircularProgressIndicator()

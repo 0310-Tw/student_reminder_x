@@ -1,0 +1,1634 @@
+# Complete Push Notification Setup Guide for Flutter Apps
+# Generic Step-by-Step Implementation Guide for Beginners
+
+===============================================================================
+OVERVIEW
+===============================================================================
+
+This guide provides a complete, generic implementation of push notifications 
+for Flutter applications using Firebase Cloud Messaging (FCM). It covers both
+local notifications (when app is open) and remote push notifications (when 
+app is closed or in background).
+
+Target Audience: Beginners to intermediate Flutter developers
+Technologies: Flutter, Firebase, FCM, Cloud Functions
+
+===============================================================================
+PREREQUISITE SETUP
+===============================================================================
+
+### REQUIREMENTS (VERIFY BEFORE STARTING)
+
+**1. Development Environment:**
+```bash
+# Verify Flutter is installed and working
+flutter doctor
+
+# Should show checkmarks for Flutter, Android toolchain, and IDE
+```
+
+**2. Node.js (for Firebase CLI):**
+```bash
+# Check Node.js version (should be 16+ for Firebase Functions)
+node --version
+
+# If not installed, download from: https://nodejs.org/
+```
+
+**3. Java (for Android development):**
+```bash
+# Check Java version (should be Java 11+)
+java --version
+
+# Required for Android builds with Firebase
+```
+
+**4. Firebase Account:**
+- Google account with access to Firebase Console
+- Credit card for Firebase Blaze plan (required for Cloud Functions)
+- Note: Blaze plan has generous free tier, you likely won't be charged
+
+**5. Platform-Specific Requirements:**
+
+**Android:**
+- Android Studio installed
+- Android SDK and build tools
+- USB debugging enabled on test device OR Android emulator
+
+**iOS (if targeting iOS):**
+- Xcode installed (macOS only)
+- iOS Simulator or physical iOS device
+- Apple Developer account (free tier sufficient for testing)
+
+### FIREBASE PROJECT SETUP (DETAILED STEPS)
+
+**Step 1: Create Firebase Project**
+1. Go to https://console.firebase.google.com/
+2. Click "Create a project" or "Add project"
+3. Enter project name (e.g., "my-notification-app")
+4. Enable/disable Google Analytics (optional but recommended)
+5. Click "Create project" and wait for setup to complete
+
+**Step 2: Enable Required Services**
+1. In Firebase Console, go to "Authentication" → "Get started" → Enable
+2. Go to "Firestore Database" → "Create database" → Start in test mode
+3. Go to "Functions" → "Get started" → Upgrade to Blaze plan (required for Cloud Functions)
+4. Go to "Cloud Messaging" → Already enabled by default
+
+**Step 3: Add Your App to Firebase**
+1. Click "Add app" → Select platform (Android/iOS)
+2. **Android Setup:**
+   - Package name: `com.yourcompany.yourapp` (must match your app)
+   - App nickname: Your app name
+   - SHA-1 certificate: Get from `keytool -list -v -keystore ~/.android/debug.keystore` (Linux/Mac) or `keytool -list -v -keystore %USERPROFILE%\.android\debug.keystore` (Windows)
+   - Download `google-services.json`
+3. **iOS Setup:**
+   - Bundle ID: `com.yourcompany.yourapp` (must match your app)
+   - App nickname: Your app name  
+   - Download `GoogleService-Info.plist`
+
+**Step 4: Download Configuration Files**
+- `google-services.json` for Android
+- `GoogleService-Info.plist` for iOS
+- **CRITICAL:** These files contain your project's API keys and configuration
+
+===============================================================================
+STEP 1: DEPENDENCIES SETUP
+===============================================================================
+
+### 1.1 Add Dependencies to pubspec.yaml
+
+```yaml
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # Firebase Core (REQUIRED)
+  firebase_core: ^3.8.0
+  firebase_auth: ^5.4.3
+  firebase_messaging: ^15.2.10
+  cloud_firestore: ^5.6.0
+  
+  # Local Notifications (REQUIRED for foreground display)
+  flutter_local_notifications: ^17.2.3
+  
+  # HTTP requests for Cloud Functions (REQUIRED)
+  http: ^1.1.0
+  
+  # Timezone for scheduled notifications (REQUIRED if using scheduled notifications)
+  timezone: ^0.9.4
+  
+  # Other common dependencies
+  shared_preferences: ^2.3.3
+  permission_handler: ^11.0.1
+```
+
+### 1.2 Install Dependencies
+
+```bash
+# Run in terminal from your Flutter project root
+flutter pub get
+```
+
+===============================================================================
+STEP 2: FIREBASE CONFIGURATION
+===============================================================================
+
+### 2.1 Install Firebase CLI
+
+```bash
+# Install Firebase CLI globally
+npm install -g firebase-tools
+
+# Login to Firebase
+firebase login
+
+# Initialize Firebase in your project
+cd your_flutter_project
+firebase init
+```
+
+### 2.2 Select Firebase Services
+When prompted, select:
+- [x] Functions: Configure and deploy Cloud Functions
+- [x] Firestore: Deploy rules and create indexes
+- [x] Storage: Deploy Cloud Storage security rules
+
+### 2.3 Add Firebase Configuration Files
+
+ANDROID:
+- Place `google-services.json` in `android/app/`
+
+IOS:
+- Place `GoogleService-Info.plist` in `ios/Runner/`
+
+### 2.4 Configure FlutterFire (CRITICAL STEP)
+
+```bash
+# Install FlutterFire CLI (only need to do this once)
+dart pub global activate flutterfire_cli
+
+# Navigate to your Flutter project root
+cd path/to/your/flutter/project
+
+# Configure Firebase for your project
+flutterfire configure
+
+# Follow the prompts:
+# 1. Select your Firebase project from the list
+# 2. Select platforms: Android, iOS (choose what you need)
+# 3. Choose Android package name (e.g., com.yourcompany.yourapp)
+# 4. Choose iOS bundle ID (same as Android for consistency)
+```
+
+**What this command does:**
+- Creates `lib/firebase_options.dart` with your project configuration
+- Links your Flutter app to your Firebase project
+- Sets up platform-specific configuration
+
+**IMPORTANT:** If you change Firebase projects or add new platforms later, re-run `flutterfire configure`
+
+===============================================================================
+STEP 3: ANDROID CONFIGURATION
+===============================================================================
+
+### 3.1 Update android/app/build.gradle.kts (APP-LEVEL)
+
+**Location:** `android/app/build.gradle.kts` (NOT the root build.gradle!)
+
+```gradle
+plugins {
+    id("com.android.application")
+    id("com.google.gms.google-services")  // REQUIRED: Add this line for Firebase
+    id("kotlin-android")
+    id("dev.flutter.flutter-gradle-plugin")
+}
+
+android {
+    namespace = "com.yourcompany.yourapp"  // Replace with your actual package name
+    compileSdk = 36
+    ndkVersion = flutter.ndkVersion
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+        isCoreLibraryDesugaringEnabled = true
+    }
+
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_11.toString()
+    }
+    
+    defaultConfig {
+        applicationId "com.yourcompany.yourapp"  // MUST match your Firebase app package name
+        minSdk = 21  // IMPORTANT: FCM requires min SDK 21
+        targetSdk = 34
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
+    }
+
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+}
+
+flutter {
+    source = "../.."
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
+    // Firebase messaging will be auto-included by Flutter
+}
+```
+
+**CRITICAL:** Make sure your `applicationId` exactly matches the package name you used when setting up your Firebase Android app.
+```
+
+### 3.2 Update android/app/src/main/AndroidManifest.xml
+
+```xml
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    
+    <!-- REQUIRED: Notification permissions -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    
+    <application
+        android:label="Your App Name"
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_launcher">
+        
+        <!-- REQUIRED: Firebase Messaging Service -->
+        <service
+            android:name="io.flutter.plugins.firebase.messaging.FlutterFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- REQUIRED: Local notifications boot receiver -->
+        <receiver android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
+        
+        <receiver android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
+            android:exported="false" />
+
+        <!-- REQUIRED: Firebase notification icon configuration -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_notification" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="your_app_notifications" />
+            
+        <!-- Your main activity -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            
+            <meta-data
+              android:name="io.flutter.embedding.android.NormalTheme"
+              android:resource="@style/NormalTheme" />
+              
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+        
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+    </application>
+</manifest>
+```
+
+### 3.3 Add to android/build.gradle.kts (ROOT level)
+
+```gradle
+// REQUIRED: Add this to the TOP of the file
+allprojects {
+    repositories {
+        google()       // REQUIRED for Firebase
+        mavenCentral()
+    }
+}
+
+// Rest of your build.gradle.kts content...
+```
+
+### 3.4 Create Notification Icon (MANDATORY)
+
+**Why required:** Android requires a notification icon or the app will crash when showing notifications.
+
+**Option 1: Create Simple Icon**
+1. Create a 24x24 pixel white PNG image with transparent background
+2. Name it `ic_stat_notification.png`
+3. Place in: `android/app/src/main/res/drawable/ic_stat_notification.png`
+
+**Option 2: Use Android Asset Studio (Recommended)**
+1. Go to: https://romannurik.github.io/AndroidAssetStudio/icons-notification.html
+2. Upload your app icon or choose from clipart
+3. Ensure it outputs as white icon with transparent background
+4. Download and extract to `android/app/src/main/res/`
+
+**Quick Fix:** If you don't have a custom icon, create a simple white square:
+```bash
+# Create the drawable directory if it doesn't exist
+mkdir -p android/app/src/main/res/drawable
+
+# You can temporarily use your app icon by copying:
+# android/app/src/main/res/mipmap-mdpi/ic_launcher.png 
+# to 
+# android/app/src/main/res/drawable/ic_stat_notification.png
+```
+
+**CRITICAL:** Without this icon, your app will crash when showing notifications!
+
+### 3.5 CRITICAL: Add google-services.json
+
+1. Download `google-services.json` from Firebase Console
+2. Place it in `android/app/google-services.json`
+3. **This file is REQUIRED** - notifications will not work without it
+
+### 3.6 Get SHA-1 Fingerprint (REQUIRED for Android)
+
+**Why needed:** Firebase uses SHA-1 to verify your app's identity.
+
+**Get SHA-1 fingerprint:**
+
+**Windows:**
+```bash
+cd android
+./gradlew signingReport
+
+# Or using keytool directly:
+keytool -list -v -alias androiddebugkey -keystore %USERPROFILE%\.android\debug.keystore
+# Password: android
+```
+
+**macOS/Linux:**
+```bash
+cd android
+./gradlew signingReport
+
+# Or using keytool directly:
+keytool -list -v -alias androiddebugkey -keystore ~/.android/debug.keystore
+# Password: android
+```
+
+**Add SHA-1 to Firebase:**
+1. Copy the SHA-1 fingerprint from the output
+2. Go to Firebase Console → Project Settings → Your Android App
+3. Click "Add fingerprint"
+4. Paste the SHA-1 fingerprint
+5. Click "Save"
+
+**Note:** You'll need to add both debug and release SHA-1 fingerprints for production apps.
+
+===============================================================================
+STEP 4: IOS CONFIGURATION
+===============================================================================
+
+### 4.1 Update ios/Runner/Info.plist
+
+```xml
+<dict>
+    <!-- Existing keys -->
+    
+    <!-- REQUIRED: Background modes for notifications -->
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>fetch</string>
+        <string>remote-notification</string>
+    </array>
+    
+    <!-- OPTIONAL: Custom notification sounds -->
+    <key>UIFileSharingEnabled</key>
+    <true/>
+</dict>
+```
+
+### 4.4 Update ios/Runner/AppDelegate.swift
+
+```swift
+import UIKit
+import Flutter
+import FirebaseCore
+
+@UIApplicationMain
+@objc class AppDelegate: FlutterAppDelegate {
+  override func application(
+    _ application: UIApplication,
+    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
+  ) -> Bool {
+    FirebaseApp.configure()
+    
+    if #available(iOS 10.0, *) {
+      UNUserNotificationCenter.current().delegate = self as? UNUserNotificationCenterDelegate
+    }
+    
+    GeneratedPluginRegistrant.register(with: self)
+    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+}
+```
+
+===============================================================================
+STEP 5: FLUTTER NOTIFICATION SERVICE
+===============================================================================
+
+### 5.1 Create lib/src/services/notification_service.dart
+
+```dart
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz;
+
+class NotificationService {
+  // REPLACE with your Firebase project URL after deploying functions
+  static const String _baseUrl = "https://YOUR_REGION-YOUR_PROJECT_ID.cloudfunctions.net";
+
+  static NotificationService? _instance;
+  static NotificationService get instance => _instance ??= NotificationService._();
+  NotificationService._();
+
+  // Local notifications plugin for foreground display
+  static final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
+
+  static FirebaseMessaging? _messaging;
+  static bool _initialized = false;
+
+  /// STEP 1: Initialize the notification service
+  static Future<void> initialize() async {
+    if (_initialized) return;
+
+    // Initialize timezone data for scheduled notifications
+    tz.initializeTimeZones();
+
+    _messaging = FirebaseMessaging.instance;
+
+    // Request permissions
+    await _messaging!.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+      provisional: false,
+    );
+
+    // Initialize local notifications for foreground display
+    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const iosSettings = DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
+
+    const initSettings = InitializationSettings(
+      android: androidSettings,
+      iOS: iosSettings,
+    );
+
+    await _localNotifications.initialize(
+      initSettings,
+      onDidReceiveNotificationResponse: _onNotificationTapped,
+    );
+
+    // Create notification channel for Android
+    const androidChannel = AndroidNotificationChannel(
+      'default_channel',
+      'Default Notifications',
+      description: 'Default notification channel for your app',
+      importance: Importance.high,
+    );
+
+    await _localNotifications
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(androidChannel);
+
+    // Handle foreground messages
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      print('Received foreground notification: ${message.notification?.title}');
+      _showForegroundNotification(message);
+    });
+
+    // Handle notification taps when app is in background/terminated
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      print('Notification tapped: ${message.notification?.title}');
+      _handleNotificationTap(message);
+    });
+
+    _initialized = true;
+  }
+
+  /// STEP 2: Show notification when app is in foreground
+  static Future<void> _showForegroundNotification(RemoteMessage message) async {
+    const androidDetails = AndroidNotificationDetails(
+      'default_channel',
+      'Default Notifications',
+      channelDescription: 'Default notification channel for your app',
+      importance: Importance.high,
+      priority: Priority.high,
+      showWhen: true,
+      enableVibration: true,
+      playSound: true,
+    );
+
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+
+    const notificationDetails = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    await _localNotifications.show(
+      DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      message.notification?.title ?? 'Notification',
+      message.notification?.body ?? 'You have a new message',
+      notificationDetails,
+      payload: message.data.toString(),
+    );
+  }
+
+  /// STEP 3: Handle notification tap actions
+  static void _onNotificationTapped(NotificationResponse response) {
+    print('Notification tapped with payload: ${response.payload}');
+    _handleNotificationTap(null, payload: response.payload);
+  }
+
+  static void _handleNotificationTap(RemoteMessage? message, {String? payload}) {
+    // Implement your navigation logic here
+    print('Handle notification tap - implement navigation');
+  }
+
+  /// STEP 4: Get FCM token for current user
+  static Future<String?> getToken() async {
+    if (_messaging == null) await initialize();
+    return await _messaging!.getToken();
+  }
+
+  /// STEP 5: Subscribe to token refresh
+  static void onTokenRefresh(Function(String) callback) {
+    if (_messaging == null) return;
+    _messaging!.onTokenRefresh.listen(callback);
+  }
+
+  /// STEP 6: Send push notification using Cloud Functions
+  static Future<bool> sendPushNotification({
+    required String deviceToken,
+    required String title,
+    required String body,
+    String? type,
+  }) async {
+    final url = Uri.parse("$_baseUrl/sendFCMNotification");
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "token": deviceToken,
+          "title": title,
+          "body": body,
+          "type": type ?? "general",
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        print("Notification sent successfully: ${response.body}");
+        return true;
+      } else {
+        print("Failed to send notification: ${response.statusCode} - ${response.body}");
+        return false;
+      }
+    } catch (e) {
+      print("Error sending push notification: $e");
+      return false;
+    }
+  }
+
+  /// STEP 7: Subscribe to topics
+  static Future<void> subscribeToTopic(String topic) async {
+    try {
+      await FirebaseMessaging.instance.subscribeToTopic(topic);
+      print("Subscribed to topic: $topic");
+    } catch (e) {
+      print("Error subscribing to topic $topic: $e");
+    }
+  }
+
+  /// STEP 8: Send test notification
+  static Future<bool> sendTestNotification() async {
+    final token = await getToken();
+    if (token == null) return false;
+
+    return await sendPushNotification(
+      deviceToken: token,
+      title: 'Test Notification',
+      body: 'This is a test notification!',
+      type: 'test',
+    );
+  }
+}
+```
+
+===============================================================================
+STEP 6: FIREBASE CLOUD FUNCTIONS
+===============================================================================
+
+### 6.1 Initialize Cloud Functions
+
+```bash
+# Navigate to your project root
+cd your_flutter_project
+
+# Initialize Firebase Functions
+firebase init functions
+
+# Select JavaScript or TypeScript (JavaScript recommended for beginners)
+# Install dependencies: Yes
+# Use ESLint: Yes (optional)
+```
+
+### 6.2 Create functions/index.js
+
+```javascript
+const {onRequest} = require("firebase-functions/v2/https");
+const admin = require('firebase-admin');
+
+// Initialize Firebase Admin SDK
+admin.initializeApp();
+
+// Cloud Function to send FCM notifications
+exports.sendFCMNotification = onRequest(async (request, response) => {
+  try {
+    const { token, title, body, type } = request.body;
+    
+    // Validate required fields
+    if (!token || !title || !body) {
+      response.status(400).send({ 
+        error: 'Missing required fields: token, title, body' 
+      });
+      return;
+    }
+
+    // Construct the FCM payload
+    const payload = {
+      token: token,
+      notification: {
+        title: title,
+        body: body,
+      },
+      data: {
+        type: type || 'general',
+        timestamp: Date.now().toString(),
+      },
+      // Android-specific options
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: 'default_channel',
+          priority: 'high',
+          defaultSound: true,
+          defaultVibrateTimings: true,
+        },
+      },
+      // iOS-specific options
+      apns: {
+        payload: {
+          aps: {
+            alert: {
+              title: title,
+              body: body,
+            },
+            sound: 'default',
+            badge: 1,
+            'content-available': 1,
+          },
+        },
+        headers: {
+          'apns-priority': '10',
+        },
+      },
+    };
+
+    // Send the message
+    const messageId = await admin.messaging().send(payload);
+    console.log('Successfully sent message:', messageId);
+
+    response.send({ 
+      success: true, 
+      messageId: messageId 
+    });
+    
+  } catch (error) {
+    console.error('Error sending FCM message:', error);
+    response.status(500).send({ 
+      error: error.message 
+    });
+  }
+});
+
+// Cloud Function to send notifications to topics
+exports.sendTopicNotification = onRequest(async (request, response) => {
+  try {
+    const { topic, title, body, type } = request.body;
+    
+    if (!topic || !title || !body) {
+      response.status(400).send({ 
+        error: 'Missing required fields: topic, title, body' 
+      });
+      return;
+    }
+
+    const payload = {
+      topic: topic,
+      notification: {
+        title: title,
+        body: body,
+      },
+      data: {
+        type: type || 'general',
+        timestamp: Date.now().toString(),
+      },
+    };
+
+    const messageId = await admin.messaging().send(payload);
+    console.log('Successfully sent topic message:', messageId);
+
+    response.send({ 
+      success: true, 
+      messageId: messageId 
+    });
+    
+  } catch (error) {
+    console.error('Error sending topic message:', error);
+    response.status(500).send({ 
+      error: error.message 
+    });
+  }
+});
+```
+
+### 6.3 Update functions/package.json
+
+```json
+{
+  "name": "functions",
+  "description": "Cloud Functions for Firebase",
+  "scripts": {
+    "lint": "eslint .",
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "engines": {
+    "node": "18"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "firebase-functions": "^5.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.15.0",
+    "eslint-config-google": "^0.14.0",
+    "firebase-functions-test": "^3.1.0"
+  },
+  "private": true
+}
+```
+
+### 6.4 Deploy Cloud Functions
+
+```bash
+# Navigate to functions directory
+cd functions
+
+# Install dependencies
+npm install
+
+# Deploy functions to Firebase
+firebase deploy --only functions
+
+# Or deploy specific function
+firebase deploy --only functions:sendFCMNotification
+
+# Get the function URL (IMPORTANT: Copy this URL)
+# It will look like: https://us-central1-your-project-id.cloudfunctions.net
+# Update your NotificationService _baseUrl with this URL
+```
+
+### 6.5 CRITICAL: Update NotificationService URL
+
+After deploying, update the `_baseUrl` in your NotificationService:
+
+```dart
+// Replace this line in notification_service.dart:
+static const String _baseUrl = "https://us-central1-YOUR_PROJECT_ID.cloudfunctions.net";
+// With your actual function URL from the deploy output
+```
+
+===============================================================================
+STEP 7: BOOTSTRAP INITIALIZATION
+===============================================================================
+
+### 7.1 Create lib/src/core/bootstrap.dart
+
+```dart
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/material.dart';
+import 'package:your_app/firebase_options.dart';  // IMPORTANT: Replace 'your_app' with your actual package name
+
+// Background message handler for FCM
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  print("Handling a background message: ${message.messageId}");
+}
+
+Future<void> initFirebase() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+}
+
+Future<void> initNotifications() async {
+  // Set up background message handler
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
+  // Initialize FCM and get token
+  FirebaseMessaging messaging = FirebaseMessaging.instance;
+
+  // Request permission
+  NotificationSettings settings = await messaging.requestPermission(
+    alert: true,
+    badge: true,
+    sound: true,
+    provisional: false,
+  );
+
+  if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+    print("Notification permissions granted");
+    
+    // Get the token
+    String? token = await messaging.getToken();
+    print("FCM Token: $token");
+    // IMPORTANT: Save this token to your database for sending notifications
+    
+  } else {
+    print("Notification permissions denied");
+  }
+}
+```
+
+### 7.2 Update lib/main.dart
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:your_app/src/core/bootstrap.dart';  // IMPORTANT: Replace 'your_app' with your actual package name
+import 'package:your_app/src/services/notification_service.dart';  // IMPORTANT: Replace 'your_app' with your actual package name
+
+void main() async {
+  // CRITICAL: Initialize Firebase first
+  await initFirebase();
+  
+  // CRITICAL: Initialize Notifications second
+  await initNotifications();
+  
+  runApp(MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Your App',
+      home: HomePage(),
+    );
+  }
+}
+
+class HomePage extends StatefulWidget {
+  @override
+  _HomePageState createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  String? _fcmToken;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeNotifications();
+  }
+
+  Future<void> _initializeNotifications() async {
+    try {
+      // CRITICAL: Initialize notification service
+      await NotificationService.initialize();
+      
+      // Get FCM token and display it
+      final token = await NotificationService.getToken();
+      setState(() {
+        _fcmToken = token;
+      });
+      print('FCM Token: $token');
+      
+      // Subscribe to default topics
+      await NotificationService.subscribeToTopic('general');
+      
+      // Listen for token refresh
+      NotificationService.onTokenRefresh((newToken) {
+        setState(() {
+          _fcmToken = newToken;
+        });
+        print('Token refreshed: $newToken');
+      });
+    } catch (e) {
+      print('Error initializing notifications: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Push Notifications Demo'),
+      ),
+      body: Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'FCM Token:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8),
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                _fcmToken ?? 'Loading token...',
+                style: TextStyle(fontSize: 12),
+              ),
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () async {
+                final success = await NotificationService.sendTestNotification();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(success 
+                        ? 'Test notification sent! Check your notification panel.' 
+                        : 'Failed to send notification. Check console for errors.'),
+                  ),
+                );
+              },
+              child: Text('Send Test Notification'),
+            ),
+            SizedBox(height: 12),
+            Text(
+              'Instructions:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            Text(
+              '1. Press the button above to send a test notification\n'
+              '2. The notification should appear in your notification panel\n'
+              '3. If the app is in foreground, you\'ll see a local notification\n'
+              '4. If the app is in background/closed, you\'ll see a system notification',
+              style: TextStyle(fontSize: 12),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
+===============================================================================
+STEP 8: ADVANCED NOTIFICATION FEATURES
+===============================================================================
+
+### 8.1 User-to-User Notifications
+
+```dart
+// In your user service or messaging service
+class MessagingService {
+  static Future<void> sendNotificationToUser({
+    required String targetUserId,
+    required String title,
+    required String body,
+    String? type,
+  }) async {
+    try {
+      // Get target user's FCM token from Firestore
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(targetUserId)
+          .get();
+      
+      final userData = userDoc.data();
+      final fcmToken = userData?['fcmToken'] as String?;
+      
+      if (fcmToken != null) {
+        await NotificationService.sendPushNotification(
+          deviceToken: fcmToken,
+          title: title,
+          body: body,
+          type: type,
+        );
+      }
+    } catch (e) {
+      print('Error sending notification to user: $e');
+    }
+  }
+}
+```
+
+### 8.2 Admin Broadcast Notifications
+
+```dart
+// Send notifications to all users subscribed to a topic
+class AdminNotificationService {
+  static Future<void> broadcastToAllUsers({
+    required String title,
+    required String body,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse("${NotificationService._baseUrl}/sendTopicNotification"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "topic": "all_users",
+          "title": title,
+          "body": body,
+          "type": "broadcast",
+        }),
+      );
+      
+      if (response.statusCode == 200) {
+        print("Broadcast notification sent successfully");
+      }
+    } catch (e) {
+      print("Error sending broadcast notification: $e");
+    }
+  }
+}
+```
+
+### 8.3 Scheduled Notifications
+
+```dart
+// Add to NotificationService class
+static Future<void> scheduleNotification({
+  required int id,
+  required String title,
+  required String body,
+  required DateTime scheduledTime,
+}) async {
+  await _localNotifications.zonedSchedule(
+    id,
+    title,
+    body,
+    tz.TZDateTime.from(scheduledTime, tz.local),
+    const NotificationDetails(
+      android: AndroidNotificationDetails(
+        'scheduled_channel',
+        'Scheduled Notifications',
+        channelDescription: 'Notifications scheduled for later delivery',
+        importance: Importance.high,
+        priority: Priority.high,
+      ),
+      iOS: DarwinNotificationDetails(),
+    ),
+    androidAllowWhileIdle: true,
+    uiLocalNotificationDateInterpretation:
+        UILocalNotificationDateInterpretation.absoluteTime,
+  );
+}
+```
+
+===============================================================================
+STEP 9: CRITICAL VALIDATION CHECKLIST
+===============================================================================
+
+### BEFORE TESTING: Ensure ALL These Files Exist
+
+✅ **Android Configuration Files:**
+- `android/app/google-services.json` (Downloaded from Firebase Console)
+- `android/app/src/main/res/drawable/ic_stat_notification.png` (White 24x24dp icon)
+
+✅ **iOS Configuration Files:**
+- `ios/Runner/GoogleService-Info.plist` (Downloaded from Firebase Console)
+
+✅ **Flutter Files:**
+- `lib/firebase_options.dart` (Generated by FlutterFire CLI)
+- `lib/src/services/notification_service.dart` (Created from this guide)
+- `lib/src/core/bootstrap.dart` (Created from this guide)
+
+✅ **Cloud Functions Files:**
+- `functions/index.js` (Created from this guide)
+- `functions/package.json` (Generated by Firebase CLI)
+
+### CRITICAL VERIFICATION STEPS
+
+1. **Firebase Project Setup:**
+   ```bash
+   # Verify Firebase project is initialized
+   firebase projects:list
+   
+   # Should show your project
+   ```
+
+2. **Dependencies Check:**
+   ```bash
+   # Verify all dependencies are installed
+   flutter pub deps
+   
+   # Should show firebase_messaging, flutter_local_notifications, http, timezone
+   ```
+
+3. **Firebase Configuration:**
+   ```bash
+   # Verify Firebase is configured
+   flutterfire configure --project=YOUR_PROJECT_ID
+   
+   # Should regenerate firebase_options.dart
+   ```
+
+4. **Cloud Functions Deployment:**
+   ```bash
+   # Deploy and verify functions
+   firebase deploy --only functions
+   
+   # Copy the function URL from output and update NotificationService._baseUrl
+   ```
+
+5. **Android Build Test:**
+   ```bash
+   # Test Android build
+   flutter build apk --debug
+   
+   # Should build without errors
+   ```
+
+6. **App Token Verification:**
+   ```bash
+   # Run app and check console for FCM token
+   flutter run
+   
+   # Should print: "FCM Token: [long token string]"
+   ```
+
+### MUST-DO CONFIGURATION UPDATES
+
+1. **Replace Package Names:**
+   - In all import statements: `your_app` → `your_actual_package_name`
+   - In AndroidManifest.xml: `com.yourcompany.yourapp` → your actual application ID
+   - In build.gradle.kts: Update applicationId and namespace
+
+2. **Update Firebase Function URL:**
+   - In NotificationService: Replace `YOUR_REGION-YOUR_PROJECT_ID` with actual values
+   - Get actual URL from: `firebase deploy --only functions` output
+
+3. **Notification Icon:**
+   - Create or download a white 24x24dp PNG icon
+   - Place in: `android/app/src/main/res/drawable/ic_stat_notification.png`
+
+===============================================================================
+STEP 10: COMPREHENSIVE TESTING GUIDE
+===============================================================================
+
+### 10.1 Pre-Test Validation
+
+**Run these commands to ensure everything is set up correctly:**
+
+```bash
+# 1. Check if Flutter can build your app
+flutter clean
+flutter pub get
+flutter build apk --debug
+
+# 2. Verify Firebase configuration
+firebase projects:list
+# Should show your project
+
+# 3. Check if functions are deployed
+firebase functions:list
+# Should show sendFCMNotification
+
+# 4. Verify all files exist
+ls android/app/google-services.json  # Should exist
+ls ios/Runner/GoogleService-Info.plist  # Should exist (if using iOS)
+ls lib/firebase_options.dart  # Should exist
+```
+
+### 10.2 Step-by-Step Testing Process
+
+**Step 1: Run the App**
+```bash
+flutter run --verbose
+```
+
+**Expected Output in Console:**
+```
+✅ "Firebase initialized successfully"
+✅ "Notification permissions granted" 
+✅ "FCM Token: eyJ0eXAiOiJKV1QiLCJhbGc..." (long token string)
+✅ App should start without crashes
+```
+
+**Step 2: Test Token Display**
+- App should show your FCM token on the screen
+- Token should be a long string starting with letters/numbers
+- If token shows "Loading token..." forever, check troubleshooting section
+
+**Step 3: Test Foreground Notifications**
+1. Keep the app open and in foreground
+2. Press "Send Test Notification" button
+3. **Expected Result:** A notification overlay should appear over your app
+4. **Success Indicator:** Console shows "Notification sent successfully"
+
+**Step 4: Test Background Notifications**
+1. Press home button to put app in background (don't close it)
+2. Press "Send Test Notification" button from notification or reopen app briefly
+3. **Expected Result:** System notification appears in notification panel
+4. **Success Indicator:** Tapping notification opens your app
+
+**Step 5: Test Terminated Notifications**
+1. Close the app completely (swipe away from recent apps)
+2. Use curl command or another device to send notification to your token
+3. **Expected Result:** System notification appears even when app is closed
+4. **Success Indicator:** Tapping notification launches your app
+
+### 10.3 Test with External Tool (Cloud Functions)
+
+```bash
+# Replace YOUR_FCM_TOKEN with the token shown in your app
+curl -X POST https://YOUR_REGION-YOUR_PROJECT_ID.cloudfunctions.net/sendFCMNotification \
+  -H "Content-Type: application/json" \
+  -d '{
+    "token": "YOUR_FCM_TOKEN_FROM_APP",
+    "title": "External Test",
+    "body": "This notification was sent from outside the app!"
+  }'
+
+# Expected Response:
+# {"success":true,"messageId":"projects/your-project/messages/0:1234567890"}
+```
+
+### 10.4 Success Checklist
+
+✅ **App starts without errors**
+✅ **FCM token displays in app** 
+✅ **Foreground notifications work** (overlay appears when app is open)
+✅ **Background notifications work** (system notification when app is minimized)
+✅ **Terminated notifications work** (system notification when app is closed)
+✅ **Cloud Functions respond successfully** (curl command returns success)
+✅ **Notification tapping opens app** 
+✅ **Console shows proper logs** (no error messages)
+
+### 10.5 Deploy to Production
+
+```bash
+# Deploy Cloud Functions
+firebase deploy --only functions
+
+# Build and release your app
+flutter build apk --release  # Android
+flutter build ios --release  # iOS
+```
+
+===============================================================================
+STEP 10: COMMON NOTIFICATION USE CASES
+===============================================================================
+
+### 10.1 Like Notifications (Social Features)
+
+```dart
+static Future<void> sendLikeNotification({
+  required String targetUserId,
+  required String likerName,
+  required String contentType,
+}) async {
+  await MessagingService.sendNotificationToUser(
+    targetUserId: targetUserId,
+    title: 'New Like!',
+    body: '$likerName liked your $contentType',
+    type: 'like',
+  );
+}
+```
+
+### 10.2 Admin Action Notifications
+
+```dart
+static Future<void> sendAdminActionNotification({
+  required String targetUserId,
+  required String action,
+  required String reason,
+}) async {
+  await MessagingService.sendNotificationToUser(
+    targetUserId: targetUserId,
+    title: 'Account Update',
+    body: 'Your account has been $action. Reason: $reason',
+    type: 'admin_action',
+  );
+}
+```
+
+### 10.3 Reminder Notifications
+
+```dart
+static Future<void> scheduleAttendanceReminder({
+  required String userId,
+  required DateTime reminderTime,
+}) async {
+  await NotificationService.scheduleNotification(
+    id: DateTime.now().millisecondsSinceEpoch,
+    title: 'Attendance Reminder',
+    body: 'Don\'t forget to mark your attendance!',
+    scheduledTime: reminderTime,
+  );
+}
+```
+
+===============================================================================
+TROUBLESHOOTING GUIDE - CRITICAL FIXES
+===============================================================================
+
+### COMMON ISSUES AND SOLUTIONS
+
+**1. "MissingPluginException: No implementation found for method"**
+- SOLUTION: Run `flutter clean && flutter pub get`
+- SOLUTION: Restart your IDE and run `flutter run` again
+
+**2. "FirebaseException: Failed to get token"**
+- SOLUTION: Check `google-services.json` is in `android/app/`
+- SOLUTION: Check `GoogleService-Info.plist` is in `ios/Runner/`
+- SOLUTION: Verify internet connection
+
+**3. "Notifications not appearing on Android"**
+- SOLUTION: Check notification permissions in Settings > Apps > Your App > Notifications
+- SOLUTION: Disable battery optimization for your app
+- SOLUTION: Ensure `ic_stat_notification.png` exists in drawable folder
+
+**4. "Cloud Functions returning 404"**
+- SOLUTION: Verify functions are deployed: `firebase functions:list`
+- SOLUTION: Check function URL in NotificationService matches deployed URL
+- SOLUTION: Re-deploy functions: `firebase deploy --only functions`
+
+**5. "FCM Token is null"**
+- SOLUTION: Add google-services.json and GoogleService-Info.plist
+- SOLUTION: Run `flutterfire configure` again
+- SOLUTION: Check Firebase project has FCM enabled
+
+**6. "Build failed - missing dependencies"**
+- SOLUTION: Add all required dependencies to pubspec.yaml
+- SOLUTION: Ensure minimum SDK version is 21 (Android)
+- SOLUTION: Add `id("com.google.gms.google-services")` to android/app/build.gradle.kts
+
+**7. "Scheduled notifications not working"**
+- SOLUTION: Add `timezone` dependency to pubspec.yaml
+- SOLUTION: Initialize timezone in NotificationService
+- SOLUTION: Grant schedule exact alarm permission (Android 12+)
+
+**8. "iOS notifications not working"**
+- SOLUTION: Add GoogleService-Info.plist to Xcode project
+- SOLUTION: Enable Push Notifications capability in Xcode
+- SOLUTION: Configure APNs key in Firebase Console
+
+### REQUIRED PERMISSIONS (Android 13+)
+
+Add to AndroidManifest.xml if missing:
+```xml
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+```
+
+### FIREBASE CONSOLE CHECKLIST
+
+✅ Project created and active
+✅ Authentication enabled
+✅ Cloud Messaging enabled
+✅ Cloud Functions enabled
+✅ APNs key uploaded (iOS)
+✅ SHA1 fingerprint added (Android)
+
+===============================================================================
+FINAL SETUP VERIFICATION & TROUBLESHOOTING
+===============================================================================
+
+### COMPLETE SETUP VERIFICATION SCRIPT
+
+Create this test script to verify your entire setup:
+
+```bash
+#!/bin/bash
+# Save as test_notification_setup.sh
+
+echo "🔍 Verifying Push Notification Setup..."
+
+# Check Flutter
+echo "1. Checking Flutter..."
+flutter doctor | grep -E "Flutter|Android toolchain"
+
+# Check Firebase CLI
+echo "2. Checking Firebase CLI..."
+firebase --version
+
+# Check project files
+echo "3. Checking required files..."
+test -f android/app/google-services.json && echo "✅ google-services.json exists" || echo "❌ google-services.json missing"
+test -f lib/firebase_options.dart && echo "✅ firebase_options.dart exists" || echo "❌ firebase_options.dart missing"
+test -f android/app/src/main/res/drawable/ic_stat_notification.png && echo "✅ notification icon exists" || echo "❌ notification icon missing"
+
+# Check dependencies
+echo "4. Checking dependencies..."
+flutter pub deps | grep -E "firebase_messaging|flutter_local_notifications|http|timezone"
+
+# Build test
+echo "5. Testing build..."
+flutter build apk --debug > /dev/null 2>&1 && echo "✅ Build successful" || echo "❌ Build failed"
+
+echo "🎉 Setup verification complete!"
+```
+
+### IF NOTIFICATIONS STILL DON'T WORK
+
+**Last Resort Checklist:**
+
+1. **Complete Project Reset:**
+```bash
+# Clean everything
+flutter clean
+cd android && ./gradlew clean && cd ..
+flutter pub get
+
+# Reconfigure Firebase
+flutterfire configure --force
+
+# Rebuild
+flutter run
+```
+
+2. **Verify Firebase Console Settings:**
+   - Go to Firebase Console → Project Settings
+   - Ensure your app package name matches exactly
+   - Check that FCM is enabled
+   - Verify SHA-1 fingerprint is added
+
+3. **Test on Real Device:**
+   - Emulators sometimes have notification issues
+   - Test on actual Android/iOS device
+   - Ensure device has internet connection
+
+4. **Check Network & Firewall:**
+   - Corporate networks may block FCM
+   - Test on mobile data instead of Wi-Fi
+   - Disable VPN if active
+
+### COMMON "GOTCHAS" THAT BREAK SETUP
+
+❌ **Package name mismatch:** Android app ID ≠ Firebase package name
+❌ **Missing google-services.json:** File not in android/app/ directory  
+❌ **Wrong notification icon:** Not white PNG or wrong location
+❌ **Outdated dependencies:** Using old Firebase versions
+❌ **Missing SHA-1:** Debug fingerprint not added to Firebase
+❌ **Wrong build.gradle:** Editing root instead of app-level build.gradle
+❌ **Case sensitivity:** File paths and package names are case-sensitive
+❌ **Network issues:** Firewall blocking Firebase services
+❌ **Permissions:** Notification permissions denied on device
+
+### GET HELP
+
+If you're still having issues after following this guide:
+
+1. **Check Firebase Console logs:** Look for error messages
+2. **Run with verbose logging:** `flutter run --verbose`
+3. **Test Cloud Functions separately:** Use curl to test your functions
+4. **Verify device permissions:** Check app notification settings
+5. **Try minimal example:** Create new project with just notification code
+
+This guide is comprehensive and should work for 99% of Flutter notification setups. If you follow every step exactly, notifications will work!
+
+===============================================================================
+SECURITY CONSIDERATIONS
+===============================================================================
+
+### BEST PRACTICES
+
+1. **Token Management:**
+   - Store FCM tokens securely in Firestore
+   - Update tokens when they refresh
+   - Remove tokens when users logout
+
+2. **Cloud Functions Security:**
+   - Implement authentication for sensitive functions
+   - Validate all input parameters
+   - Use HTTPS endpoints only
+
+3. **User Privacy:**
+   - Request notification permissions appropriately
+   - Allow users to opt-out of notifications
+   - Don't send sensitive data in notification body
+
+===============================================================================
+TERMINAL COMMANDS SUMMARY
+===============================================================================
+
+```bash
+# 1. Install Firebase CLI
+npm install -g firebase-tools
+
+# 2. Login to Firebase
+firebase login
+
+# 3. Initialize Firebase project
+firebase init
+
+# 4. Install FlutterFire CLI
+dart pub global activate flutterfire_cli
+
+# 5. Configure Firebase for Flutter
+flutterfire configure
+
+# 6. Install Flutter dependencies
+flutter pub get
+
+# 7. Deploy Cloud Functions
+cd functions
+npm install
+firebase deploy --only functions
+
+# 8. Test with emulators
+firebase emulators:start --only functions
+
+# 9. View function logs
+firebase functions:log
+
+# 10. Build and test app
+flutter run
+flutter build apk --release
+```
+
+===============================================================================
+CONCLUSION
+===============================================================================
+
+This guide provides a complete implementation of push notifications for Flutter
+apps using Firebase Cloud Messaging. The setup includes:
+
+✅ Local notifications for foreground display
+✅ Remote push notifications for background/terminated states
+✅ Cloud Functions for server-side notification sending
+✅ Topic subscriptions for broadcast notifications
+✅ User-to-user messaging capabilities
+✅ Admin notification systems
+✅ Scheduled notifications
+
+Follow each step carefully, and you'll have a fully functional notification
+system that works across all app states and both major platforms.
+
+For production apps, remember to implement proper error handling, user
+preferences, and notification analytics to improve user experience.
+
+===============================================================================

@@ -1,5 +1,5 @@
 // file: lib/src/admin/models/admin_user.dart
-class AdminUser {
+class appUser {
   final String uid;
   final String firstName;
   final String lastName;
@@ -8,7 +8,7 @@ class AdminUser {
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
-  const AdminUser({
+  const appUser({
     required this.uid,
     required this.firstName,
     required this.lastName,
@@ -18,8 +18,8 @@ class AdminUser {
     this.updatedAt,
   });
 
-  factory AdminUser.fromMap(String uid, Map<String, dynamic> data) {
-    return AdminUser(
+  factory appUser.fromMap(String uid, Map<String, dynamic> data) {
+    return appUser(
       uid: uid,
       firstName: data['firstName'] ?? '',
       lastName: data['lastName'] ?? '',
