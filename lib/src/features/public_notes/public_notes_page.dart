@@ -281,7 +281,11 @@ class PublicFeeds extends StatelessWidget {
                                 : (isLiked ? 'Unlike' : 'Like'),
                             icon: Icon(
                               isLiked ? Icons.favorite : Icons.favorite_border,
-                              color: isSuspended ? Colors.grey : null,
+                              color: isSuspended
+                                  ? Colors.grey
+                                  : (isLiked
+                                        ? Color(0xFFE74C3C)
+                                        : Color(0xFF5D6D7E)),
                             ),
                             onPressed: isSuspended
                                 ? null
@@ -331,7 +335,7 @@ class PublicFeeds extends StatelessWidget {
                                   tooltip: 'Actions disabled (suspended)',
                                   icon: Icon(
                                     Icons.more_vert,
-                                    color: Colors.grey,
+                                    color: Color(0xFF95A5BC),
                                   ),
                                   onPressed: null,
                                 )

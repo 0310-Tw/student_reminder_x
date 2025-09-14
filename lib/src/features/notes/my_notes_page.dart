@@ -120,7 +120,7 @@ class _MyNotesPageState extends State<MyNotesPage> {
                       style: TextStyle(
                         fontWeight: FontWeight.w500,
                         fontSize: 12,
-                        color: Colors.grey[700],
+                        color: Color(0xFF5D6D7E),
                       ),
                     ),
                     SizedBox(height: 4),
@@ -348,7 +348,7 @@ class _MyNotesPageState extends State<MyNotesPage> {
                                 body,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(color: Colors.grey[600]),
+                                style: TextStyle(color: Color(0xFF5D6D7E)),
                               ),
                               // Always show tag section for debugging
                               SizedBox(height: 8),
@@ -358,7 +358,7 @@ class _MyNotesPageState extends State<MyNotesPage> {
                                     'Tags: ',
                                     style: TextStyle(
                                       fontSize: 10,
-                                      color: Colors.grey[500],
+                                      color: Color(0xFF7B8794),
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
@@ -367,7 +367,7 @@ class _MyNotesPageState extends State<MyNotesPage> {
                                       '(none)',
                                       style: TextStyle(
                                         fontSize: 10,
-                                        color: Colors.grey[400],
+                                        color: Color(0xFF95A5BC),
                                         fontStyle: FontStyle.italic,
                                       ),
                                     )
@@ -657,7 +657,7 @@ class _MyNotesPageState extends State<MyNotesPage> {
                                   }
                                 });
                               },
-                              backgroundColor: Colors.grey[200],
+                              backgroundColor: Color(0xFFE8F4FD),
                               selectedColor: Color(0xFF3498DB).withOpacity(0.1),
                               checkmarkColor: Color(0xFF3498DB),
                             );

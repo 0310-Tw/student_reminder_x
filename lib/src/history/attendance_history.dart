@@ -488,7 +488,7 @@ class _CalendarGrid extends StatelessWidget {
                 crossAxisCount: 7,
                 mainAxisSpacing: 10,
                 crossAxisSpacing: 10,
-                childAspectRatio: 0.9,
+                childAspectRatio: 1.0,
               ),
               itemBuilder: (context, i) {
                 final d = days[i];
@@ -529,13 +529,6 @@ class _CalendarGrid extends StatelessWidget {
                             color: dot,
                             shape: BoxShape.circle,
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          d.status,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 10, color: dot),
                         ),
                       ],
                     ),
