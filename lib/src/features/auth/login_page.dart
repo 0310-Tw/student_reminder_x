@@ -33,9 +33,9 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFFF8F9FA),
+      backgroundColor: Color(0xFFF7F9FC),
       appBar: AppBar(
-        backgroundColor: Color(0xFF1A237E),
+        backgroundColor: Color(0xFF2C3E50),
         foregroundColor: Colors.white,
         title: Text('Student Login'),
       ),
@@ -88,8 +88,12 @@ class _LoginPageState extends State<LoginPage> {
                       SizedBox(height: 20),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Color(0xFF1976D2),
+                          backgroundColor: Color(0xFF2C3E50),
                           foregroundColor: Colors.white,
+                          minimumSize: const Size(double.infinity, 48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                         onPressed: _busy ? null : _login,
                         child: _busy
@@ -98,6 +102,14 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       SizedBox(height: 12),
                       OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Color(0xFF2C3E50),
+                          minimumSize: const Size(double.infinity, 48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          side: BorderSide(color: Color(0xFF2C3E50)),
+                        ),
                         onPressed: () =>
                             Navigator.pushNamed(context, AppRoutes.register),
                         child: _busy

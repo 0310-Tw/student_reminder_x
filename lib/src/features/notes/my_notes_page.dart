@@ -47,9 +47,9 @@ class _MyNotesPageState extends State<MyNotesPage> {
     final uid = user.uid;
 
     return Scaffold(
-      backgroundColor: Color(0xFFF8F9FA),
+      backgroundColor: Color(0xFFF7F9FC),
       appBar: AppBar(
-        backgroundColor: Color(0xFF1A237E),
+        backgroundColor: Color(0xFF2C3E50),
         foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
         title: Text('My Notes'),
@@ -65,7 +65,7 @@ class _MyNotesPageState extends State<MyNotesPage> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: Color(0xFF1976D2),
+        backgroundColor: Color(0xFF3498DB),
         foregroundColor: Colors.white,
         onPressed: () async {
           await showModalBottomSheet(
@@ -163,7 +163,7 @@ class _MyNotesPageState extends State<MyNotesPage> {
                               'Tag: $tag',
                               style: TextStyle(fontSize: 10),
                             ),
-                            backgroundColor: Color(0xFF1976D2).withOpacity(0.1),
+                            backgroundColor: Color(0xFF3498DB).withOpacity(0.1),
                             deleteIcon: Icon(Icons.close, size: 14),
                             onDeleted: () =>
                                 setState(() => _selectedTags.remove(tag)),
@@ -514,13 +514,13 @@ class _MyNotesPageState extends State<MyNotesPage> {
                                       Icon(
                                         Icons.edit,
                                         size: 16,
-                                        color: Color(0xFF1976D2),
+                                        color: Color(0xFF3498DB),
                                       ),
                                       SizedBox(width: 4),
                                       Text(
                                         'Edit',
                                         style: TextStyle(
-                                          color: Color(0xFF1976D2),
+                                          color: Color(0xFF3498DB),
                                         ),
                                       ),
                                     ],
@@ -658,8 +658,8 @@ class _MyNotesPageState extends State<MyNotesPage> {
                                 });
                               },
                               backgroundColor: Colors.grey[200],
-                              selectedColor: Color(0xFF1976D2).withOpacity(0.1),
-                              checkmarkColor: Color(0xFF1976D2),
+                              selectedColor: Color(0xFF3498DB).withOpacity(0.1),
+                              checkmarkColor: Color(0xFF3498DB),
                             );
                           }).toList(),
                         ),

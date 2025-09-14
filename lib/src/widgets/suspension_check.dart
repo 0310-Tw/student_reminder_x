@@ -215,7 +215,7 @@ class SuspensionCheck extends StatelessWidget {
                   // You can implement a contact support feature here
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFF1976D2),
+                  backgroundColor: Color(0xFF3498DB),
                   foregroundColor: Colors.white,
                   padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   shape: RoundedRectangleBorder(

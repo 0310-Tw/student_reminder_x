@@ -42,9 +42,9 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFFF8F9FA),
+      backgroundColor: Color(0xFFF7F9FC),
       appBar: AppBar(
-        backgroundColor: Color(0xFF1A237E),
+        backgroundColor: Color(0xFF2C3E50),
         foregroundColor: Colors.white,
         title: Text('Student Registration'),
       ),
@@ -117,8 +117,12 @@ class _RegisterPageState extends State<RegisterPage> {
                     SizedBox(height: 12),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xFF1976D2),
+                        backgroundColor: Color(0xFF2C3E50),
                         foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       onPressed: _busy ? null : _register,
                       child: _busy

@@ -262,7 +262,7 @@ class UserBannerNotifications extends StatelessWidget {
       margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
+          colors: [Color(0xFF3498DB), Color(0xFF2C3E50)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),

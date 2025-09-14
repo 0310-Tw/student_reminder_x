@@ -35,9 +35,9 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
     final end = DateTime(now.year, now.month, now.day);
 
     return Scaffold(
-      backgroundColor: Color(0xFFF8F9FA),
+      backgroundColor: Color(0xFFF7F9FC),
       appBar: AppBar(
-        backgroundColor: Color(0xFF1A237E),
+        backgroundColor: Color(0xFF2C3E50),
         foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
         title: const Text('Attendance • Last 14 days'),
@@ -63,10 +63,13 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
                       icon: const Icon(Icons.login),
                       label: const Text("Clock In"),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xFF1976D2),
+                        backgroundColor: Color(0xFF3498DB),
                         foregroundColor: Colors.white,
                         minimumSize: const Size(double.infinity, 48),
                         elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
                   ),
@@ -77,10 +80,13 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
                       icon: const Icon(Icons.logout),
                       label: const Text("Clock Out"),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xFF1976D2),
+                        backgroundColor: Color(0xFFE74C3C),
                         foregroundColor: Colors.white,
                         minimumSize: const Size(double.infinity, 48),
                         elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
                   ),
@@ -304,16 +310,16 @@ class _DayItem {
 Color _statusColor(String status) {
   switch (status) {
     case 'present':
-      return Colors.green;
+      return Color(0xFF27AE60); // Sage Green
     case 'early':
-      return Colors.green;
+      return Color(0xFF27AE60); // Sage Green
     case 'late':
-      return Colors.orange;
+      return Color(0xFFF39C12); // Warm Amber
     case 'in_progress':
-      return Colors.blue;
+      return Color(0xFF3498DB); // Sky Blue
     case 'absent':
     default:
-      return Colors.red;
+      return Color(0xFFE74C3C); // Soft Red
   }
 }
 
@@ -340,7 +346,7 @@ Widget _statusBadgeWithAdmin(_DayItem dayItem) {
       color: c.withOpacity(0.12),
       border: Border.all(
         color: dayItem.isAdminMarked
-            ? Colors.purple.withOpacity(0.8)
+            ? Color(0xFF8E44AD).withOpacity(0.8)
             : c.withOpacity(0.6),
         width: dayItem.isAdminMarked ? 2 : 1,
       ),
@@ -351,7 +357,7 @@ Widget _statusBadgeWithAdmin(_DayItem dayItem) {
       style: TextStyle(
         fontSize: 10,
         fontWeight: FontWeight.w600,
-        color: dayItem.isAdminMarked ? Colors.purple.shade700 : c,
+        color: dayItem.isAdminMarked ? Color(0xFF8E44AD) : c,
       ),
       textAlign: TextAlign.center,
     ),
@@ -422,7 +428,7 @@ class _HistoryList extends StatelessWidget {
               dateLabel,
               style: const TextStyle(
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF1A237E),
+                color: Color(0xFF2C3E50),
               ),
             ),
             subtitle: Row(
@@ -432,13 +438,13 @@ class _HistoryList extends StatelessWidget {
                     padding: const EdgeInsets.only(right: 12),
                     child: Text(
                       'In: ${_fmtJM(d.inAt)}',
-                      style: const TextStyle(color: Color(0xFF424242)),
+                      style: const TextStyle(color: Color(0xFF5D6D7E)),
                     ),
                   ),
                 if (d.outAt != null)
                   Text(
                     'Out: ${_fmtJM(d.outAt)}',
-                    style: const TextStyle(color: Color(0xFF424242)),
+                    style: const TextStyle(color: Color(0xFF5D6D7E)),
                   ),
               ],
             ),
@@ -468,10 +474,10 @@ class _CalendarGrid extends StatelessWidget {
             spacing: 12,
             runSpacing: 8,
             children: const [
-              _Legend(color: Colors.green, label: 'Early'),
-              _Legend(color: Colors.orange, label: 'Late'),
-              _Legend(color: Colors.red, label: 'Absent'),
-              _Legend(color: Colors.blue, label: 'In progress'),
+              _Legend(color: Color(0xFF27AE60), label: 'Early'),
+              _Legend(color: Color(0xFFF39C12), label: 'Late'),
+              _Legend(color: Color(0xFFE74C3C), label: 'Absent'),
+              _Legend(color: Color(0xFF3498DB), label: 'In progress'),
             ],
           ),
           const SizedBox(height: 12),
@@ -494,12 +500,12 @@ class _CalendarGrid extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade300),
+                      border: Border.all(color: Color(0xFFE8F4FD)),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 4,
-                          offset: Offset(0, 2),
+                          color: Color(0xFF2C3E50).withOpacity(0.08),
+                          blurRadius: 6,
+                          offset: Offset(0, 3),
                         ),
                       ],
                     ),
@@ -512,6 +518,7 @@ class _CalendarGrid extends StatelessWidget {
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
+                            color: Color(0xFF2C3E50),
                           ),
                         ),
                         const SizedBox(height: 6),

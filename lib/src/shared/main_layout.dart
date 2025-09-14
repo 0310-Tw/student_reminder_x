@@ -185,8 +185,8 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
             indicatorShape: _isAdmin
                 ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
                 : const CircleBorder(),
-            indicatorColor: _isAdmin ? null : Color(0xFF1976D2),
-            backgroundColor: _isAdmin ? null : Color(0xFFF8F9FA),
+            indicatorColor: _isAdmin ? null : Color(0xFF3498DB),
+            backgroundColor: _isAdmin ? null : Color(0xFFF7F9FC),
             selectedIndex: _index,
             destinations: _buildNavigationDestinations(),
             onDestinationSelected: (i) => setState(() => _index = i),
