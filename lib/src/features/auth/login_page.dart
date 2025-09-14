@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/shared/misc.dart';
 import 'package:students_reminder/src/shared/routes.dart';
@@ -38,43 +39,78 @@ class _LoginPageState extends State<LoginPage> {
         foregroundColor: Colors.white,
         title: Text('Student Login'),
       ),
-      body: Padding(
-        padding: EdgeInsetsGeometry.all(16),
-        child: Center(
-          child: Column(
-            children: [
-              //Email
-              TextField(
-                controller: _email,
-                decoration: InputDecoration(labelText: 'Email'),
-              ),
-              SizedBox(height: 12),
-              //Password
-              TextField(
-                controller: _password,
-                decoration: InputDecoration(labelText: 'Password'),
-                obscureText: true,
-              ),
-              SizedBox(height: 20),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFF1976D2),
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: _busy ? null : _login,
-                child: _busy ? CircularProgressIndicator() : Text('Login'),
-              ),
-              SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: () =>
-                    Navigator.pushNamed(context, AppRoutes.register),
-                child: _busy
-                    ? CircularProgressIndicator()
-                    : Text('No Account? Register'),
-              ),
-            ],
+      body: Stack(
+        children: [
+          // Lottie animation as background
+          Positioned.fill(
+            child: Lottie.asset(
+              'assests/login pic.json',
+              fit: BoxFit.cover,
+              repeat: true,
+              reverse: false,
+              animate: true,
+            ),
           ),
-        ),
+          // Login form with semi-transparent background
+          Container(
+            color: Colors.white.withOpacity(0.85),
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(
+                child: Container(
+                  padding: EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.95),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                        offset: Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      //Email
+                      TextField(
+                        controller: _email,
+                        decoration: InputDecoration(labelText: 'Email'),
+                      ),
+                      SizedBox(height: 12),
+                      //Password
+                      TextField(
+                        controller: _password,
+                        decoration: InputDecoration(labelText: 'Password'),
+                        obscureText: true,
+                      ),
+                      SizedBox(height: 20),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Color(0xFF1976D2),
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: _busy ? null : _login,
+                        child: _busy
+                            ? CircularProgressIndicator()
+                            : Text('Login'),
+                      ),
+                      SizedBox(height: 12),
+                      OutlinedButton(
+                        onPressed: () =>
+                            Navigator.pushNamed(context, AppRoutes.register),
+                        child: _busy
+                            ? CircularProgressIndicator()
+                            : Text('No Account? Register'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -11,7 +11,6 @@ import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/shared/misc.dart';
 import 'package:students_reminder/src/widgets/suspension_check.dart';
 
-
 class AttendanceHistory14d extends StatefulWidget {
   const AttendanceHistory14d({super.key});
 
@@ -36,9 +35,10 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
     final end = DateTime(now.year, now.month, now.day);
 
     return Scaffold(
-      backgroundColor: Colors.lightBlue.shade100,
+      backgroundColor: Color(0xFFF8F9FA),
       appBar: AppBar(
-        backgroundColor: Colors.tealAccent,
+        backgroundColor: Color(0xFF1A237E),
+        foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
         title: const Text('Attendance • Last 14 days'),
         actions: [
@@ -63,7 +63,10 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
                       icon: const Icon(Icons.login),
                       label: const Text("Clock In"),
                       style: ElevatedButton.styleFrom(
+                        backgroundColor: Color(0xFF1976D2),
+                        foregroundColor: Colors.white,
                         minimumSize: const Size(double.infinity, 48),
+                        elevation: 2,
                       ),
                     ),
                   ),
@@ -74,7 +77,10 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
                       icon: const Icon(Icons.logout),
                       label: const Text("Clock Out"),
                       style: ElevatedButton.styleFrom(
+                        backgroundColor: Color(0xFF1976D2),
+                        foregroundColor: Colors.white,
                         minimumSize: const Size(double.infinity, 48),
+                        elevation: 2,
                       ),
                     ),
                   ),
@@ -89,9 +95,11 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
                     return const Center(child: CircularProgressIndicator());
                   }
                   final docs =
-                      snap.data?.docs ?? <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                      snap.data?.docs ??
+                      <QueryDocumentSnapshot<Map<String, dynamic>>>[];
                   final byDate = {
-                    for (final d in docs) (d.data()['dayId'] as String): d.data(),
+                    for (final d in docs)
+                      (d.data()['dayId'] as String): d.data(),
                   };
 
                   final items = <_DayItem>[];
@@ -398,24 +406,45 @@ class _HistoryList extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView.separated(
       itemCount: days.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, i) {
         final d = days[i];
         final dateLabel = DateFormat('EEE, MMM d').format(d.date);
-        return ListTile(
-          title: Text(dateLabel),
-          subtitle: Row(
-            children: [
-              if (d.inAt != null)
-                Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: Text('In: ${_fmtJM(d.inAt)}'),
-                ),
-              if (d.outAt != null) Text('Out: ${_fmtJM(d.outAt)}'),
-            ],
+        return Card(
+          elevation: 2,
+          margin: const EdgeInsets.symmetric(horizontal: 8),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 8,
+            ),
+            title: Text(
+              dateLabel,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1A237E),
+              ),
+            ),
+            subtitle: Row(
+              children: [
+                if (d.inAt != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: Text(
+                      'In: ${_fmtJM(d.inAt)}',
+                      style: const TextStyle(color: Color(0xFF424242)),
+                    ),
+                  ),
+                if (d.outAt != null)
+                  Text(
+                    'Out: ${_fmtJM(d.outAt)}',
+                    style: const TextStyle(color: Color(0xFF424242)),
+                  ),
+              ],
+            ),
+            trailing: _statusBadgeWithAdmin(d),
+            onTap: () => _openMapModal(context, uid: uid, dayId: d.dateId),
           ),
-          trailing: _statusBadgeWithAdmin(d),
-          onTap: () => _openMapModal(context, uid: uid, dayId: d.dateId),
         );
       },
     );
@@ -463,8 +492,16 @@ class _CalendarGrid extends StatelessWidget {
                       _openMapModal(context, uid: uid, dayId: d.dateId),
                   child: Container(
                     decoration: BoxDecoration(
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Theme.of(context).dividerColor),
+                      border: Border.all(color: Colors.grey.shade300),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 4,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
                     ),
                     padding: const EdgeInsets.all(8),
                     child: Column(
@@ -632,7 +669,9 @@ class _DayMapModalState extends State<DayMapModal> {
             title: 'Clock In',
             snippet: inAt != null ? DateFormat.jm().format(inAt!) : null,
           ),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueGreen,
+          ),
         ),
       );
     }
