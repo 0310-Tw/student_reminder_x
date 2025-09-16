@@ -417,7 +417,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
               children: [
                 Text(
                   _formatDisplayDate(date),
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  style:  TextStyle(fontWeight: FontWeight.bold),
                 ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -656,7 +656,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
 
       await AttendanceService.adminMarkPresent(user.uid, studentUid, dateStr);
       _showSuccessSnackBar(
-        '✅ Student marked as present for $dateStr and notified',
+        ' Student marked as present for $dateStr and notified',
       );
     } catch (e) {
       _showErrorSnackBar('Failed to mark present: $e');
@@ -710,7 +710,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
         reason: reasonController.text.isNotEmpty ? reasonController.text : null,
       );
       _showSuccessSnackBar(
-        '✅ Student marked as absent for $dateStr and notified',
+        ' Student marked as absent for $dateStr and notified',
       );
     } catch (e) {
       _showErrorSnackBar('Failed to mark absent: $e');
