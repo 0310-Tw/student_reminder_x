@@ -20,8 +20,6 @@ class AdminHomePage extends StatefulWidget {
 class _AdminHomePageState extends State<AdminHomePage> {
   String _group = 'mobile'; //default
 
-  
-
   @override
   Widget build(BuildContext context) {
     final uid = AuthService.instance.currentUser?.uid;
@@ -787,8 +785,12 @@ class _AdminHomePageState extends State<AdminHomePage> {
             .add({
               'title': title,
               'body': body,
+              'message': body, // Add message field for banner notifications
               'type': 'admin_action',
               'priority': 'high',
+              'severity': title.contains('Unsuspended')
+                  ? 'info'
+                  : (title.contains('Suspended') ? 'critical' : 'warning'),
               'read': false,
               'actionBy': AuthService.instance.currentUser?.email ?? 'Admin',
               'actionDate': FieldValue.serverTimestamp(),
@@ -847,64 +849,270 @@ class _AdminHomePageState extends State<AdminHomePage> {
         content: Container(
           width: double.maxFinite,
           height: 400,
-          child: StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('users')
-                .doc(userId)
-                .collection('notifications')
-                .where('type', isEqualTo: 'admin_action')
-                .orderBy('createdAt', descending: true)
-                .limit(10)
-                .snapshots(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return Center(child: CircularProgressIndicator());
-              }
+          child: Column(
+            children: [
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(userId)
+                      .collection('notifications')
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return Center(child: CircularProgressIndicator());
+                    }
 
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                return Center(child: Text('No admin notifications found'));
-              }
-
-              return ListView.builder(
-                itemCount: snapshot.data!.docs.length,
-                itemBuilder: (context, index) {
-                  final doc = snapshot.data!.docs[index];
-                  final data = doc.data() as Map<String, dynamic>;
-                  final timestamp = data['createdAt'] as Timestamp?;
-                  final date = timestamp?.toDate();
-
-                  return Card(
-                    child: ListTile(
-                      leading: Icon(
-                        Icons.notifications,
-                        color: data['read'] == true ? Colors.grey : Colors.blue,
-                      ),
-                      title: Text(data['title'] ?? 'No Title'),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(data['body'] ?? 'No Content'),
-                          if (date != null)
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.error, color: Colors.red, size: 48),
+                            SizedBox(height: 8),
+                            Text('Error loading notifications'),
                             Text(
-                              '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}',
+                              '${snapshot.error}',
                               style: TextStyle(
-                                fontSize: 10,
+                                fontSize: 12,
                                 color: Colors.grey,
                               ),
                             ),
-                        ],
-                      ),
-                      trailing: data['read'] == true
-                          ? Icon(Icons.check, color: Colors.green, size: 16)
-                          : Icon(Icons.fiber_new, color: Colors.red, size: 16),
-                    ),
-                  );
-                },
-              );
-            },
+                          ],
+                        ),
+                      );
+                    }
+
+                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.notifications_off,
+                              color: Colors.grey,
+                              size: 48,
+                            ),
+                            SizedBox(height: 8),
+                            Text('No notifications found'),
+                            Text(
+                              'No admin notifications have been sent to this user yet.',
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    // Manually sort notifications by timestamp (newest first)
+                    final docs = snapshot.data!.docs.toList();
+                    docs.sort((a, b) {
+                      final aData = a.data() as Map<String, dynamic>;
+                      final bData = b.data() as Map<String, dynamic>;
+                      final aTime =
+                          aData['createdAt'] as Timestamp? ??
+                          aData['actionDate'] as Timestamp?;
+                      final bTime =
+                          bData['createdAt'] as Timestamp? ??
+                          bData['actionDate'] as Timestamp?;
+
+                      if (aTime == null && bTime == null) return 0;
+                      if (aTime == null) return 1;
+                      if (bTime == null) return -1;
+
+                      return bTime.compareTo(aTime); // Newest first
+                    });
+
+                    // Limit to most recent 20 notifications
+                    final limitedDocs = docs.take(20).toList();
+
+                    return ListView.builder(
+                      itemCount: limitedDocs.length,
+                      itemBuilder: (context, index) {
+                        final doc = limitedDocs[index];
+                        final data = doc.data() as Map<String, dynamic>;
+                        final timestamp = data['createdAt'] as Timestamp?;
+                        final actionTimestamp =
+                            data['actionDate'] as Timestamp?;
+                        final date =
+                            timestamp?.toDate() ?? actionTimestamp?.toDate();
+                        final notificationType = data['type'] ?? 'unknown';
+                        final actionBy = data['actionBy'] ?? 'Admin';
+
+                        // Determine icon and color based on notification type
+                        IconData iconData = Icons.notifications;
+                        Color iconColor = data['read'] == true
+                            ? Colors.grey
+                            : Color(0xFF3498DB);
+
+                        switch (notificationType) {
+                          case 'admin_action':
+                            iconData = Icons.admin_panel_settings;
+                            iconColor = data['read'] == true
+                                ? Colors.grey
+                                : Color(0xFFE74C3C);
+                            break;
+                          case 'attendance_update':
+                            iconData = Icons.event_available;
+                            iconColor = data['read'] == true
+                                ? Colors.grey
+                                : Color(0xFF27AE60);
+                            break;
+                          case 'flag':
+                            iconData = Icons.flag;
+                            iconColor = data['read'] == true
+                                ? Colors.grey
+                                : Color(0xFFF39C12);
+                            break;
+                          case 'suspension':
+                            iconData = Icons.block;
+                            iconColor = data['read'] == true
+                                ? Colors.grey
+                                : Color(0xFFE74C3C);
+                            break;
+                        }
+
+                        return Card(
+                          margin: EdgeInsets.symmetric(
+                            vertical: 4,
+                            horizontal: 8,
+                          ),
+                          child: ListTile(
+                            leading: Icon(iconData, color: iconColor),
+                            title: Text(
+                              data['title'] ?? 'No Title',
+                              style: TextStyle(
+                                fontWeight: data['read'] == true
+                                    ? FontWeight.normal
+                                    : FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(data['body'] ?? 'No Content'),
+                                SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.person,
+                                      size: 12,
+                                      color: Colors.grey,
+                                    ),
+                                    SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        'By: $actionBy',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.grey,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (date != null)
+                                      Text(
+                                        '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            trailing: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (data['read'] == true)
+                                  Icon(
+                                    Icons.check_circle,
+                                    color: Color(0xFF27AE60),
+                                    size: 16,
+                                  )
+                                else
+                                  Icon(
+                                    Icons.fiber_new,
+                                    color: Color(0xFFE74C3C),
+                                    size: 16,
+                                  ),
+                                SizedBox(height: 4),
+                                Text(
+                                  notificationType.toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 8,
+                                    color: Colors.grey,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            onTap: () async {
+                              // Mark as read when tapped
+                              if (data['read'] != true) {
+                                try {
+                                  await FirebaseFirestore.instance
+                                      .collection('users')
+                                      .doc(userId)
+                                      .collection('notifications')
+                                      .doc(doc.id)
+                                      .update({'read': true});
+                                } catch (e) {
+                                  print(
+                                    'Error marking notification as read: $e',
+                                  );
+                                }
+                              }
+                            },
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         ),
         actions: [
+          TextButton.icon(
+            onPressed: () async {
+              // Mark all notifications as read
+              try {
+                final batch = FirebaseFirestore.instance.batch();
+                final notifications = await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(userId)
+                    .collection('notifications')
+                    .where('read', isEqualTo: false)
+                    .get();
+
+                for (final doc in notifications.docs) {
+                  batch.update(doc.reference, {'read': true});
+                }
+
+                await batch.commit();
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Marked ${notifications.docs.length} notifications as read',
+                    ),
+                    backgroundColor: Color(0xFF27AE60),
+                  ),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error marking notifications as read: $e'),
+                    backgroundColor: Color(0xFFE74C3C),
+                  ),
+                );
+              }
+            },
+            icon: Icon(Icons.done_all),
+            label: Text('Mark All Read'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text('Close'),

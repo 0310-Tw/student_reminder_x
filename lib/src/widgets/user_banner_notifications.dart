@@ -2,8 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 
-class UserBannerNotifications extends StatelessWidget {
+class UserBannerNotifications extends StatefulWidget {
   const UserBannerNotifications({super.key});
+
+  @override
+  State<UserBannerNotifications> createState() =>
+      _UserBannerNotificationsState();
+}
+
+class _UserBannerNotificationsState extends State<UserBannerNotifications> {
+  String? _currentNotificationId;
 
   @override
   Widget build(BuildContext context) {
@@ -16,72 +24,93 @@ class UserBannerNotifications extends StatelessWidget {
           .doc(user.uid)
           .collection('notifications')
           .where('read', isEqualTo: false)
-          .orderBy('timestamp', descending: true)
-          .limit(5)
           .snapshots(),
       builder: (context, snapshot) {
-        print('UserNotifications StreamBuilder triggered');
-        print('Has data: ${snapshot.hasData}');
-        print('Docs count: ${snapshot.data?.docs.length ?? 0}');
-
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          print('No notifications found or no data');
           return SizedBox.shrink();
         }
 
         final notifications = snapshot.data!.docs;
-        print('Total notifications: ${notifications.length}');
 
-        // Debug: Print all notifications
-        for (int i = 0; i < notifications.length; i++) {
-          final data = notifications[i].data() as Map;
-          print(
-            'Notification $i: ${data['type']} - ${data['severity']} - ${data['title']}',
-          );
-        }
+        // Manually sort notifications by creation time (newest first)
+        final sortedNotifications = notifications.toList()
+          ..sort((a, b) {
+            final aData = a.data() as Map<String, dynamic>;
+            final bData = b.data() as Map<String, dynamic>;
+            final aTime = aData['createdAt'] as Timestamp?;
+            final bTime = bData['createdAt'] as Timestamp?;
 
-        final criticalNotifications = notifications
-            .where((doc) => (doc.data() as Map)['severity'] == 'critical')
-            .toList();
+            if (aTime == null && bTime == null) return 0;
+            if (aTime == null) return 1;
+            if (bTime == null) return -1;
 
-        print('Critical notifications: ${criticalNotifications.length}');
+            return bTime.compareTo(aTime); // Newest first
+          });
 
-        // Show critical notifications (suspensions) as prominent banners
-        if (criticalNotifications.isNotEmpty) {
-          final notification = criticalNotifications.first.data() as Map;
-          return _buildCriticalNotificationBanner(
-            context,
-            notification,
-            criticalNotifications.first.id,
-          );
-        }
+        // Show only the most recent notification to prevent jumping
+        if (sortedNotifications.isNotEmpty) {
+          final latestNotification = sortedNotifications.first;
+          final data = latestNotification.data() as Map<String, dynamic>;
+          final severity = data['severity'] ?? 'info';
+          final title = data['title'] ?? '';
+          final createdAt = data['createdAt'] as Timestamp?;
 
-        // Show warning notifications (flags) as smaller banners
-        final warningNotifications = notifications
-            .where((doc) => (doc.data() as Map)['severity'] == 'warning')
-            .toList();
+          // Filter out suspension-related notifications (both suspended and unsuspended)
+          if (title.contains('Suspended') ||
+              title.contains('Unsuspended') ||
+              data['message']?.toString().contains('suspended') == true ||
+              data['message']?.toString().contains('unsuspended') == true ||
+              data['message']?.toString().contains('suspension') == true) {
+            // Always hide suspension-related notifications
+            _markAsRead(latestNotification.id);
+            return SizedBox.shrink();
+          }
 
-        if (warningNotifications.isNotEmpty) {
-          final notification = warningNotifications.first.data() as Map;
-          return _buildWarningNotificationBanner(
-            context,
-            notification,
-            warningNotifications.first.id,
-          );
-        }
+          // Auto-dismiss old notifications (older than 1 hour)
+          if (createdAt != null) {
+            final notificationAge = DateTime.now().difference(
+              createdAt.toDate(),
+            );
+            if (notificationAge.inHours > 1) {
+              // Auto-mark old notifications as read
+              _markAsRead(latestNotification.id);
+              return SizedBox.shrink();
+            }
+          }
 
-        // Show info notifications (unflag, etc.) as informational banners
-        final infoNotifications = notifications
-            .where((doc) => (doc.data() as Map)['severity'] == 'info')
-            .toList();
+          // Only update if this is a different notification to prevent flicker
+          if (_currentNotificationId != latestNotification.id) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                setState(() {
+                  _currentNotificationId = latestNotification.id;
+                });
+              }
+            });
+          }
 
-        if (infoNotifications.isNotEmpty) {
-          final notification = infoNotifications.first.data() as Map;
-          return _buildInfoNotificationBanner(
-            context,
-            notification,
-            infoNotifications.first.id,
-          );
+          switch (severity) {
+            case 'critical':
+              return _buildCriticalNotificationBanner(
+                context,
+                data,
+                latestNotification.id,
+              );
+            case 'warning':
+              return _buildWarningNotificationBanner(
+                context,
+                data,
+                latestNotification.id,
+              );
+            case 'info':
+              return _buildInfoNotificationBanner(
+                context,
+                data,
+                latestNotification.id,
+              );
+            default:
+              return SizedBox.shrink();
+          }
         }
 
         return SizedBox.shrink();
@@ -309,7 +338,7 @@ class UserBannerNotifications extends StatelessWidget {
             TextButton(
               onPressed: () => _markAsRead(notificationId),
               child: Text(
-                'OK',
+                'OKy',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,

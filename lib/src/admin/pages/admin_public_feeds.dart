@@ -874,7 +874,7 @@ class _AdminPublicFeedsState extends State<AdminPublicFeeds> {
                                           if (!userSnapshot.hasData ||
                                               !userSnapshot.data!.exists) {
                                             return Text(
-                                              'Reporter: Unknown User (ID: ${reporterId.substring(0, 8)}...)',
+                                              'Reporter: Unknown User',
                                               style: TextStyle(
                                                 fontSize: 12,
                                                 color: Colors.grey[600],
@@ -895,7 +895,7 @@ class _AdminPublicFeedsState extends State<AdminPublicFeeds> {
                                               '$firstName $lastName'.trim();
 
                                           return Text(
-                                            'Reporter: ${fullName.isNotEmpty ? fullName : 'Unknown User'} (ID: ${reporterId.substring(0, 8)}...)',
+                                            'Reporter: ${fullName.isNotEmpty ? fullName : 'Unknown User'}',
                                             style: TextStyle(
                                               fontSize: 12,
                                               color: Colors.grey[600],
@@ -905,7 +905,6 @@ class _AdminPublicFeedsState extends State<AdminPublicFeeds> {
                                         },
                                       ),
                                     ),
-                                    Spacer(),
                                     if (createdAt != null)
                                       Text(
                                         _formatTimestamp(createdAt),
@@ -914,6 +913,89 @@ class _AdminPublicFeedsState extends State<AdminPublicFeeds> {
                                           color: Colors.grey[500],
                                         ),
                                       ),
+                                    SizedBox(width: 8),
+                                    // Delete button
+                                    IconButton(
+                                      onPressed: () async {
+                                        // Show confirmation dialog
+                                        final bool?
+                                        confirmDelete = await showDialog<bool>(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            title: Text('Delete Report'),
+                                            content: Text(
+                                              'Are you sure you want to delete this report? This action cannot be undone.',
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () => Navigator.of(
+                                                  context,
+                                                ).pop(false),
+                                                child: Text('Cancel'),
+                                              ),
+                                              TextButton(
+                                                onPressed: () => Navigator.of(
+                                                  context,
+                                                ).pop(true),
+                                                style: TextButton.styleFrom(
+                                                  foregroundColor: Colors.red,
+                                                ),
+                                                child: Text('Delete'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+
+                                        if (confirmDelete == true) {
+                                          try {
+                                            // Delete the report document
+                                            await noteRef
+                                                .collection('reports')
+                                                .doc(reporterId)
+                                                .delete();
+
+                                            // Show success message
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  'Report deleted successfully',
+                                                ),
+                                                backgroundColor: Color(
+                                                  0xFF27AE60,
+                                                ),
+                                              ),
+                                            );
+                                          } catch (e) {
+                                            // Show error message
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  'Error deleting report: $e',
+                                                ),
+                                                backgroundColor: Color(
+                                                  0xFFE74C3C,
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        }
+                                      },
+                                      icon: Icon(
+                                        Icons.delete_outline,
+                                        size: 18,
+                                        color: Colors.red[600],
+                                      ),
+                                      tooltip: 'Delete Report',
+                                      constraints: BoxConstraints(
+                                        minWidth: 32,
+                                        minHeight: 32,
+                                      ),
+                                      padding: EdgeInsets.all(4),
+                                    ),
                                   ],
                                 ),
                                 SizedBox(height: 8),

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../services/attendance_service.dart';
 import '../../shared/misc.dart';
 
@@ -70,7 +71,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     if (!_isAdmin) {
       return Scaffold(
         appBar: AppBar(
-          title:  Text('Access Denied'),
+          title: Text('Access Denied'),
           backgroundColor: Color(0xFF1A237E),
           foregroundColor: Colors.white,
         ),
@@ -129,23 +130,19 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Attendance'),
-        backgroundColor: Color(0xFF1A237E), 
+        backgroundColor: Color(0xFF1A237E),
         foregroundColor: Colors.white,
         elevation: 2,
       ),
-      backgroundColor: Color(0xFFF8F9FA), 
+      backgroundColor: Color(0xFFF8F9FA),
       body: Column(
         children: [
-
           Container(
             width: double.infinity,
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [
-                  Color(0xFF3F51B5),
-                  Color(0xFF1A237E),
-                ],
+                colors: [Color(0xFF3F51B5), Color(0xFF1A237E)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -327,7 +324,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Padding(
-            padding:  EdgeInsets.all(16),
+            padding: EdgeInsets.all(16),
             child: Text('Error loading attendance: ${snapshot.error}'),
           );
         }
@@ -417,7 +414,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
               children: [
                 Text(
                   _formatDisplayDate(date),
-                  style:  TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -804,151 +801,230 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
         data['outAt'] ?? data['clockOutAt'] ?? data['clockOut'];
     final lateReason = data['lateReason'] as String?;
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.location_on, color: Colors.red),
-            SizedBox(width: 8),
-            Text('Attendance Location Details'),
-          ],
-        ),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 400,
-          child: SingleChildScrollView(
+    // If no location data available, show the old dialog
+    if (clockInLoc == null && clockOutLoc == null) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.location_off, color: Colors.grey),
+              SizedBox(width: 8),
+              Text('No Location Data'),
+            ],
+          ),
+          content: Container(
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                if (clockInLoc != null) ...[
-                  Container(
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.green.shade200),
-                    ),
-                    width: double.infinity,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.login, color: Colors.green, size: 16),
-                            SizedBox(width: 4),
-                            Text(
-                              'Clock In Location:',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 8),
-                        Text('📍 Coordinates:'),
-                        Text(
-                          '   Latitude: ${clockInLoc.latitude.toStringAsFixed(6)}',
-                        ),
-                        Text(
-                          '   Longitude: ${clockInLoc.longitude.toStringAsFixed(6)}',
-                        ),
-                        if (clockInTime != null) ...[
-                          SizedBox(height: 4),
-                          Text('🕐 Time: ${_formatTimestamp(clockInTime)}'),
-                        ],
-                        if (lateReason != null && lateReason.isNotEmpty) ...[
-                          SizedBox(height: 4),
-                          Text('📝 Late Reason: $lateReason'),
-                        ],
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                ],
-                if (clockOutLoc != null) ...[
-                  Container(
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.orange.shade200),
-                    ),
-                    width: double.infinity,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.logout, color: Colors.orange, size: 16),
-                            SizedBox(width: 4),
-                            Text(
-                              'Clock Out Location:',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 8),
-                        Text('📍 Coordinates:'),
-                        Text(
-                          '   Latitude: ${clockOutLoc.latitude.toStringAsFixed(6)}',
-                        ),
-                        Text(
-                          '   Longitude: ${clockOutLoc.longitude.toStringAsFixed(6)}',
-                        ),
-                        if (clockOutTime != null) ...[
-                          SizedBox(height: 4),
-                          Text('🕐 Time: ${_formatTimestamp(clockOutTime)}'),
-                        ],
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                ],
-                if (clockInLoc == null && clockOutLoc == null) ...[
-                  Container(
-                    padding: EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    width: double.infinity,
-                    child: Column(
-                      children: [
-                        Icon(Icons.location_off, size: 48, color: Colors.grey),
-                        SizedBox(height: 8),
-                        Text(
-                          'No location data available',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          'This attendance record was created without location tracking.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                Icon(Icons.location_off, size: 48, color: Colors.grey),
+                SizedBox(height: 8),
+                Text(
+                  'No location data available',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  'This attendance record was created without location tracking.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey),
+                ),
               ],
             ),
           ),
-        ),
-        actions: [
-          if (clockInLoc != null || clockOutLoc != null)
-            TextButton.icon(
-              onPressed: () {
-                final coords = clockInLoc ?? clockOutLoc!;
-                _showSuccessSnackBar(
-                  'Coordinates: ${coords.latitude.toStringAsFixed(6)}, ${coords.longitude.toStringAsFixed(6)}',
-                );
-              },
-              icon: Icon(Icons.copy),
-              label: Text('Copy Coords'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Close'),
             ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Close'),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // Show map dialog with Google Maps
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.9,
+          height: MediaQuery.of(context).size.height * 0.8,
+          child: Column(
+            children: [
+              // Header
+              Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Color(0xFF2C3E50),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(8),
+                    topRight: Radius.circular(8),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.location_on, color: Colors.white),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Attendance Locations',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(Icons.close, color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+              // Map
+              Expanded(
+                flex: 3,
+                child: _buildLocationMap(clockInLoc, clockOutLoc),
+              ),
+              // Location details
+              Expanded(
+                flex: 2,
+                child: Container(
+                  padding: EdgeInsets.all(16),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (clockInLoc != null) ...[
+                          _buildLocationCard(
+                            'Clock In Location',
+                            Icons.login,
+                            Colors.green,
+                            clockInLoc,
+                            clockInTime,
+                            lateReason,
+                          ),
+                          SizedBox(height: 12),
+                        ],
+                        if (clockOutLoc != null) ...[
+                          _buildLocationCard(
+                            'Clock Out Location',
+                            Icons.logout,
+                            Colors.orange,
+                            clockOutLoc,
+                            clockOutTime,
+                            null,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocationMap(GeoPoint? clockInLoc, GeoPoint? clockOutLoc) {
+    Set<Marker> markers = {};
+    LatLng center;
+
+    if (clockInLoc != null) {
+      markers.add(
+        Marker(
+          markerId: MarkerId('clock_in'),
+          position: LatLng(clockInLoc.latitude, clockInLoc.longitude),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueGreen,
+          ),
+          infoWindow: InfoWindow(title: 'Clock In Location'),
+        ),
+      );
+      center = LatLng(clockInLoc.latitude, clockInLoc.longitude);
+    } else {
+      center = LatLng(clockOutLoc!.latitude, clockOutLoc.longitude);
+    }
+
+    if (clockOutLoc != null) {
+      markers.add(
+        Marker(
+          markerId: MarkerId('clock_out'),
+          position: LatLng(clockOutLoc.latitude, clockOutLoc.longitude),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueOrange,
+          ),
+          infoWindow: InfoWindow(title: 'Clock Out Location'),
+        ),
+      );
+    }
+
+    return GoogleMap(
+      onMapCreated: (GoogleMapController controller) {
+        // Multiple attempts to ensure zoom works
+        Future.delayed(Duration(milliseconds: 100), () {
+          controller.animateCamera(CameraUpdate.newLatLngZoom(center, 19.0));
+        });
+        Future.delayed(Duration(milliseconds: 1000), () {
+          controller.animateCamera(CameraUpdate.newLatLngZoom(center, 19.0));
+        });
+      },
+      initialCameraPosition: CameraPosition(target: center, zoom: 19.0),
+      markers: markers,
+      mapType: MapType.normal,
+      myLocationButtonEnabled: false,
+      zoomControlsEnabled: true,
+      minMaxZoomPreference: MinMaxZoomPreference(15.0, 21.0),
+    );
+  }
+
+  Widget _buildLocationCard(
+    String title,
+    IconData icon,
+    Color color,
+    GeoPoint location,
+    dynamic time,
+    String? reason,
+  ) {
+    return Container(
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 16),
+              SizedBox(width: 4),
+              Text(title, style: TextStyle(fontWeight: FontWeight.bold)),
+            ],
+          ),
+          SizedBox(height: 8),
+          Text('📍 Coordinates:'),
+          Text(
+            '   ${location.latitude.toStringAsFixed(6)}, ${location.longitude.toStringAsFixed(6)}',
+          ),
+          if (time != null) ...[
+            SizedBox(height: 4),
+            Text('🕐 Time: ${_formatTimestamp(time)}'),
+          ],
+          if (reason != null && reason.isNotEmpty) ...[
+            SizedBox(height: 4),
+            Text('📝 Late Reason: $reason'),
+          ],
         ],
       ),
     );

@@ -692,10 +692,10 @@ class _DayMapModalState extends State<DayMapModal> {
 
     CameraPosition initialCam = const CameraPosition(
       target: LatLng(18.005611, -76.744127),
-      zoom: 12,
+      zoom: 15,
     );
     if (_inLoc != null) {
-      initialCam = CameraPosition(target: _inLoc!, zoom: 15);
+      initialCam = CameraPosition(target: _inLoc!, zoom: 18);
     }
 
     return SizedBox(
@@ -710,7 +710,7 @@ class _DayMapModalState extends State<DayMapModal> {
             );
           } else if (_inLoc != null) {
             await _controller!.animateCamera(
-              CameraUpdate.newLatLngZoom(_inLoc!, 15),
+              CameraUpdate.newLatLngZoom(_inLoc!, 18),
             );
           }
         },
