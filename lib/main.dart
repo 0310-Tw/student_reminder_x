@@ -22,7 +22,7 @@ class StudentsReminderApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       onGenerateRoute: AppRoutes.onGenerateRoute,
       // initialRoute: AppRoutes.register,
-      initialRoute: AppRoutes.intro,
+      initialRoute: AppRoutes.splash,
     );
   }
 }

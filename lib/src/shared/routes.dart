@@ -4,7 +4,6 @@ import 'package:students_reminder/src/admin/pages/admin_home_page.dart';
 import 'package:students_reminder/src/features/auth/login_page.dart';
 import 'package:students_reminder/src/features/auth/register_page.dart';
 import 'package:students_reminder/src/features/profile/student_profile_page.dart';
-import 'package:students_reminder/src/intro/intro_screen.dart';
 import 'package:students_reminder/src/shared/main_layout.dart';
 import 'package:students_reminder/src/admin/pages/attendance_admin_page.dart';
 import 'package:students_reminder/src/admin/pages/admin_public_feeds.dart';
@@ -21,7 +20,6 @@ class AppRoutes {
   static const adminFeeds = '/admin-feeds';
   static const adminNav = '/admin-home';
   static const splash = '/splash';
-  static const intro = '/intro';
 
   static Route<dynamic> onGenerateRoute(RouteSettings setting) {
     //Expecting /student/:uid
@@ -48,8 +46,6 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const AdminHomePage());
       case adminFeeds:
         return MaterialPageRoute(builder: (_) => const AdminPublicFeeds());
-      case intro:
-        return MaterialPageRoute(builder: (_) => const IntroScreen());
 
       case splash:
         return MaterialPageRoute(builder: (_) => const SplashGate());

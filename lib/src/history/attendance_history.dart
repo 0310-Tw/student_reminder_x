@@ -509,23 +509,22 @@ class _CalendarGrid extends StatelessWidget {
                         ),
                       ],
                     ),
-                    padding: const EdgeInsets.all(6),
+                    padding: const EdgeInsets.all(8),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
                           DateFormat('d').format(d.date),
                           style: const TextStyle(
-                            fontSize: 14,
+                            fontSize: 16,
                             fontWeight: FontWeight.w600,
                             color: Color(0xFF2C3E50),
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
                         Container(
-                          width: 10,
-                          height: 10,
+                          width: 12,
+                          height: 12,
                           decoration: BoxDecoration(
                             color: dot,
                             shape: BoxShape.circle,
