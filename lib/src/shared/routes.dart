@@ -4,6 +4,7 @@ import 'package:students_reminder/src/admin/pages/admin_home_page.dart';
 import 'package:students_reminder/src/features/auth/login_page.dart';
 import 'package:students_reminder/src/features/auth/register_page.dart';
 import 'package:students_reminder/src/features/profile/student_profile_page.dart';
+import 'package:students_reminder/src/intro/intro_screen.dart';
 import 'package:students_reminder/src/shared/main_layout.dart';
 import 'package:students_reminder/src/admin/pages/attendance_admin_page.dart';
 import 'package:students_reminder/src/admin/pages/admin_public_feeds.dart';
@@ -14,6 +15,7 @@ class AppRoutes {
   static const login = '/login';
   static const register = '/register';
   static const main = '/main';
+  static const intro = '/intro';
   static const admin = '/admin';
   static const adminDashboard = '/admin-dashboard';
   static const adminHome = '/admin-home';
@@ -38,6 +40,8 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const RegisterPage());
       case main:
         return MaterialPageRoute(builder: (_) => const MainLayoutPage());
+      case intro:
+        return MaterialPageRoute(builder: (_) => const IntroScreen());
       case admin:
         return MaterialPageRoute(builder: (_) => const AttendanceAdminPage());
       case adminDashboard:

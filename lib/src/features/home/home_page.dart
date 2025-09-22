@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:table_calendar/table_calendar.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/user_service.dart';
 
@@ -13,13 +14,10 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   String? _selectedAction;
+  String? _selectedAttendanceStatus;
   Stream<QuerySnapshot<Map<String, dynamic>>>? _studentStream;
   final uid = AuthService.instance.currentUser?.uid;
 
-  // Attendance filter for interactive chart
-  String? _selectedAttendanceStatus; // 'present', 'late', 'absent'
-
-  // Student dashboard counts
   final Map<String, int> _counts = {
     "Mobile": 0,
     "Web": 0,
@@ -29,19 +27,15 @@ class _HomePageState extends State<HomePage> {
     "Calendar": 0,
   };
 
-  // Documents dashboard state
-  String? _selectedDocCategory;
-  final Map<String, int> _docCounts = {
-    'All': 0,
-    'PDFs': 0,
-    'Docs': 0,
-    'Images': 0,
-  };
+  int _totalPresent = 0;
+  int _totalLate = 0;
+  int _totalAbsent = 0;
 
   @override
   void initState() {
     super.initState();
     _setupLiveCounts();
+    _listenAllStudents();
   }
 
   void _setupLiveCounts() {
@@ -56,7 +50,6 @@ class _HomePageState extends State<HomePage> {
   void _listenAndUpdate(String label, Stream<QuerySnapshot<Map<String, dynamic>>> stream) {
     stream.listen((snap) {
       int count = 0;
-
       switch (label) {
         case "Mobile":
           count = snap.docs.where((d) => d['courseGroup'] == 'mobile').length;
@@ -86,16 +79,36 @@ class _HomePageState extends State<HomePage> {
           final now = DateTime.now();
           count = snap.docs.where((d) {
             final events = List.from(d['events'] ?? []);
-            return events.any((e) {
-              final date = (e['date'] as Timestamp).toDate();
-              return date.isAfter(now);
-            });
+            return events.any((e) => (e['date'] as Timestamp).toDate().isAfter(now));
           }).length;
           break;
       }
+      setState(() => _counts[label] = count);
+    });
+  }
 
+  void _listenAllStudents() {
+    UserService.instance.watchAllStudents().listen((snap) {
+      int present = 0, late = 0, absent = 0;
+      for (var doc in snap.docs) {
+        final data = doc.data();
+        final status = data['attendanceStatus'] ?? 'present';
+        switch (status) {
+          case 'present':
+            present++;
+            break;
+          case 'late':
+            late++;
+            break;
+          case 'absent':
+            absent++;
+            break;
+        }
+      }
       setState(() {
-        _counts[label] = count;
+        _totalPresent = present;
+        _totalLate = late;
+        _totalAbsent = absent;
       });
     });
   }
@@ -115,221 +128,89 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
         ),
-        body: TabBarView(
+        body: Column(
           children: [
-            // ----------- Student Dashboard Tab -----------
-            SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _quickAction("Mobile", icon: Icons.phone_android),
-                        const SizedBox(width: 16),
-                        _quickAction("Web", icon: Icons.web),
-                        const SizedBox(width: 16),
-                        _quickAction("Tasks", icon: Icons.task_alt),
-                        const SizedBox(width: 16),
-                        _quickAction("Reports", icon: Icons.bar_chart),
-                        const SizedBox(width: 16),
-                        _quickAction("Announcements", icon: Icons.announcement),
-                        const SizedBox(width: 16),
-                        _quickAction("Calendar", icon: Icons.calendar_month),
-                      ],
-                    ),
+                  _buildAttendanceSummary(
+                    "Present",
+                    _totalPresent,
+                    Colors.green,
+                    onTap: () {
+                      setState(() {
+                        _selectedAttendanceStatus =
+                            _selectedAttendanceStatus == 'present' ? null : 'present';
+                      });
+                    },
                   ),
-                  const SizedBox(height: 20),
-                  if (_studentStream != null)
-                    StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                      stream: _studentStream,
-                      builder: (context, snap) {
-                        if (snap.connectionState == ConnectionState.waiting) {
-                          return const Center(child: CircularProgressIndicator());
-                        }
-                        if (snap.hasError) return Center(child: Text("Error: ${snap.error}"));
-
-                        List docs = snap.data?.docs ?? [];
-
-                        // Filter students based on selected action and attendance status
-                        docs = docs.where((d) {
-                          switch (_selectedAction) {
-                            case "Mobile":
-                              if (_selectedAttendanceStatus != null) {
-                                return d['courseGroup'] == 'mobile' &&
-                                    (d['attendanceStatus'] ?? 'present') == _selectedAttendanceStatus;
-                              }
-                              return d['courseGroup'] == 'mobile';
-                            case "Web":
-                              if (_selectedAttendanceStatus != null) {
-                                return d['courseGroup'] == 'web' &&
-                                    (d['attendanceStatus'] ?? 'present') == _selectedAttendanceStatus;
-                              }
-                              return d['courseGroup'] == 'web';
-                            case "Tasks":
-                              final tasks = List.from(d['tasks'] ?? []);
-                              return tasks.any((t) => t['completed'] == false);
-                            case "Reports":
-                              final reports = List.from(d['reports'] ?? []);
-                              return reports.isNotEmpty;
-                            case "Announcements":
-                              final ann = List.from(d['announcements'] ?? []);
-                              return ann.any((a) => a['read'] == false);
-                            case "Calendar":
-                              final now = DateTime.now();
-                              final events = List.from(d['events'] ?? []);
-                              return events.any((e) => (e['date'] as Timestamp).toDate().isAfter(now));
-                            default:
-                              return false;
-                          }
-                        }).toList();
-
-                        if (docs.isEmpty) return const Padding(
-                          padding: EdgeInsets.all(16.0),
-                          child: Text("No students found"),
-                        );
-
-                        // Grid for Mobile/Web
-                        if (_selectedAction == "Mobile" || _selectedAction == "Web") {
-                          return Column(
-                            children: [
-                              GridView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                itemCount: docs.length,
-                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2,
-                                  mainAxisSpacing: 8,
-                                  crossAxisSpacing: 8,
-                                  childAspectRatio: 3 / 2,
-                                ),
-                                itemBuilder: (context, i) {
-                                  final data = docs[i];
-                                  final name = "${data['firstName'] ?? ''} ${data['lastName'] ?? ''}".trim();
-                                  final course = data['courseGroup'] ?? '';
-                                  final isMe = data.id == uid;
-                                  return Card(
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                    elevation: 2,
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(8),
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          CircleAvatar(
-                                            radius: 24,
-                                            backgroundColor: Colors.blue.shade100,
-                                            child: Icon(course == 'mobile' ? Icons.phone_android : Icons.web, color: Colors.blue),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(name, style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-                                          const SizedBox(height: 4),
-                                          Text(course == 'mobile' ? "Mobile App Dev" : "Web App Dev", style: const TextStyle(fontSize: 12), textAlign: TextAlign.center),
-                                          if (isMe)
-                                            const Padding(
-                                              padding: EdgeInsets.only(top: 4),
-                                              child: Text("You", style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic)),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-
-                              const SizedBox(height: 12),
-
-                              // Interactive Attendance Chart
-                              SizedBox(
-                                height: 160,
-                                child: PieChart(
-                                  PieChartData(
-                                    sections: [
-                                      PieChartSectionData(
-                                        value: docs.where((d) => d['attendanceStatus'] == 'present').length.toDouble(),
-                                        color: Colors.green,
-                                        title: 'Present',
-                                        radius: _selectedAttendanceStatus == 'present' ? 60 : 50,
-                                        titleStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                                      ),
-                                      PieChartSectionData(
-                                        value: docs.where((d) => d['attendanceStatus'] == 'late').length.toDouble(),
-                                        color: Colors.orange,
-                                        title: 'Late',
-                                        radius: _selectedAttendanceStatus == 'late' ? 60 : 50,
-                                        titleStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                                      ),
-                                      PieChartSectionData(
-                                        value: docs.where((d) => d['attendanceStatus'] == 'absent').length.toDouble(),
-                                        color: Colors.red,
-                                        title: 'Absent',
-                                        radius: _selectedAttendanceStatus == 'absent' ? 60 : 50,
-                                        titleStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                                      ),
-                                    ],
-                                    sectionsSpace: 2,
-                                    centerSpaceRadius: 30,
-                                    pieTouchData: PieTouchData(
-                                      touchCallback: (event, response) {
-                                        if (response == null || response.touchedSection == null) return;
-                                        final index = response.touchedSection!.touchedSectionIndex;
-                                        setState(() {
-                                          _selectedAttendanceStatus = switch (index) {
-                                            0 => _selectedAttendanceStatus == 'present' ? null : 'present',
-                                            1 => _selectedAttendanceStatus == 'late' ? null : 'late',
-                                            2 => _selectedAttendanceStatus == 'absent' ? null : 'absent',
-                                            _ => null,
-                                          };
-                                        });
-                                      },
-                                    ),
-                                  ),
-                                ),
-                              ),
-
-                              if (_selectedAttendanceStatus != null)
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 4),
-                                  child: Text(
-                                    "Showing: ${_selectedAttendanceStatus!.toUpperCase()} students",
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                            ],
-                          );
-                        }
-
-                        // Other lists for Tasks, Reports, etc.
-                        return ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: docs.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
-                          itemBuilder: (_, i) {
-                            final data = docs[i];
-                            final name = "${data['firstName'] ?? ''} ${data['lastName'] ?? ''}".trim();
-                            return ListTile(title: Text(name));
-                          },
-                        );
-                      },
-                    ),
+                  _buildAttendanceSummary(
+                    "Late",
+                    _totalLate,
+                    Colors.orange,
+                    onTap: () {
+                      setState(() {
+                        _selectedAttendanceStatus =
+                            _selectedAttendanceStatus == 'late' ? null : 'late';
+                      });
+                    },
+                  ),
+                  _buildAttendanceSummary(
+                    "Absent",
+                    _totalAbsent,
+                    Colors.red,
+                    onTap: () {
+                      setState(() {
+                        _selectedAttendanceStatus =
+                            _selectedAttendanceStatus == 'absent' ? null : 'absent';
+                      });
+                    },
+                  ),
                 ],
               ),
             ),
-
-            // ----------- Documents Dashboard Tab -----------
-            SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            SizedBox(
+              height: 160,
+              child: PieChart(
+                PieChartData(
+                  sections: [
+                    PieChartSectionData(
+                      value: _totalPresent.toDouble(),
+                      color: Colors.green,
+                      title: 'Present',
+                      radius: 50,
+                      titleStyle:
+                          const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                    PieChartSectionData(
+                      value: _totalLate.toDouble(),
+                      color: Colors.orange,
+                      title: 'Late',
+                      radius: 50,
+                      titleStyle:
+                          const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                    PieChartSectionData(
+                      value: _totalAbsent.toDouble(),
+                      color: Colors.red,
+                      title: 'Absent',
+                      radius: 50,
+                      titleStyle:
+                          const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                  sectionsSpace: 2,
+                  centerSpaceRadius: 30,
+                ),
+              ),
+            ),
+            Expanded(
+              child: TabBarView(
                 children: [
-                  const Text(
-                    "Documents Dashboard",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  // ... your existing documents tab code ...
+                  _buildStudentsTab(),
+                  _buildDocumentsTab(),
                 ],
               ),
             ),
@@ -339,68 +220,383 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _quickAction(String label, {required IconData icon}) {
+  Widget _buildAttendanceSummary(String label, int count, Color color, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Text(
+            count.toString(),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color),
+          ),
+          Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStudentsTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildActionContainer(
+                  icon: Icons.phone_android,
+                  label: "Mobile",
+                  color: Colors.green,
+                  onTap: () {
+                    setState(() {
+                      _selectedAction = "Mobile";
+                      _selectedAttendanceStatus = null;
+                      _studentStream = UserService.instance.watchUserByCourseGroup('mobile');
+                    });
+                  },
+                ),
+                _buildActionContainer(
+                  icon: Icons.web,
+                  label: "Web",
+                  color: Colors.orange,
+                  onTap: () {
+                    setState(() {
+                      _selectedAction = "Web";
+                      _selectedAttendanceStatus = null;
+                      _studentStream = UserService.instance.watchUserByCourseGroup('web');
+                    });
+                  },
+                ),
+                _buildActionContainer(
+                  icon: Icons.event,
+                  label: "Calendar",
+                  color: Colors.teal,
+                  onTap: () {
+                    setState(() {
+                      _selectedAction = "Calendar";
+                      _studentStream = UserService.instance.watchStudentsWithUpcomingEvents();
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          if (_selectedAction == "Calendar")
+            _buildCalendarTab()
+          else
+            _buildStudentsList(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCalendarTab() {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: _studentStream,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snap.hasError) return Center(child: Text("Error: ${snap.error}"));
+
+        final events = <DateTime, List<Map<String, dynamic>>>{};
+
+        for (var doc in snap.data?.docs ?? []) {
+          final data = doc.data();
+          final studentEvents = List.from(data['events'] ?? []);
+          final status = data['attendanceStatus'] ?? 'present';
+          Color eventColor;
+          switch (status) {
+            case 'present':
+              eventColor = Colors.green;
+              break;
+            case 'late':
+              eventColor = Colors.orange;
+              break;
+            case 'absent':
+              eventColor = Colors.red;
+              break;
+            default:
+              eventColor = Colors.blue;
+          }
+          for (var e in studentEvents) {
+            final date = (e['date'] as Timestamp).toDate();
+            final day = DateTime(date.year, date.month, date.day);
+            events[day] ??= [];
+            events[day]!.add({
+              ...e,
+              'studentName': "${data['firstName'] ?? ''} ${data['lastName'] ?? ''}".trim(),
+              'color': eventColor,
+            });
+          }
+        }
+
+        return TableCalendar<Map<String, dynamic>>(
+          firstDay: DateTime.utc(2020, 1, 1),
+          lastDay: DateTime.utc(2030, 12, 31),
+          focusedDay: DateTime.now(),
+          eventLoader: (day) => events[day] ?? [],
+          calendarBuilders: CalendarBuilders<Map<String, dynamic>>(
+            markerBuilder: (context, date, dayEvents) {
+              if (dayEvents.isEmpty) return const SizedBox();
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: dayEvents
+                    .map<Widget>((e) => Container(
+                          width: 6,
+                          height: 6,
+                          margin: const EdgeInsets.symmetric(horizontal: 1),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: e['color'],
+                          ),
+                        ))
+                    .toList(),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStudentsList() {
+    if (_studentStream == null) return const SizedBox();
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: _studentStream,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snap.hasError) return Center(child: Text("Error: ${snap.error}"));
+
+        List docs = snap.data?.docs ?? [];
+
+        docs = docs.where((d) {
+          final data = d.data();
+          if (_selectedAttendanceStatus != null) {
+            return (data['attendanceStatus'] ?? 'present') == _selectedAttendanceStatus;
+          }
+          return true;
+        }).toList();
+
+        if (docs.isEmpty) return const Text("No students found");
+
+        return ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: docs.length,
+          separatorBuilder: (_, __) => const Divider(height: 1),
+          itemBuilder: (_, i) {
+            final data = docs[i].data();
+            final name = "${data['firstName'] ?? ''} ${data['lastName'] ?? ''}".trim();
+            return ListTile(
+              title: Text(name),
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    title: Text(name),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Present: ${data['presentCount'] ?? 0}"),
+                        Text("Late: ${data['lateCount'] ?? 0}"),
+                        Text("Absent: ${data['absentCount'] ?? 0}"),
+                        Text("Location: ${data['location'] ?? 'Unknown'}"),
+                      ],
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text("Close"),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildDocumentsTab() {
+    final docStream = FirebaseFirestore.instance.collection('documents').snapshots();
+    String selectedFilter = 'All';
+
+    return StatefulBuilder(
+      builder: (context, setState) {
+        Map<String, Color> filterColors = {
+          'All': Colors.grey,
+          'General': Colors.green,
+          'Info': Colors.blue,
+          'Important': Colors.orange,
+          'Urgent': Colors.red,
+        };
+
+        Color getBadgeColor(String type) {
+          switch (type.toLowerCase()) {
+            case 'urgent':
+              return Colors.red;
+            case 'important':
+              return Colors.orange;
+            case 'info':
+              return Colors.blue;
+            case 'general':
+            default:
+              return Colors.green;
+          }
+        }
+
+        return Column(
+          children: [
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: filterColors.keys.map((type) {
+                  final isSelected = selectedFilter == type;
+                  final color = filterColors[type]!;
+                  return GestureDetector(
+                    onTap: () => setState(() => selectedFilter = type),
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isSelected ? color : color.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: color, width: 1.5),
+                      ),
+                      child: Text(
+                        type,
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : color,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            Expanded(
+              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: docStream,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) return Center(child: Text('Error: ${snapshot.error}'));
+
+                  List docs = snapshot.data?.docs ?? [];
+
+                  if (selectedFilter != 'All') {
+                    docs = docs.where((d) {
+                      final type = (d.data()['type'] ?? 'general').toString().toLowerCase();
+                      return type == selectedFilter.toLowerCase();
+                    }).toList();
+                  }
+
+                  if (docs.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Text("No documents found"),
+                    );
+                  }
+
+                  return ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: docs.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final data = docs[index].data();
+                      final title = data['title'] ?? 'Untitled';
+                      final uploadedBy = data['uploadedBy'] ?? 'Unknown';
+                      final timestamp = data['date'] as Timestamp?;
+                      final date = timestamp != null
+                          ? "${timestamp.toDate().day}/${timestamp.toDate().month}/${timestamp.toDate().year}"
+                          : 'Unknown date';
+                      final type = data['type'] ?? 'general';
+                      final badgeColor = getBadgeColor(type);
+
+                      return ListTile(
+                        leading: CircleAvatar(radius: 10, backgroundColor: badgeColor),
+                        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text("Uploaded by: $uploadedBy\nDate: $date"),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildActionContainer({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
     final bool isSelected = _selectedAction == label;
     final count = _counts[label] ?? 0;
 
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedAction = label;
-          _selectedAttendanceStatus = null; // reset chart filter
-
-          switch (label) {
-            case "Mobile":
-              _studentStream = UserService.instance.watchUserByCourseGroup('mobile');
-              break;
-            case "Web":
-              _studentStream = UserService.instance.watchUserByCourseGroup('web');
-              break;
-            case "Tasks":
-              _studentStream = UserService.instance.watchStudentsWithPendingTasks();
-              break;
-            case "Reports":
-              _studentStream = UserService.instance.watchStudentsWithReports();
-              break;
-            case "Announcements":
-              _studentStream = UserService.instance.watchStudentsWithUnreadAnnouncements();
-              break;
-            case "Calendar":
-              _studentStream = UserService.instance.watchStudentsWithUpcomingEvents();
-              break;
-          }
-        });
-      },
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isSelected ? Colors.blue : Colors.blue.shade100,
-            ),
-            child: Column(
-              children: [
-                Icon(icon, color: isSelected ? Colors.white : Colors.blue, size: 28),
-                const SizedBox(height: 8),
-                Text(label, style: TextStyle(fontSize: 14, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-              ],
-            ),
+      onTap: onTap,
+      child: Container(
+        width: 100,
+        height: 130,
+        margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(60),
+          border: Border.all(
+            color: isSelected ? color : Colors.transparent,
+            width: 2,
           ),
-          if (count > 0)
-            Positioned(
-              top: -4,
-              right: -4,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(12)),
-                child: Text(count.toString(), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 40, color: color),
+            const SizedBox(height: 8),
+            Flexible(
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-        ],
+            if (count > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: CircleAvatar(
+                  radius: 12,
+                  backgroundColor: Colors.red,
+                  child: Text(
+                    count.toString(),
+                    style: const TextStyle(
+                        color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

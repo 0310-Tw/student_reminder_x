@@ -2,6 +2,7 @@ import 'dart:math';
 
 //import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
@@ -583,6 +584,7 @@ void _openMapModal(
   );
 }
 
+// ------------------ Update Map Modal ------------------
 class DayMapModal extends StatefulWidget {
   const DayMapModal({super.key, required this.uid, required this.dayId});
   final String uid;
@@ -601,6 +603,9 @@ class _DayMapModalState extends State<DayMapModal> {
   DateTime? inAt;
   DateTime? outAt;
 
+  String? inAddress;
+  String? outAddress;
+
   @override
   void initState() {
     super.initState();
@@ -617,16 +622,38 @@ class _DayMapModalState extends State<DayMapModal> {
     if (!mounted) return;
     final data = snap.data();
     if (data != null) {
+      final inTimestamp = data['inAt'] ?? data['clockInAt'];
+      final outTimestamp = data['outAt'] ?? data['clockOutAt'];
+
+      _inLoc = _toLatLng(data['inLoc'] ?? data['clockInLoc']);
+      _outLoc = _toLatLng(data['outLoc'] ?? data['clockOutLoc']);
+      inAt = (inTimestamp as Timestamp?)?.toDate();
+      outAt = (outTimestamp as Timestamp?)?.toDate();
+
+      // Start with placeholders
+      inAddress = _inLoc != null ? "Fetching..." : null;
+      outAddress = _outLoc != null ? "Fetching..." : null;
+
       setState(() {
         status = (data['status'] as String?) ?? 'absent';
-        final inTimestamp = data['inAt'] ?? data['clockInAt'];
-        inAt = (inTimestamp as Timestamp?)?.toDate();
-        final outTimestamp = data['outAt'] ?? data['clockOutAt'];
-        outAt = (outTimestamp as Timestamp?)?.toDate();
-        _inLoc = _toLatLng(data['inLoc'] ?? data['clockInLoc']);
-        _outLoc = _toLatLng(data['outLoc'] ?? data['clockOutLoc']);
         _mapReady = true;
       });
+
+      // 🔄 Fetch addresses in the background, then refresh UI
+      if (_inLoc != null) {
+        _getAddressFromLatLng(_inLoc!).then((addr) {
+          if (mounted) {
+            setState(() => inAddress = addr);
+          }
+        });
+      }
+      if (_outLoc != null) {
+        _getAddressFromLatLng(_outLoc!).then((addr) {
+          if (mounted) {
+            setState(() => outAddress = addr);
+          }
+        });
+      }
     }
   }
 
@@ -636,6 +663,22 @@ class _DayMapModalState extends State<DayMapModal> {
       return LatLng(v['latitude'], v['longitude']);
     }
     return null;
+  }
+
+  Future<String> _getAddressFromLatLng(LatLng loc) async {
+    try {
+      final placemarks = await placemarkFromCoordinates(
+        loc.latitude,
+        loc.longitude,
+      );
+      if (placemarks.isNotEmpty) {
+        final place = placemarks.first;
+        return "${place.locality}, ${place.country}";
+      }
+    } catch (e) {
+      debugPrint("Reverse geocoding failed: $e");
+    }
+    return "Unknown location";
   }
 
   LatLngBounds _latLngBoundsFrom(LatLng a, LatLng b) {
@@ -667,11 +710,12 @@ class _DayMapModalState extends State<DayMapModal> {
           position: _inLoc!,
           infoWindow: InfoWindow(
             title: 'Clock In',
-            snippet: inAt != null ? DateFormat.jm().format(inAt!) : null,
+            snippet: [
+              if (inAt != null) DateFormat.jm().format(inAt!),
+              if (inAddress != null) inAddress!
+            ].join("\n"),
           ),
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            BitmapDescriptor.hueGreen,
-          ),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
         ),
       );
     }
@@ -682,7 +726,10 @@ class _DayMapModalState extends State<DayMapModal> {
           position: _outLoc!,
           infoWindow: InfoWindow(
             title: 'Clock Out',
-            snippet: outAt != null ? DateFormat.jm().format(outAt!) : null,
+            snippet: [
+              if (outAt != null) DateFormat.jm().format(outAt!),
+              if (outAddress != null) outAddress!
+            ].join("\n"),
           ),
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
         ),
@@ -698,25 +745,68 @@ class _DayMapModalState extends State<DayMapModal> {
     }
 
     return SizedBox(
-      height: MediaQuery.of(context).size.height * 0.6,
-      child: GoogleMap(
-        onMapCreated: (c) async {
-          _controller = c;
-          if (_inLoc != null && _outLoc != null) {
-            final bounds = _latLngBoundsFrom(_inLoc!, _outLoc!);
-            await _controller!.animateCamera(
-              CameraUpdate.newLatLngBounds(bounds, 50),
-            );
-          } else if (_inLoc != null) {
-            await _controller!.animateCamera(
-              CameraUpdate.newLatLngZoom(_inLoc!, 15),
-            );
-          }
-        },
-        initialCameraPosition: initialCam,
-        markers: markers,
-        myLocationEnabled: true,
-        myLocationButtonEnabled: true,
+      height: MediaQuery.of(context).size.height * 0.75,
+      child: Column(
+        children: [
+          Expanded(
+            child: GoogleMap(
+              onMapCreated: (c) async {
+                _controller = c;
+                if (_inLoc != null && _outLoc != null) {
+                  final bounds = _latLngBoundsFrom(_inLoc!, _outLoc!);
+                  await _controller!.animateCamera(
+                    CameraUpdate.newLatLngBounds(bounds, 50),
+                  );
+                } else if (_inLoc != null) {
+                  await _controller!.animateCamera(
+                    CameraUpdate.newLatLngZoom(_inLoc!, 15),
+                  );
+                }
+              },
+              initialCameraPosition: initialCam,
+              markers: markers,
+              myLocationEnabled: true,
+              myLocationButtonEnabled: true,
+            ),
+          ),
+          const Divider(height: 1),
+          // 👇 Info section under the map
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_inLoc != null) ...[
+                  Text(
+                    "Clock In",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green,
+                    ),
+                  ),
+                  Text(inAt != null
+                      ? "Time: ${DateFormat.jm().format(inAt!)}"
+                      : "Time: Unknown"),
+                  Text("Location: ${inAddress ?? "Fetching..."}"),
+                  const SizedBox(height: 8),
+                ],
+                if (_outLoc != null) ...[
+                  Text(
+                    "Clock Out",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red,
+                    ),
+                  ),
+                  Text(outAt != null
+                      ? "Time: ${DateFormat.jm().format(outAt!)}"
+                      : "Time: Unknown"),
+                  Text("Location: ${outAddress ?? "Fetching..."}"),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

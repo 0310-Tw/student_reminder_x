@@ -86,6 +86,14 @@ class UserService {
         .snapshots();
   }
 
+  // Stream of all students (for totals row)
+  Stream<QuerySnapshot<Map<String, dynamic>>> watchAllStudents() {
+    return _db
+        .collection('users')
+        .orderBy('lastName')
+        .snapshots();
+  }
+
   Future<void> updateMyProfile(
     String uid, {
     String? firstName,
