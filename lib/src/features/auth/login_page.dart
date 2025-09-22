@@ -94,143 +94,142 @@ class _LoginPageState extends State<LoginPage> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                      //Email
-                      TextField(
-                        controller: _email,
-                        decoration: InputDecoration(labelText: 'Email'),
-                      ),
-                      SizedBox(height: 4),
-                      //Password
-                      TextField(
-                        controller: _password,
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _passwordVisible
-                                  ? Icons.visibility
-                                  : Icons.visibility_off,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _passwordVisible = !_passwordVisible;
-                              });
-                            },
+                          //Email
+                          TextField(
+                            controller: _email,
+                            decoration: InputDecoration(labelText: 'Email'),
                           ),
-                        ),
-                        obscureText: !_passwordVisible,
-                        
-                      ),
-                      SizedBox(height: 12),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Color(0xFF2C3E50),
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size(double.infinity, 48),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onPressed: _busy ? null : _login,
-                        child: _busy
-                            ? CircularProgressIndicator()
-                            : Text('Login'),
-                      ),
-                      SizedBox(height: 2),
-
-                      // Forgot Password Button
-                      GestureDetector(
-                        onTap: _busy
-                            ? null
-                            : () {
-                                Navigator.pushNamed(
-                                  context,
-                                  AppRoutes.forgotPassword,
-                                );
-                              },
-                        child: Text(
-                          'Forgot Password?',
-                          style: TextStyle(
-                            color: Color(0xFF2C3E50),
-                            fontWeight: FontWeight.w500,
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ),
-                      SizedBox(height: 2),
-
-                      // Divider
-                      Row(
-                        children: [
-                          Expanded(child: Divider()),
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 16),
-                            child: Text(
-                              'OR',
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w500,
+                          SizedBox(height: 4),
+                          //Password
+                          TextField(
+                            controller: _password,
+                            decoration: InputDecoration(
+                              labelText: 'Password',
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _passwordVisible
+                                      ? Icons.visibility
+                                      : Icons.visibility_off,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _passwordVisible = !_passwordVisible;
+                                  });
+                                },
                               ),
                             ),
+                            obscureText: !_passwordVisible,
                           ),
-                          Expanded(child: Divider()),
-                        ],
-                      ),
-                      SizedBox(height: 6),
-
-                      // Google Sign-In Button
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.black87,
-                          minimumSize: const Size(double.infinity, 48),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          side: BorderSide(color: Colors.grey[300]!),
-                          backgroundColor: Colors.white,
-                        ),
-                        onPressed: _busy ? null : _signInWithGoogle,
-                        icon: Icon(
-                          Icons.g_mobiledata,
-                          size: 24,
-                          color: Colors.red,
-                        ),
-                        label: Text(
-                          'Continue with Google',
-                          style: TextStyle(fontWeight: FontWeight.w500),
-                        ),
-                      ),
-                      SizedBox(height: 12),
-
-                      // Register Link
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'No Account? ',
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 14,
+                          SizedBox(height: 12),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Color(0xFF2C3E50),
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size(double.infinity, 48),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
+                            onPressed: _busy ? null : _login,
+                            child: _busy
+                                ? CircularProgressIndicator()
+                                : Text('Login'),
                           ),
+                          SizedBox(height: 2),
+
+                          // Forgot Password Button
                           GestureDetector(
-                            onTap: () => Navigator.pushNamed(
-                              context,
-                              AppRoutes.register,
-                            ),
+                            onTap: _busy
+                                ? null
+                                : () {
+                                    Navigator.pushNamed(
+                                      context,
+                                      AppRoutes.forgotPassword,
+                                    );
+                                  },
                             child: Text(
-                              'Register',
+                              'Forgot Password?',
                               style: TextStyle(
                                 color: Color(0xFF2C3E50),
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.w500,
                                 decoration: TextDecoration.underline,
                               ),
                             ),
                           ),
+                          SizedBox(height: 2),
+
+                          // Divider
+                          Row(
+                            children: [
+                              Expanded(child: Divider()),
+                              Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 16),
+                                child: Text(
+                                  'OR',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                              Expanded(child: Divider()),
+                            ],
+                          ),
+                          SizedBox(height: 6),
+
+                          // Google Sign-In Button
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.black87,
+                              minimumSize: const Size(double.infinity, 48),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              side: BorderSide(color: Colors.grey[300]!),
+                              backgroundColor: Colors.white,
+                            ),
+                            onPressed: _busy ? null : _signInWithGoogle,
+                            icon: Icon(
+                              Icons.g_mobiledata,
+                              size: 24,
+                              color: Colors.red,
+                            ),
+                            label: Text(
+                              'Continue with Google',
+                              style: TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                          SizedBox(height: 12),
+
+                          // Register Link
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'No Account? ',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 14,
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: () => Navigator.pushNamed(
+                                  context,
+                                  AppRoutes.register,
+                                ),
+                                child: Text(
+                                  'Register',
+                                  style: TextStyle(
+                                    color: Color(0xFF2C3E50),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
-                      ),
-                    ],
                       ),
                     ),
                   ),
