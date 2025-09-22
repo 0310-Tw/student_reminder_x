@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:students_reminder/src/services/session_manager.dart';
 
 class AuthService {
@@ -71,7 +72,62 @@ class AuthService {
   // Password Reset CODE
   Future<void> sendPasswordReset(String email) =>
       _auth.sendPasswordResetEmail(email: email);
+
+  // Google Sign-In CODE
+  Future<UserCredential> signInWithGoogle() async {
+    try {
+      // Trigger the authentication flow
+      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+
+      // If user cancels the sign-in flow
+      if (googleUser == null) {
+        throw Exception('Google Sign-In was cancelled');
+      }
+
+      // Obtain the auth details from the request
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      // Create a new credential
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // Sign in to Firebase with the Google user credential
+      final UserCredential userCredential = await _auth.signInWithCredential(
+        credential,
+      );
+
+      // Check if this is a new user and create a Firestore document
+      if (userCredential.additionalUserInfo?.isNewUser ?? false) {
+        final user = userCredential.user!;
+        await _db.collection('users').doc(user.uid).set({
+          'firstName': user.displayName?.split(' ').first ?? '',
+          'lastName': user.displayName!.split(' ').length > 1
+              ? user.displayName!.split(' ').sublist(1).join(' ')
+              : '',
+          'courseGroup': '', // Will need to be set later
+          'email': user.email ?? '',
+          'phone': '', // Will need to be set later
+          'gender': null,
+          'bio': null,
+          'role': 'student', // Default role for new users
+          'createdAt': FieldValue.serverTimestamp(),
+          'signInMethod': 'google',
+        });
+      }
+
+      await SessionManager.onLoginSuccess();
+      return userCredential;
+    } on FirebaseAuthException catch (e) {
+      throw Exception('Firebase Auth Error: ${e.message}');
+    } catch (e) {
+      throw Exception('Google Sign-In Error: $e');
+    }
+  }
 }
+
 //   // Password Reset CODE
 //   Future<void> sendPasswordReset(String email) =>
 //       _auth.sendPasswordResetEmail(email: email);

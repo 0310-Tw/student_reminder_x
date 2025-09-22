@@ -10,14 +10,14 @@ import 'package:students_reminder/src/widgets/user_banner_notifications.dart';
 import 'package:students_reminder/src/widgets/suspension_check.dart';
 import 'package:students_reminder/src/shared/misc.dart';
 
-class AdminHomePage extends StatefulWidget {
-  const AdminHomePage({super.key});
+class AdminProfileviewPage extends StatefulWidget {
+  const AdminProfileviewPage({super.key});
 
   @override
-  State<AdminHomePage> createState() => _AdminHomePageState();
+  State<AdminProfileviewPage> createState() => _AdminProfileviewPageState();
 }
 
-class _AdminHomePageState extends State<AdminHomePage> {
+class _AdminProfileviewPageState extends State<AdminProfileviewPage> {
   String _group = 'mobile'; //default
 
   @override

@@ -22,15 +22,18 @@ class NotesService {
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> publicFeeds() {
+    print('🔍 Querying public feeds...');
     return _db
         .collectionGroup('notes')
         .where('visibility', isEqualTo: 'public')
-        .orderBy(
-          'aud_dt',
-          descending: true,
-        ) // or orderBy('likesCount', descending: true)
+        .orderBy('aud_dt', descending: true)
         .limit(100)
-        .snapshots();
+        .snapshots()
+        .handleError((error) {
+          print('❌ Error in publicFeeds stream: $error');
+          print('Error type: ${error.runtimeType}');
+          print('This is likely a Firestore security rules issue');
+        });
   }
 
   Future<String> createNote(

@@ -1,6 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:curved_navigation_bar/curved_navigation_bar.dart';
+import 'package:students_reminder/src/admin/pages/admin_dashborad.dart';
 import 'package:students_reminder/src/features/auth/login_page.dart';
 import 'package:students_reminder/src/features/home/home_page.dart';
 import 'package:students_reminder/src/features/notes/my_notes_page.dart';
@@ -10,7 +12,7 @@ import 'package:students_reminder/src/history/attendance_history.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/admin_service.dart';
 import 'package:students_reminder/src/services/notification_service.dart';
-import 'package:students_reminder/src/admin/pages/admin_home_page.dart';
+import 'package:students_reminder/src/admin/pages/admin_profileview_page.dart';
 import 'package:students_reminder/src/admin/pages/admin_public_feeds.dart';
 import 'package:students_reminder/src/admin/pages/attendance_admin_page.dart';
 
@@ -112,7 +114,7 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
   void _updatePages() {
     if (_isAdmin) {
       _pages = [
-        const AdminHomePage(),
+        const AdminDashboard(),
         const AdminPublicFeeds(),
         const AttendanceAdminPage(),
         const ProfilePage(),
@@ -128,42 +130,21 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
     }
   }
 
-  List<NavigationDestination> _buildNavigationDestinations() {
+  List<Widget> _buildNavigationIcons() {
     if (_isAdmin) {
       return [
-        const NavigationDestination(icon: Icon(Icons.people), label: 'Users'),
-        const NavigationDestination(
-          icon: Icon(Icons.content_copy),
-          label: 'Content',
-        ),
-        const NavigationDestination(
-          icon: Icon(Icons.assessment),
-          label: 'Attendance',
-        ),
-        const NavigationDestination(
-          icon: Icon(Icons.person_outline),
-          label: 'Profile',
-        ),
+        Icon(Icons.people, size: 30, color: Colors.white),
+        Icon(Icons.content_copy, size: 30, color: Colors.white),
+        Icon(Icons.assessment, size: 30, color: Colors.white),
+        Icon(Icons.person_outline, size: 30, color: Colors.white),
       ];
     } else {
       return [
-        const NavigationDestination(icon: Icon(Icons.home), label: 'Home'),
-        const NavigationDestination(
-          icon: Icon(Icons.event_note),
-          label: 'Notes',
-        ),
-        const NavigationDestination(
-          icon: Icon(Icons.public),
-          label: 'Public Feeds',
-        ),
-        const NavigationDestination(
-          icon: Icon(Icons.history),
-          label: 'Attendance',
-        ),
-        const NavigationDestination(
-          icon: Icon(Icons.person_outline),
-          label: 'Profile',
-        ),
+        Icon(Icons.home, size: 30, color: Colors.white),
+        Icon(Icons.event_note, size: 30, color: Colors.white),
+        Icon(Icons.public, size: 30, color: Colors.white),
+        Icon(Icons.history, size: 30, color: Colors.white),
+        Icon(Icons.person_outline, size: 30, color: Colors.white),
       ];
     }
   }
@@ -181,15 +162,18 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
         if (user == null) return LoginPage();
         return Scaffold(
           body: _pages[_index],
-          bottomNavigationBar: NavigationBar(
-            indicatorShape: _isAdmin
-                ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
-                : const CircleBorder(),
-            indicatorColor: _isAdmin ? null : Color(0xFF3498DB),
-            backgroundColor: _isAdmin ? null : Color(0xFFF7F9FC),
-            selectedIndex: _index,
-            destinations: _buildNavigationDestinations(),
-            onDestinationSelected: (i) => setState(() => _index = i),
+          bottomNavigationBar: CurvedNavigationBar(
+            index: _index,
+            height: 60.0,
+            items: _buildNavigationIcons(),
+            color: _isAdmin ? const Color(0xFF6366F1) : const Color(0xFF3498DB),
+            buttonBackgroundColor: _isAdmin
+                ? const Color(0xFF4F46E5)
+                : const Color(0xFF2980B9),
+            backgroundColor: Colors.transparent,
+            animationCurve: Curves.easeInOut,
+            animationDuration: const Duration(milliseconds: 900),
+            onTap: (index) => setState(() => _index = index),
           ),
         );
       },

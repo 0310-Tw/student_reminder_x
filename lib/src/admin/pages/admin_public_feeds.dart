@@ -134,6 +134,32 @@ class _AdminPublicFeedsState extends State<AdminPublicFeeds> {
                 if (snap.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
+                if (snap.hasError) {
+                  print('Public feeds error: ${snap.error}');
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error, color: Colors.red, size: 48),
+                        SizedBox(height: 16),
+                        Text(
+                          'Error loading public notes',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          '${snap.error}',
+                          style: TextStyle(color: Colors.red),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  );
+                }
                 if (!snap.hasData) {
                   return const Center(child: Text('Loading...'));
                 }
