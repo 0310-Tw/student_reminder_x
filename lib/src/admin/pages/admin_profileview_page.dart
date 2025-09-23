@@ -51,7 +51,6 @@ class _AdminProfileviewPageState extends State<AdminProfileviewPage> {
       body: SuspensionCheck(
         child: Column(
           children: [
-            // Show user notifications for flags/suspensions
             UserBannerNotifications(),
             GroupFilter(
               value: _group,
@@ -68,15 +67,11 @@ class _AdminProfileviewPageState extends State<AdminProfileviewPage> {
                   if (snap.hasError) {
                     return Center(child: Text('Error Detected: ${snap.error}'));
                   }
+
                   final docs = snap.data?.docs ?? [];
-                  // if (docs.isEmpty) {
-                  //   return Center(
-                  //     child: Text('There are no students in this group'),
-                  //   );
-                  // }
 
                   return ListView.separated(
-                    separatorBuilder: (_, _) =>
+                    separatorBuilder: (context, index) =>
                         Divider(height: 1, color: Colors.grey.shade200),
                     itemCount: docs.length,
                     itemBuilder: (context, i) {
@@ -84,31 +79,24 @@ class _AdminProfileviewPageState extends State<AdminProfileviewPage> {
                       final data = doc.data();
                       final isMe = doc.id == uid;
                       final name =
-                          '${data['firstName'] ?? ''} ${data['lastName'] ?? ''}'
-                              .trim();
+                          '${data['firstName'] ?? ''} ${data['lastName'] ?? ''}'.trim();
                       final course = (data['courseGroup'] ?? '').toString();
                       final isSuspended = data['status'] == 'suspended';
                       final isFlagged = data['flagged'] == true;
                       final email = data['email'] ?? '';
 
                       return Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
+                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         color: isFlagged ? Colors.orange.shade50 : Colors.white,
                         child: Column(
                           children: [
                             Row(
                               children: [
-                                // User Avatar
                                 CircleAvatar(
                                   radius: 20,
                                   backgroundColor: getInitialColor(name),
                                   child: Text(
-                                    name.isNotEmpty
-                                        ? name[0].toUpperCase()
-                                        : '?',
+                                    name.isNotEmpty ? name[0].toUpperCase() : '?',
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
@@ -116,12 +104,9 @@ class _AdminProfileviewPageState extends State<AdminProfileviewPage> {
                                   ),
                                 ),
                                 SizedBox(width: 12),
-
-                                // User Info
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
@@ -136,14 +121,10 @@ class _AdminProfileviewPageState extends State<AdminProfileviewPage> {
                                           ),
                                           if (isFlagged)
                                             Container(
-                                              padding: EdgeInsets.symmetric(
-                                                horizontal: 8,
-                                                vertical: 2,
-                                              ),
+                                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                               decoration: BoxDecoration(
                                                 color: Colors.orange,
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
+                                                borderRadius: BorderRadius.circular(12),
                                               ),
                                               child: Text(
                                                 'FLAGGED',
@@ -176,37 +157,25 @@ class _AdminProfileviewPageState extends State<AdminProfileviewPage> {
                                     ],
                                   ),
                                 ),
-
-                                // Action Buttons (Right Side)
                                 if (!isMe) ...[
                                   PopupMenuButton<String>(
                                     onSelected: (value) {
                                       switch (value) {
                                         case 'flag':
-                                          if (isFlagged) {
-                                            _showUnflagDialog(doc.id, name);
-                                          } else {
-                                            _showFlagDialog(doc.id, name);
-                                          }
+                                          isFlagged
+                                              ? _showUnflagDialog(doc.id, name)
+                                              : _showFlagDialog(doc.id, name);
                                           break;
                                         case 'suspend':
-                                          if (isSuspended) {
-                                            _showUnsuspendDialog(doc.id, name);
-                                          } else {
-                                            _showSuspendDialog(doc.id, name);
-                                          }
+                                          isSuspended
+                                              ? _showUnsuspendDialog(doc.id, name)
+                                              : _showSuspendDialog(doc.id, name);
                                           break;
                                         case 'profile':
-                                          Navigator.pushNamed(
-                                            context,
-                                            '/student/${doc.id}',
-                                          );
+                                          Navigator.pushNamed(context, '/student/${doc.id}');
                                           break;
                                         case 'notifications':
-                                          _showNotificationHistory(
-                                            doc.id,
-                                            name,
-                                          );
+                                          _showNotificationHistory(doc.id, name);
                                           break;
                                         case 'delete':
                                           _showDeleteDialog(doc.id, name);
@@ -219,18 +188,12 @@ class _AdminProfileviewPageState extends State<AdminProfileviewPage> {
                                         child: Row(
                                           children: [
                                             Icon(
-                                              isFlagged
-                                                  ? Icons.flag_outlined
-                                                  : Icons.flag,
+                                              isFlagged ? Icons.flag_outlined : Icons.flag,
                                               color: Colors.orange,
                                               size: 20,
                                             ),
                                             SizedBox(width: 12),
-                                            Text(
-                                              isFlagged
-                                                  ? 'Unflag User'
-                                                  : 'Flag User',
-                                            ),
+                                            Text(isFlagged ? 'Unflag User' : 'Flag User'),
                                           ],
                                         ),
                                       ),
@@ -239,20 +202,12 @@ class _AdminProfileviewPageState extends State<AdminProfileviewPage> {
                                         child: Row(
                                           children: [
                                             Icon(
-                                              isSuspended
-                                                  ? Icons.check_circle
-                                                  : Icons.block,
-                                              color: isSuspended
-                                                  ? Colors.green
-                                                  : Colors.red,
+                                              isSuspended ? Icons.check_circle : Icons.block,
+                                              color: isSuspended ? Colors.green : Colors.red,
                                               size: 20,
                                             ),
                                             SizedBox(width: 12),
-                                            Text(
-                                              isSuspended
-                                                  ? 'Unsuspend User'
-                                                  : 'Suspend User',
-                                            ),
+                                            Text(isSuspended ? 'Unsuspend User' : 'Suspend User'),
                                           ],
                                         ),
                                       ),
@@ -260,11 +215,7 @@ class _AdminProfileviewPageState extends State<AdminProfileviewPage> {
                                         value: 'profile',
                                         child: Row(
                                           children: [
-                                            Icon(
-                                              Icons.person,
-                                              color: Colors.blue,
-                                              size: 20,
-                                            ),
+                                            Icon(Icons.person, color: Colors.blue, size: 20),
                                             SizedBox(width: 12),
                                             Text('View Profile'),
                                           ],
@@ -274,11 +225,7 @@ class _AdminProfileviewPageState extends State<AdminProfileviewPage> {
                                         value: 'notifications',
                                         child: Row(
                                           children: [
-                                            Icon(
-                                              Icons.history,
-                                              color: Colors.purple,
-                                              size: 20,
-                                            ),
+                                            Icon(Icons.history, color: Colors.purple, size: 20),
                                             SizedBox(width: 12),
                                             Text('Notification History'),
                                           ],
@@ -288,43 +235,28 @@ class _AdminProfileviewPageState extends State<AdminProfileviewPage> {
                                         value: 'delete',
                                         child: Row(
                                           children: [
-                                            Icon(
-                                              Icons.delete,
-                                              color: Colors.red,
-                                              size: 20,
-                                            ),
+                                            Icon(Icons.delete, color: Colors.red, size: 20),
                                             SizedBox(width: 12),
                                             Text('Delete User'),
                                           ],
                                         ),
                                       ),
                                     ],
-                                    child: Icon(
-                                      Icons.more_vert,
-                                      color: Colors.grey.shade600,
-                                    ),
+                                    child: Icon(Icons.more_vert, color: Colors.grey.shade600),
                                   ),
                                 ],
                               ],
                             ),
-                            // Status indicator at bottom center
                             if (isFlagged || isSuspended) ...[
                               SizedBox(height: 8),
                               Center(
                                 child: Container(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 4,
-                                  ),
+                                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: isSuspended
-                                        ? Colors.red.shade100
-                                        : Colors.orange.shade100,
+                                    color: isSuspended ? Colors.red.shade100 : Colors.orange.shade100,
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
-                                      color: isSuspended
-                                          ? Colors.red.shade300
-                                          : Colors.orange.shade300,
+                                      color: isSuspended ? Colors.red.shade300 : Colors.orange.shade300,
                                       width: 1,
                                     ),
                                   ),
@@ -334,9 +266,7 @@ class _AdminProfileviewPageState extends State<AdminProfileviewPage> {
                                       Icon(
                                         isSuspended ? Icons.block : Icons.flag,
                                         size: 14,
-                                        color: isSuspended
-                                            ? Colors.red.shade700
-                                            : Colors.orange.shade700,
+                                        color: isSuspended ? Colors.red.shade700 : Colors.orange.shade700,
                                       ),
                                       SizedBox(width: 4),
                                       Text(
@@ -344,9 +274,7 @@ class _AdminProfileviewPageState extends State<AdminProfileviewPage> {
                                         style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.bold,
-                                          color: isSuspended
-                                              ? Colors.red.shade700
-                                              : Colors.orange.shade700,
+                                          color: isSuspended ? Colors.red.shade700 : Colors.orange.shade700,
                                         ),
                                       ),
                                     ],
