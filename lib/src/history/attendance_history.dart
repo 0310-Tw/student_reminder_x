@@ -7,6 +7,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
+import 'package:students_reminder/src/history/shift_timeline.dart';
 import 'package:students_reminder/src/services/attendance_service.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/shared/misc.dart';
@@ -409,49 +410,60 @@ class _HistoryList extends StatelessWidget {
   final String uid;
   final List<_DayItem> days;
 
+  // ✅ Status color helper
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'Early':
+        return Colors.green;
+      case 'Late':
+        return Colors.orange;
+      case 'Absent':
+        return Colors.red;
+      case 'In progress':
+        return Colors.blue;
+      default:
+        return Colors.grey;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListView.separated(
       itemCount: days.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, i) {
         final d = days[i];
         final dateLabel = DateFormat('EEE, MMM d').format(d.date);
-        return Card(
-          elevation: 2,
-          margin: const EdgeInsets.symmetric(horizontal: 8),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 8,
-            ),
-            title: Text(
-              dateLabel,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF2C3E50),
-              ),
-            ),
-            subtitle: Row(
-              children: [
-                if (d.inAt != null)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: Text(
-                      'In: ${_fmtJM(d.inAt)}',
-                      style: const TextStyle(color: Color(0xFF5D6D7E)),
+
+        return ListTile(
+          title: Text(dateLabel),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  if (d.inAt != null)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: Text('In: ${_fmtJM(d.inAt)}'),
                     ),
-                  ),
-                if (d.outAt != null)
-                  Text(
-                    'Out: ${_fmtJM(d.outAt)}',
-                    style: const TextStyle(color: Color(0xFF5D6D7E)),
-                  ),
-              ],
-            ),
-            trailing: _statusBadgeWithAdmin(d),
-            onTap: () => _openMapModal(context, uid: uid, dayId: d.dateId),
+                  if (d.outAt != null) Text('Out: ${_fmtJM(d.outAt)}'),
+                ],
+              ),
+              const SizedBox(height: 6),
+              // Shift timeline with status color
+              SizedBox(
+                height: 20,
+                child: ShiftTimeline(
+                  clockIn: d.inAt,
+                  clockOut: d.outAt,
+                  color: _statusColor(d.status), // Use status color 
+                ),
+              ),
+            ],
           ),
+          trailing: _statusBadgeWithAdmin(d),
+          onTap: () => _openMapModal(context, uid: uid, dayId: d.dateId),
         );
       },
     );
@@ -471,17 +483,19 @@ class _CalendarGrid extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       child: Column(
         children: [
+          // Legend
           Wrap(
             spacing: 12,
             runSpacing: 8,
             children: const [
-              _Legend(color: Color(0xFF27AE60), label: 'Early'),
-              _Legend(color: Color(0xFFF39C12), label: 'Late'),
-              _Legend(color: Color(0xFFE74C3C), label: 'Absent'),
-              _Legend(color: Color(0xFF3498DB), label: 'In progress'),
+              _Legend(color: Colors.green, label: 'Early'),
+              _Legend(color: Colors.orange, label: 'Late'),
+              _Legend(color: Colors.red, label: 'Absent'),
+              _Legend(color: Colors.blue, label: 'In progress'),
             ],
           ),
           const SizedBox(height: 12),
+          // Grid
           Expanded(
             child: GridView.builder(
               itemCount: days.length,
@@ -489,46 +503,60 @@ class _CalendarGrid extends StatelessWidget {
                 crossAxisCount: 7,
                 mainAxisSpacing: 10,
                 crossAxisSpacing: 10,
-                childAspectRatio: 1.0,
+                childAspectRatio: 0.8, // Adjusted for better spacing
               ),
               itemBuilder: (context, i) {
                 final d = days[i];
                 final dot = _statusColor(d.status);
+
                 return InkWell(
-                  onTap: () =>
-                      _openMapModal(context, uid: uid, dayId: d.dateId),
+                  onTap: () => _openMapModal(context, uid: uid, dayId: d.dateId),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Color(0xFFE8F4FD)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Color(0xFF2C3E50).withOpacity(0.08),
-                          blurRadius: 6,
-                          offset: Offset(0, 3),
-                        ),
-                      ],
+                      border: Border.all(color: Theme.of(context).dividerColor),
                     ),
                     padding: const EdgeInsets.all(8),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
+                        // Day number
                         Text(
                           DateFormat('d').format(d.date),
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF2C3E50),
                           ),
                         ),
                         const SizedBox(height: 6),
-                        Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: dot,
-                            shape: BoxShape.circle,
+                        // Status dot with mini timeline inside
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              // Background circle (lighter)
+                              Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  color: dot.withOpacity(0.3),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              // Mini timeline bar
+                              FractionallySizedBox(
+                                widthFactor: d.inAt != null && d.outAt != null ? 1.0 : 0.0,
+                                heightFactor: 0.3,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: dot,
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -543,6 +571,7 @@ class _CalendarGrid extends StatelessWidget {
     );
   }
 }
+
 
 class _Legend extends StatelessWidget {
   const _Legend({required this.color, required this.label});
@@ -568,23 +597,20 @@ class _Legend extends StatelessWidget {
 
 // ------------------ Map Modal ------------------
 
-void _openMapModal(
-  BuildContext context, {
-  required String uid,
-  required String dayId,
-}) {
+/// -------------------- updated Map Modal --------------------
+
+void _openMapModal(BuildContext context,
+    {required String uid, required String dayId}) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    showDragHandle: true,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
     builder: (_) => DayMapModal(uid: uid, dayId: dayId),
   );
 }
 
-// ------------------ Update Map Modal ------------------
 class DayMapModal extends StatefulWidget {
   const DayMapModal({super.key, required this.uid, required this.dayId});
   final String uid;
@@ -629,94 +655,46 @@ class _DayMapModalState extends State<DayMapModal> {
       _outLoc = _toLatLng(data['outLoc'] ?? data['clockOutLoc']);
       inAt = (inTimestamp as Timestamp?)?.toDate();
       outAt = (outTimestamp as Timestamp?)?.toDate();
-
-      // Start with placeholders
-      inAddress = _inLoc != null ? "Fetching..." : null;
-      outAddress = _outLoc != null ? "Fetching..." : null;
-
-      setState(() {
-        status = (data['status'] as String?) ?? 'absent';
-        _mapReady = true;
-      });
-
-      // 🔄 Fetch addresses in the background, then refresh UI
-      if (_inLoc != null) {
-        _getAddressFromLatLng(_inLoc!).then((addr) {
-          if (mounted) {
-            setState(() => inAddress = addr);
-          }
-        });
-      }
-      if (_outLoc != null) {
-        _getAddressFromLatLng(_outLoc!).then((addr) {
-          if (mounted) {
-            setState(() => outAddress = addr);
-          }
-        });
-      }
+      status = (data['status'] ?? 'absent').toString();
     }
+    if (_inLoc != null) {
+      inAddress = await _reverseGeocode(_inLoc!);
+    }
+    if (_outLoc != null) {
+      outAddress = await _reverseGeocode(_outLoc!);
+    }
+    if (mounted) setState(() {});
   }
 
   LatLng? _toLatLng(dynamic v) {
+    if (v == null) return null;
     if (v is GeoPoint) return LatLng(v.latitude, v.longitude);
-    if (v is Map<String, dynamic> && v.containsKey('latitude')) {
-      return LatLng(v['latitude'], v['longitude']);
-    }
     return null;
   }
 
-  Future<String> _getAddressFromLatLng(LatLng loc) async {
+  Future<String?> _reverseGeocode(LatLng pos) async {
     try {
-      final placemarks = await placemarkFromCoordinates(
-        loc.latitude,
-        loc.longitude,
-      );
+      final placemarks =
+          await placemarkFromCoordinates(pos.latitude, pos.longitude);
       if (placemarks.isNotEmpty) {
-        final place = placemarks.first;
-        return "${place.locality}, ${place.country}";
+        final pm = placemarks.first;
+        return "${pm.street}, ${pm.locality}, ${pm.country}";
       }
-    } catch (e) {
-      debugPrint("Reverse geocoding failed: $e");
-    }
-    return "Unknown location";
-  }
-
-  LatLngBounds _latLngBoundsFrom(LatLng a, LatLng b) {
-    final southWest = LatLng(
-      min(a.latitude, b.latitude),
-      min(a.longitude, b.longitude),
-    );
-    final northEast = LatLng(
-      max(a.latitude, b.latitude),
-      max(a.longitude, b.longitude),
-    );
-    return LatLngBounds(southwest: southWest, northeast: northEast);
+    } catch (_) {}
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_mapReady) {
-      return const SizedBox(
-        height: 300,
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
-
     final markers = <Marker>{};
     if (_inLoc != null) {
       markers.add(
         Marker(
-          markerId: const MarkerId('in'),
+          markerId: const MarkerId("in"),
           position: _inLoc!,
           infoWindow: InfoWindow(
-            title: 'Clock In',
-            snippet: [
-              if (inAt != null) DateFormat.jm().format(inAt!),
-              if (inAddress != null) inAddress!,
-            ].join("\n"),
-          ),
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            BitmapDescriptor.hueGreen,
+            title: "Clocked In",
+            snippet: inAddress ?? _fmtJM(inAt),
           ),
         ),
       );
@@ -724,96 +702,57 @@ class _DayMapModalState extends State<DayMapModal> {
     if (_outLoc != null) {
       markers.add(
         Marker(
-          markerId: const MarkerId('out'),
+          markerId: const MarkerId("out"),
           position: _outLoc!,
           infoWindow: InfoWindow(
-            title: 'Clock Out',
-            snippet: [
-              if (outAt != null) DateFormat.jm().format(outAt!),
-              if (outAddress != null) outAddress!,
-            ].join("\n"),
+            title: "Clocked Out",
+            snippet: outAddress ?? _fmtJM(outAt),
           ),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
         ),
       );
     }
 
-    CameraPosition initialCam = const CameraPosition(
-      target: LatLng(18.005611, -76.744127),
-      zoom: 15,
-    );
-    if (_inLoc != null) {
-      initialCam = CameraPosition(target: _inLoc!, zoom: 18);
-    }
+    final center = _outLoc ?? _inLoc ?? const LatLng(18.005, -76.7936);
 
-    return SizedBox(
-      height: MediaQuery.of(context).size.height * 0.75,
-      child: Column(
-        children: [
-          Expanded(
-            child: GoogleMap(
-              onMapCreated: (c) async {
-                _controller = c;
-                if (_inLoc != null && _outLoc != null) {
-                  final bounds = _latLngBoundsFrom(_inLoc!, _outLoc!);
-                  await _controller!.animateCamera(
-                    CameraUpdate.newLatLngBounds(bounds, 50),
-                  );
-                } else if (_inLoc != null) {
-                  await _controller!.animateCamera(
-                    CameraUpdate.newLatLngZoom(_inLoc!, 15),
-                  );
-                }
-              },
-              initialCameraPosition: initialCam,
-              markers: markers,
-              myLocationEnabled: true,
-              myLocationButtonEnabled: true,
+    return DraggableScrollableSheet(
+      expand: false,
+      minChildSize: 0.5,
+      initialChildSize: 0.75,
+      builder: (context, scrollController) {
+        return Column(
+          children: [
+            Container(
+              height: 5,
+              width: 40,
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade400,
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
-          ),
-          const Divider(height: 1),
-          // 👇 Info section under the map
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (_inLoc != null) ...[
-                  Text(
-                    "Clock In",
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green,
-                    ),
-                  ),
-                  Text(
-                    inAt != null
-                        ? "Time: ${DateFormat.jm().format(inAt!)}"
-                        : "Time: Unknown",
-                  ),
-                  Text("Location: ${inAddress ?? "Fetching..."}"),
-                  const SizedBox(height: 8),
-                ],
-                if (_outLoc != null) ...[
-                  Text(
-                    "Clock Out",
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.red,
-                    ),
-                  ),
-                  Text(
-                    outAt != null
-                        ? "Time: ${DateFormat.jm().format(outAt!)}"
-                        : "Time: Unknown",
-                  ),
-                  Text("Location: ${outAddress ?? "Fetching..."}"),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
+            Text("Day: ${widget.dayId}"),
+            Text("Status: $status"),
+            if (inAt != null) Text("Clock In: ${_fmtJM(inAt)}"),
+            if (outAt != null) Text("Clock Out: ${_fmtJM(outAt)}"),
+            const SizedBox(height: 8),
+            if (!_mapReady)
+              const Expanded(
+                  child: Center(child: CircularProgressIndicator()))
+            else
+              Expanded(
+                child: GoogleMap(
+                  initialCameraPosition:
+                      CameraPosition(target: center, zoom: 15),
+                  onMapCreated: (c) {
+                    _controller = c;
+                    setState(() => _mapReady = true);
+                  },
+                  markers: markers,
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }
