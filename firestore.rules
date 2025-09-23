@@ -98,5 +98,10 @@ service cloud.firestore {
     match /{path=**}/notes/{noteId} {
       allow read: if isAuthenticated() && resource.data.visibility == 'public';
     }
+
+    // Additional rules for admin dashboard data access
+    match /{document=**} {
+      allow read: if isAdmin();
+    }
   }
 }

@@ -112,6 +112,7 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
   }
 
   void _updatePages() {
+    final previousPageCount = _pages.length;
     if (_isAdmin) {
       _pages = [
         const AdminDashboard(),
@@ -127,6 +128,11 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
         AttendanceHistory14d(),
         const ProfilePage(),
       ];
+    }
+
+    // Reset index if switching between admin/student mode or if current index is out of bounds
+    if (previousPageCount != _pages.length || _index >= _pages.length) {
+      _index = 0;
     }
   }
 
@@ -154,27 +160,47 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
     return StreamBuilder<User?>(
       stream: AuthService.instance.authStateChanged(),
       builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting ||
-            _isLoadingAdminStatus) {
-          return Scaffold(body: Center(child: CircularProgressIndicator()));
-        }
         final user = snap.data;
         if (user == null) return LoginPage();
+
+        // Show loading only on initial load, not during navigation
+        if (snap.connectionState == ConnectionState.waiting && _pages.isEmpty) {
+          return Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+
+        // Show loading for admin status only if pages aren't initialized yet
+        if (_isLoadingAdminStatus && _pages.isEmpty) {
+          return Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+
+        // Use IndexedStack to prevent page rebuilds and maintain state
         return Scaffold(
-          body: _pages[_index],
-          bottomNavigationBar: CurvedNavigationBar(
+          body: IndexedStack(
+            key: ValueKey(_isAdmin ? 'admin' : 'student'),
             index: _index,
-            height: 60.0,
-            items: _buildNavigationIcons(),
-            color: _isAdmin ? const Color(0xFF6366F1) : const Color(0xFF3498DB),
-            buttonBackgroundColor: _isAdmin
-                ? const Color(0xFF4F46E5)
-                : const Color(0xFF2980B9),
-            backgroundColor: Colors.transparent,
-            animationCurve: Curves.easeInOut,
-            animationDuration: const Duration(milliseconds: 900),
-            onTap: (index) => setState(() => _index = index),
+            children: _pages.isNotEmpty ? _pages : [Container()],
           ),
+          bottomNavigationBar: _pages.isNotEmpty
+              ? CurvedNavigationBar(
+                  index: _index,
+                  height: 60.0,
+                  items: _buildNavigationIcons(),
+                  color: _isAdmin
+                      ? const Color(0xFF6366F1)
+                      : const Color(0xFF3498DB),
+                  buttonBackgroundColor: _isAdmin
+                      ? const Color(0xFF4F46E5)
+                      : const Color(0xFF2980B9),
+                  backgroundColor: Colors.transparent,
+                  animationCurve: Curves.easeInOutCubic,
+                  animationDuration: const Duration(milliseconds: 250),
+                  onTap: (index) {
+                    if (index != _index && index < _pages.length) {
+                      setState(() => _index = index);
+                    }
+                  },
+                )
+              : null,
         );
       },
     );
