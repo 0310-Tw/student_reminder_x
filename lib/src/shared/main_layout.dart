@@ -6,6 +6,7 @@ import 'package:students_reminder/src/features/home/home_page.dart';
 import 'package:students_reminder/src/features/notes/my_notes_page.dart';
 import 'package:students_reminder/src/features/profile/profile_page.dart';
 import 'package:students_reminder/src/features/public_notes/public_notes_page.dart';
+import 'package:students_reminder/src/features/time_table/time_table_screen.dart';
 import 'package:students_reminder/src/history/attendance_history.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/admin_service.dart';
@@ -120,6 +121,7 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
     } else {
       _pages = [
         const HomePage(),
+        TimetableScreen(),  // 👈 new timetable screen
         const MyNotesPage(),
         PublicFeeds(),
         AttendanceHistory14d(),
@@ -148,6 +150,7 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
     } else {
       return [
         const NavigationDestination(icon: Icon(Icons.home), label: 'Home'),
+        const NavigationDestination(icon: Icon(Icons.schedule), label: 'Courses'),
         const NavigationDestination(
           icon: Icon(Icons.event_note),
           label: 'Notes',
