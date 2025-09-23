@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:students_reminder/src/widgets/suspension_check.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/user_service.dart';
@@ -39,15 +40,33 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _setupLiveCounts() {
-    _listenAndUpdate("Mobile", UserService.instance.watchUserByCourseGroup('mobile'));
+    _listenAndUpdate(
+      "Mobile",
+      UserService.instance.watchUserByCourseGroup('mobile'),
+    );
     _listenAndUpdate("Web", UserService.instance.watchUserByCourseGroup('web'));
-    _listenAndUpdate("Tasks", UserService.instance.watchStudentsWithPendingTasks());
-    _listenAndUpdate("Reports", UserService.instance.watchStudentsWithReports());
-    _listenAndUpdate("Announcements", UserService.instance.watchStudentsWithUnreadAnnouncements());
-    _listenAndUpdate("Calendar", UserService.instance.watchStudentsWithUpcomingEvents());
+    _listenAndUpdate(
+      "Tasks",
+      UserService.instance.watchStudentsWithPendingTasks(),
+    );
+    _listenAndUpdate(
+      "Reports",
+      UserService.instance.watchStudentsWithReports(),
+    );
+    _listenAndUpdate(
+      "Announcements",
+      UserService.instance.watchStudentsWithUnreadAnnouncements(),
+    );
+    _listenAndUpdate(
+      "Calendar",
+      UserService.instance.watchStudentsWithUpcomingEvents(),
+    );
   }
 
-  void _listenAndUpdate(String label, Stream<QuerySnapshot<Map<String, dynamic>>> stream) {
+  void _listenAndUpdate(
+    String label,
+    Stream<QuerySnapshot<Map<String, dynamic>>> stream,
+  ) {
     stream.listen((snap) {
       int count = 0;
       switch (label) {
@@ -79,7 +98,9 @@ class _HomePageState extends State<HomePage> {
           final now = DateTime.now();
           count = snap.docs.where((d) {
             final events = List.from(d['events'] ?? []);
-            return events.any((e) => (e['date'] as Timestamp).toDate().isAfter(now));
+            return events.any(
+              (e) => (e['date'] as Timestamp).toDate().isAfter(now),
+            );
           }).length;
           break;
       }
@@ -128,108 +149,132 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
         ),
-        body: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildAttendanceSummary(
-                    "Present",
-                    _totalPresent,
-                    Colors.green,
-                    onTap: () {
-                      setState(() {
-                        _selectedAttendanceStatus =
-                            _selectedAttendanceStatus == 'present' ? null : 'present';
-                      });
-                    },
-                  ),
-                  _buildAttendanceSummary(
-                    "Late",
-                    _totalLate,
-                    Colors.orange,
-                    onTap: () {
-                      setState(() {
-                        _selectedAttendanceStatus =
-                            _selectedAttendanceStatus == 'late' ? null : 'late';
-                      });
-                    },
-                  ),
-                  _buildAttendanceSummary(
-                    "Absent",
-                    _totalAbsent,
-                    Colors.red,
-                    onTap: () {
-                      setState(() {
-                        _selectedAttendanceStatus =
-                            _selectedAttendanceStatus == 'absent' ? null : 'absent';
-                      });
-                    },
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(
-              height: 160,
-              child: PieChart(
-                PieChartData(
-                  sections: [
-                    PieChartSectionData(
-                      value: _totalPresent.toDouble(),
-                      color: Colors.green,
-                      title: 'Present',
-                      radius: 50,
-                      titleStyle:
-                          const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        body: SuspensionCheck(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildAttendanceSummary(
+                      "Present",
+                      _totalPresent,
+                      Colors.green,
+                      onTap: () {
+                        setState(() {
+                          _selectedAttendanceStatus =
+                              _selectedAttendanceStatus == 'present'
+                              ? null
+                              : 'present';
+                        });
+                      },
                     ),
-                    PieChartSectionData(
-                      value: _totalLate.toDouble(),
-                      color: Colors.orange,
-                      title: 'Late',
-                      radius: 50,
-                      titleStyle:
-                          const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    _buildAttendanceSummary(
+                      "Late",
+                      _totalLate,
+                      Colors.orange,
+                      onTap: () {
+                        setState(() {
+                          _selectedAttendanceStatus =
+                              _selectedAttendanceStatus == 'late'
+                              ? null
+                              : 'late';
+                        });
+                      },
                     ),
-                    PieChartSectionData(
-                      value: _totalAbsent.toDouble(),
-                      color: Colors.red,
-                      title: 'Absent',
-                      radius: 50,
-                      titleStyle:
-                          const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    _buildAttendanceSummary(
+                      "Absent",
+                      _totalAbsent,
+                      Colors.red,
+                      onTap: () {
+                        setState(() {
+                          _selectedAttendanceStatus =
+                              _selectedAttendanceStatus == 'absent'
+                              ? null
+                              : 'absent';
+                        });
+                      },
                     ),
                   ],
-                  sectionsSpace: 2,
-                  centerSpaceRadius: 30,
                 ),
               ),
-            ),
-            Expanded(
-              child: TabBarView(
-                children: [
-                  _buildStudentsTab(),
-                  _buildDocumentsTab(),
-                ],
+              SizedBox(
+                height: 160,
+                child: PieChart(
+                  PieChartData(
+                    sections: [
+                      PieChartSectionData(
+                        value: _totalPresent.toDouble(),
+                        color: Colors.green,
+                        title: 'Present',
+                        radius: 50,
+                        titleStyle: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      PieChartSectionData(
+                        value: _totalLate.toDouble(),
+                        color: Colors.orange,
+                        title: 'Late',
+                        radius: 50,
+                        titleStyle: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      PieChartSectionData(
+                        value: _totalAbsent.toDouble(),
+                        color: Colors.red,
+                        title: 'Absent',
+                        radius: 50,
+                        titleStyle: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                    sectionsSpace: 2,
+                    centerSpaceRadius: 30,
+                  ),
+                ),
               ),
-            ),
-          ],
+              Expanded(
+                child: TabBarView(
+                  children: [_buildStudentsTab(), _buildDocumentsTab()],
+                ),
+              ),
+            ],
+          ),
+          
         ),
       ),
     );
   }
 
-  Widget _buildAttendanceSummary(String label, int count, Color color, {VoidCallback? onTap}) {
+  Widget _buildAttendanceSummary(
+    String label,
+    int count,
+    Color color, {
+    VoidCallback? onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Column(
         children: [
           Text(
             count.toString(),
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
           ),
-          Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+          ),
         ],
       ),
     );
@@ -253,7 +298,8 @@ class _HomePageState extends State<HomePage> {
                     setState(() {
                       _selectedAction = "Mobile";
                       _selectedAttendanceStatus = null;
-                      _studentStream = UserService.instance.watchUserByCourseGroup('mobile');
+                      _studentStream = UserService.instance
+                          .watchUserByCourseGroup('mobile');
                     });
                   },
                 ),
@@ -265,7 +311,8 @@ class _HomePageState extends State<HomePage> {
                     setState(() {
                       _selectedAction = "Web";
                       _selectedAttendanceStatus = null;
-                      _studentStream = UserService.instance.watchUserByCourseGroup('web');
+                      _studentStream = UserService.instance
+                          .watchUserByCourseGroup('web');
                     });
                   },
                 ),
@@ -276,7 +323,8 @@ class _HomePageState extends State<HomePage> {
                   onTap: () {
                     setState(() {
                       _selectedAction = "Calendar";
-                      _studentStream = UserService.instance.watchStudentsWithUpcomingEvents();
+                      _studentStream = UserService.instance
+                          .watchStudentsWithUpcomingEvents();
                     });
                   },
                 ),
@@ -328,7 +376,8 @@ class _HomePageState extends State<HomePage> {
             events[day] ??= [];
             events[day]!.add({
               ...e,
-              'studentName': "${data['firstName'] ?? ''} ${data['lastName'] ?? ''}".trim(),
+              'studentName':
+                  "${data['firstName'] ?? ''} ${data['lastName'] ?? ''}".trim(),
               'color': eventColor,
             });
           }
@@ -345,15 +394,17 @@ class _HomePageState extends State<HomePage> {
               return Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: dayEvents
-                    .map<Widget>((e) => Container(
-                          width: 6,
-                          height: 6,
-                          margin: const EdgeInsets.symmetric(horizontal: 1),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: e['color'],
-                          ),
-                        ))
+                    .map<Widget>(
+                      (e) => Container(
+                        width: 6,
+                        height: 6,
+                        margin: const EdgeInsets.symmetric(horizontal: 1),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: e['color'],
+                        ),
+                      ),
+                    )
                     .toList(),
               );
             },
@@ -378,7 +429,8 @@ class _HomePageState extends State<HomePage> {
         docs = docs.where((d) {
           final data = d.data();
           if (_selectedAttendanceStatus != null) {
-            return (data['attendanceStatus'] ?? 'present') == _selectedAttendanceStatus;
+            return (data['attendanceStatus'] ?? 'present') ==
+                _selectedAttendanceStatus;
           }
           return true;
         }).toList();
@@ -392,7 +444,8 @@ class _HomePageState extends State<HomePage> {
           separatorBuilder: (_, __) => const Divider(height: 1),
           itemBuilder: (_, i) {
             final data = docs[i].data();
-            final name = "${data['firstName'] ?? ''} ${data['lastName'] ?? ''}".trim();
+            final name = "${data['firstName'] ?? ''} ${data['lastName'] ?? ''}"
+                .trim();
             return ListTile(
               title: Text(name),
               onTap: () {
@@ -427,7 +480,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildDocumentsTab() {
-    final docStream = FirebaseFirestore.instance.collection('documents').snapshots();
+    final docStream = FirebaseFirestore.instance
+        .collection('documents')
+        .snapshots();
     String selectedFilter = 'All';
 
     return StatefulBuilder(
@@ -467,7 +522,10 @@ class _HomePageState extends State<HomePage> {
                     onTap: () => setState(() => selectedFilter = type),
                     child: Container(
                       margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: isSelected ? color : color.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(20),
@@ -492,13 +550,16 @@ class _HomePageState extends State<HomePage> {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  if (snapshot.hasError) return Center(child: Text('Error: ${snapshot.error}'));
+                  if (snapshot.hasError)
+                    return Center(child: Text('Error: ${snapshot.error}'));
 
                   List docs = snapshot.data?.docs ?? [];
 
                   if (selectedFilter != 'All') {
                     docs = docs.where((d) {
-                      final type = (d.data()['type'] ?? 'general').toString().toLowerCase();
+                      final type = (d.data()['type'] ?? 'general')
+                          .toString()
+                          .toLowerCase();
                       return type == selectedFilter.toLowerCase();
                     }).toList();
                   }
@@ -526,8 +587,14 @@ class _HomePageState extends State<HomePage> {
                       final badgeColor = getBadgeColor(type);
 
                       return ListTile(
-                        leading: CircleAvatar(radius: 10, backgroundColor: badgeColor),
-                        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        leading: CircleAvatar(
+                          radius: 10,
+                          backgroundColor: badgeColor,
+                        ),
+                        title: Text(
+                          title,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
                         subtitle: Text("Uploaded by: $uploadedBy\nDate: $date"),
                       );
                     },
@@ -591,7 +658,10 @@ class _HomePageState extends State<HomePage> {
                   child: Text(
                     count.toString(),
                     style: const TextStyle(
-                        color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),

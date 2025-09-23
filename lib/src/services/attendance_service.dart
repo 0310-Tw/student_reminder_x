@@ -41,15 +41,13 @@ class AttendanceService {
   static Stream<QuerySnapshot<Map<String, dynamic>>> streamLast14Days(
     String uid,
   ) {
-    final now = JmTime.nowLocal();
-    final start = DateUtils.dateOnly(now).subtract(const Duration(days: 13));
+    // Simplified query to avoid index requirements - using ascending order
     return FirebaseFirestore.instance
         .collection('attendance')
         .doc(uid)
         .collection('days')
-        .where('dayId', isGreaterThanOrEqualTo: JmTime.dateId(start))
-        .orderBy('dayId', descending: true)
-        .limit(14)
+        .orderBy('dayId') // ascending order to avoid index requirements
+        .limit(30) // Get more than 14 to ensure we have recent data
         .snapshots();
   }
 
@@ -79,7 +77,7 @@ class AttendanceService {
         .collection('days')
         .where('dayId', isGreaterThanOrEqualTo: startId)
         .where('dayId', isLessThanOrEqualTo: endId)
-        .orderBy('dayId', descending: true)
+        .orderBy('dayId') // Remove descending to avoid index requirement
         .snapshots();
   }
 
@@ -93,7 +91,7 @@ class AttendanceService {
     return FirebaseFirestore.instance
         .collectionGroup('days')
         .where('dayId', isGreaterThanOrEqualTo: startId)
-        .orderBy('dayId', descending: true)
+        .orderBy('dayId') // Remove descending to avoid index requirement
         .snapshots();
   }
 
@@ -152,7 +150,7 @@ class AttendanceService {
   static Future<void> adminMarkPresent(
     String adminUid,
     String targetUid,
-    String dateId, 
+    String dateId,
   ) async {
     try {
       // Get admin and target user info for notifications
@@ -324,11 +322,11 @@ class AttendanceService {
         Map<String, dynamic> updateData = {
           'dayId': dateId,
           'status': 'absent',
-          'timingStatus': null, 
-          'inAt': null, 
-          'clockInAt': null, 
+          'timingStatus': null,
+          'inAt': null,
+          'clockInAt': null,
           'inLoc': null,
-          'clockInLoc': null, 
+          'clockInLoc': null,
           'outAt': null,
           'clockOutAt': null,
           'outLoc': null,

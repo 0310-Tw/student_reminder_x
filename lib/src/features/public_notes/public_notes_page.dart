@@ -290,27 +290,46 @@ class PublicFeeds extends StatelessWidget {
                             onPressed: isSuspended
                                 ? null
                                 : () async {
-                                    // Toggle the like
-                                    await NotesService.instance.toggleLike(
-                                      noteRef: ref,
-                                      uid: uid,
-                                    );
+                                    try {
+                                      print(
+                                        '🔍 Attempting to toggle like for note: ${ref.id}',
+                                      );
+                                      print('🔍 Current user uid: $uid');
+                                      print(
+                                        '🔍 Current isLiked status: $isLiked',
+                                      );
+                                      print('🔍 Current likes count: $likes');
 
-                                    // Send notification if note was just liked (not unliked)
-                                    if (!isLiked) {
-                                      try {
-                                        await NotificationService.sendPushNotification(
-                                          deviceToken:
-                                              'user_${data['authorId']}', // This should be the actual FCM token
-                                          title: 'Your note was liked!',
-                                          body:
-                                              'Someone liked your note: "$title"',
-                                        );
-                                      } catch (e) {
-                                        print(
-                                          'Error sending like notification: $e',
-                                        );
+                                      // Toggle the like
+                                      await NotesService.instance.toggleLike(
+                                        noteRef: ref,
+                                        uid: uid,
+                                      );
+
+                                      print('✅ Successfully toggled like');
+
+                                      // Send notification if note was just liked (not unliked)
+                                      if (!isLiked) {
+                                        try {
+                                          await NotificationService.sendPushNotification(
+                                            deviceToken:
+                                                'user_${data['authorId']}', // This should be the actual FCM token
+                                            title: 'Your note was liked!',
+                                            body:
+                                                'Someone liked your note: "$title"',
+                                          );
+                                        } catch (e) {
+                                          print(
+                                            'Error sending like notification: $e',
+                                          );
+                                        }
                                       }
+                                    } catch (e) {
+                                      print('❌ Error toggling like: $e');
+                                      displaySnackBar(
+                                        context,
+                                        'Failed to like note: $e',
+                                      );
                                     }
                                   },
                           );

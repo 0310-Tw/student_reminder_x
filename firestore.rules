@@ -79,6 +79,15 @@ service cloud.firestore {
     match /users/{userId}/notes/{noteId} {
       allow read: if isAdmin() || isOwner(userId) || resource.data.visibility == 'public';
       allow write: if isAdmin() || isOwner(userId);
+      // Allow authenticated users to like/unlike public notes
+      allow update: if isAuthenticated() && 
+                   resource.data.visibility == 'public' &&
+                   // Only allow updates to like-related fields
+                   request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount', 'likedBy']) &&
+                   // Ensure title, body, and other core fields aren't changed
+                   request.resource.data.title == resource.data.title &&
+                   request.resource.data.body == resource.data.body &&
+                   request.resource.data.visibility == resource.data.visibility;
     }
 
     // Global rules for collection group queries (needed for admin dashboard)
