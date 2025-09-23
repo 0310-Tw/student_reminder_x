@@ -126,6 +126,84 @@ class AuthService {
       throw Exception('Google Sign-In Error: $e');
     }
   }
+
+  // Google Sign-In for Registration - returns user info without creating account
+  Future<Map<String, String?>> getGoogleUserInfo() async {
+    try {
+      // Trigger the authentication flow
+      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+
+      // If user cancels the sign-in flow
+      if (googleUser == null) {
+        throw Exception('Google Sign-In was cancelled');
+      }
+
+      // Return the user information for form pre-filling
+      return {
+        'firstName': googleUser.displayName?.split(' ').first ?? '',
+        'lastName': googleUser.displayName!.split(' ').length > 1
+            ? googleUser.displayName!.split(' ').sublist(1).join(' ')
+            : '',
+        'email': googleUser.email,
+      };
+    } catch (e) {
+      throw Exception('Google Sign-In Error: $e');
+    }
+  }
+
+  // Register with Google - complete registration with additional info
+  Future<UserCredential> registerWithGoogle({
+    required String firstName,
+    required String lastName,
+    required String courseGroup,
+    required String phone,
+  }) async {
+    try {
+      // Get the currently signed-in Google user
+      final GoogleSignInAccount? googleUser = GoogleSignIn().currentUser;
+
+      if (googleUser == null) {
+        throw Exception('No Google user found. Please sign in first.');
+      }
+
+      // Obtain the auth details from the request
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      // Create a new credential
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // Sign in to Firebase with the Google user credential
+      final UserCredential userCredential = await _auth.signInWithCredential(
+        credential,
+      );
+
+      // Create/update the Firestore document with complete user info
+      final user = userCredential.user!;
+      await _db.collection('users').doc(user.uid).set({
+        'firstName': firstName,
+        'lastName': lastName,
+        'courseGroup': courseGroup,
+        'email': user.email ?? '',
+        'phone': phone,
+        'gender': null,
+        'bio': null,
+        'role': 'student',
+        'createdAt': FieldValue.serverTimestamp(),
+        'signInMethod': 'google',
+      });
+
+      await SessionManager.onLoginSuccess();
+      return userCredential;
+    } on FirebaseAuthException catch (e) {
+      throw Exception('Firebase Auth Error: ${e.message}');
+    } catch (e) {
+      throw Exception('Google Registration Error: $e');
+    }
+  }
 }
 
 //   // Password Reset CODE

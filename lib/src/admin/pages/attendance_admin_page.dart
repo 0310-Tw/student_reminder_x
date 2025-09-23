@@ -19,6 +19,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
   DateTime _endDate = DateTime.now();
   bool _isAdmin = false;
   bool _isLoading = true;
+  String _platformFilter = 'All'; // 'All', 'Web', 'Mobile'
 
   // Real-time synchronization
   StreamSubscription<QuerySnapshot>? _attendanceSubscription;
@@ -156,6 +157,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
             ),
           ),
           _buildDateRangePicker(),
+          _buildPlatformFilter(),
           Expanded(child: _buildStudentsList()),
         ],
       ),
@@ -233,6 +235,92 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     );
   }
 
+  Widget _buildPlatformFilter() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Filter by Platform',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: Color(0xFF2E3440),
+            ),
+          ),
+          SizedBox(height: 12),
+          Row(
+            children: [
+              _buildFilterButton('All'),
+              SizedBox(width: 8),
+              _buildFilterButton('Web'),
+              SizedBox(width: 8),
+              _buildFilterButton('Mobile'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterButton(String filter) {
+    final isSelected = _platformFilter == filter;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _platformFilter = filter;
+        });
+      },
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? Color(0xFF1976D2) : Colors.grey[100],
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? Color(0xFF1976D2) : Colors.grey[300]!,
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              filter == 'All'
+                  ? Icons.people
+                  : filter == 'Web'
+                  ? Icons.web
+                  : Icons.phone_android,
+              size: 16,
+              color: isSelected ? Colors.white : Colors.grey[600],
+            ),
+            SizedBox(width: 6),
+            Text(
+              filter,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.grey[600],
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildStudentsList() {
     return StreamBuilder<QuerySnapshot>(
       stream: AttendanceService.getStudentsStream(),
@@ -251,7 +339,31 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
         final students = allUsers.where((doc) {
           final userData = doc.data() as Map<String, dynamic>;
           final userRole = userData['role'] as String?;
-          return userRole != 'admin'; //minus admin users
+
+          // First filter: exclude admin users
+          if (userRole == 'admin') return false;
+
+          // Second filter: platform filtering
+          if (_platformFilter != 'All') {
+            // Use courseGroup field (which contains 'web' or 'mobile') instead of platform
+            final courseGroup =
+                (userData['courseGroup']?.toString() ?? 'mobile').toLowerCase();
+
+            if (_platformFilter == 'Web') {
+              return courseGroup.contains('web') ||
+                  courseGroup.contains('browser');
+            } else if (_platformFilter == 'Mobile') {
+              return courseGroup.contains('mobile') ||
+                  courseGroup.contains('app') ||
+                  courseGroup.contains('android') ||
+                  courseGroup.contains('ios') ||
+                  !courseGroup.contains(
+                    'web',
+                  ); // Default to mobile if not specified
+            }
+          }
+
+          return true;
         }).toList();
 
         if (students.isEmpty) {
@@ -296,62 +408,140 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     String studentUid,
     Map<String, dynamic> studentData,
   ) {
-    return Card(
+    final studentName =
+        '${studentData['firstName'] ?? ''} ${studentData['lastName'] ?? ''}'
+            .trim()
+            .isEmpty
+        ? 'Unknown Student'
+        : '${studentData['firstName'] ?? ''} ${studentData['lastName'] ?? ''}'
+              .trim();
+
+    return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: ExpansionTile(
-        title: Text(
-          '${studentData['firstName'] ?? ''} ${studentData['lastName'] ?? ''}'
-                  .trim()
-                  .isEmpty
-              ? 'Unknown Student'
-              : '${studentData['firstName'] ?? ''} ${studentData['lastName'] ?? ''}'
-                    .trim(),
-          style: const TextStyle(fontWeight: FontWeight.bold),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+        border: Border.all(color: Colors.grey[200]!, width: 1),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: ExpansionTile(
+          backgroundColor: Colors.white,
+          collapsedBackgroundColor: Colors.white,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          childrenPadding: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          leading: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: Color(0xFF1976D2).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Icon(Icons.person, color: Color(0xFF1976D2), size: 24),
+          ),
+          title: Text(
+            studentName,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+              color: Color(0xFF2E3440),
+            ),
+          ),
+          subtitle: Text(
+            studentData['email'] ?? 'No email',
+            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+          ),
+          trailing: Icon(
+            Icons.keyboard_arrow_down,
+            color: Colors.grey[600],
+            size: 24,
+          ),
+          children: [_buildAttendanceList(studentUid)],
         ),
-        subtitle: Text(studentData['email'] ?? 'No email'),
-        children: [_buildAttendanceList(studentUid)],
       ),
     );
   }
 
   Widget _buildAttendanceList(String studentUid) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: AttendanceService.getStudentAttendanceStream(
-        studentUid,
-        _startDate,
-        _endDate,
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(16),
+          bottomRight: Radius.circular(16),
+        ),
       ),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
+      child: StreamBuilder<QuerySnapshot>(
+        stream: AttendanceService.getStudentAttendanceStream(
+          studentUid,
+          _startDate,
+          _endDate,
+        ),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Padding(
+              padding: EdgeInsets.all(20),
+              child: Center(
+                child: Text(
+                  'Error loading attendance: ${snapshot.error}',
+                  style: TextStyle(color: Colors.red[600]),
+                ),
+              ),
+            );
+          }
+
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Padding(
+              padding: EdgeInsets.all(20),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          final attendanceDocs = snapshot.data?.docs ?? [];
+
+          // Generate all dates in range for display
+          final allDates = _generateDateRange(_startDate, _endDate);
+
           return Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('Error loading attendance: ${snapshot.error}'),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Attendance Details',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                    color: Color(0xFF2E3440),
+                  ),
+                ),
+                SizedBox(height: 12),
+                ...allDates.map((date) {
+                  final dateStr = _formatDateString(date);
+                  final attendanceDoc = attendanceDocs
+                      .cast<QueryDocumentSnapshot?>()
+                      .firstWhere(
+                        (doc) => doc?.id == dateStr,
+                        orElse: () => null,
+                      );
+
+                  return _buildAttendanceRow(studentUid, date, attendanceDoc);
+                }).toList(),
+              ],
+            ),
           );
-        }
-
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Padding(
-            padding: EdgeInsets.all(16),
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
-
-        final attendanceDocs = snapshot.data?.docs ?? [];
-
-        // Generate all dates in range for display
-        final allDates = _generateDateRange(_startDate, _endDate);
-
-        return Column(
-          children: allDates.map((date) {
-            final dateStr = _formatDateString(date);
-            final attendanceDoc = attendanceDocs
-                .cast<QueryDocumentSnapshot?>()
-                .firstWhere((doc) => doc?.id == dateStr, orElse: () => null);
-
-            return _buildAttendanceRow(studentUid, date, attendanceDoc);
-          }).toList(),
-        );
-      },
+        },
+      ),
     );
   }
 
@@ -401,119 +591,216 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     }
 
     return Container(
+      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: Colors.grey[300]!)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!, width: 1),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Expanded(
-            flex: 2,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _formatDisplayDate(date),
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                Column(
+          Row(
+            children: [
+              // Date Section
+              Expanded(
+                flex: 3,
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildStatusChip(
-                      status,
-                      isRealTime: _attendanceSubscription != null,
-                    ),
-                    if (timingStatus != null && status == 'present') ...[
-                      const SizedBox(height: 4),
-                      _buildTimingBadge(timingStatus),
-                    ],
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (clockInAt != null)
-                  Text(
-                    'In: ${_formatTime(clockInAt.toDate())}',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                if (clockOutAt != null)
-                  Text(
-                    'Out: ${_formatTime(clockOutAt.toDate())}',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                if (lateReason != null)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Reason: $lateReason',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.orange,
-                        ),
+                    Text(
+                      _formatDisplayDate(date),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: Color(0xFF2E3440),
                       ),
-                      if (data['lateReasonEditedBy'] != null)
-                        Text(
-                          'Edited by: ${data['lateReasonEditedByName'] ?? 'Admin'}',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: Colors.purple,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                    ],
-                  ),
-              ],
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Column(
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.check, color: Colors.green, size: 20),
-                      onPressed: () => _markPresent(studentUid, dateStr),
-                      tooltip: 'Mark Present',
                     ),
-                    IconButton(
-                      icon: Icon(Icons.close, color: Colors.red, size: 20),
-                      onPressed: () => _markAbsent(studentUid, dateStr),
-                      tooltip: 'Mark Absent',
+                    SizedBox(height: 4),
+                    Row(
+                      children: [
+                        _buildStatusChip(
+                          status,
+                          isRealTime: _attendanceSubscription != null,
+                        ),
+                        if (timingStatus != null && status == 'present') ...[
+                          const SizedBox(width: 8),
+                          _buildTimingBadge(timingStatus),
+                        ],
+                      ],
                     ),
                   ],
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
+              ),
+
+              // Time Section
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    IconButton(
-                      icon: Icon(Icons.edit, color: Colors.blue, size: 20),
-                      onPressed: () =>
-                          _editLateReason(studentUid, dateStr, lateReason),
-                      tooltip: 'Edit Reason',
+                    if (clockInAt != null)
+                      Row(
+                        children: [
+                          Icon(Icons.login, size: 14, color: Colors.grey[600]),
+                          SizedBox(width: 4),
+                          Text(
+                            _formatTime(clockInAt.toDate()),
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                        ],
+                      ),
+                    if (clockOutAt != null) ...[
+                      SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Icon(Icons.logout, size: 14, color: Colors.grey[600]),
+                          SizedBox(width: 4),
+                          Text(
+                            _formatTime(clockOutAt.toDate()),
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+              // Action Section - modern dropdown menu
+              Container(
+                child: PopupMenuButton<String>(
+                  icon: Icon(
+                    Icons.more_vert,
+                    color: Colors.grey[600],
+                    size: 20,
+                  ),
+                  tooltip: 'Actions',
+                  onSelected: (String value) {
+                    switch (value) {
+                      case 'present':
+                        _markPresent(studentUid, dateStr);
+                        break;
+                      case 'absent':
+                        _markAbsent(studentUid, dateStr);
+                        break;
+                      case 'edit_reason':
+                        _editLateReason(studentUid, dateStr, lateReason);
+                        break;
+                      case 'view_location':
+                        _showLocationMap(data);
+                        break;
+                    }
+                  },
+                  itemBuilder: (BuildContext context) => [
+                    PopupMenuItem<String>(
+                      value: 'present',
+                      child: Row(
+                        children: [
+                          Icon(Icons.check, color: Colors.green, size: 18),
+                          SizedBox(width: 8),
+                          Text('Mark Present'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'absent',
+                      child: Row(
+                        children: [
+                          Icon(Icons.close, color: Colors.red, size: 18),
+                          SizedBox(width: 8),
+                          Text('Mark Absent'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'edit_reason',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, color: Colors.blue, size: 18),
+                          SizedBox(width: 8),
+                          Text('Edit Reason'),
+                        ],
+                      ),
                     ),
                     if (data['inLoc'] != null ||
                         data['outLoc'] != null ||
                         data['clockInLoc'] != null ||
                         data['clockOutLoc'] != null)
-                      IconButton(
-                        icon: Icon(Icons.map, color: Colors.purple, size: 20),
-                        onPressed: () => _showLocationMap(data),
-                        tooltip: 'View Location',
+                      PopupMenuItem<String>(
+                        value: 'view_location',
+                        child: Row(
+                          children: [
+                            Icon(Icons.map, color: Colors.purple, size: 18),
+                            SizedBox(width: 8),
+                            Text('View Location'),
+                          ],
+                        ),
                       ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
+
+          // Late reason and additional details
+          if (lateReason != null) ...[
+            SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange[200]!, width: 1),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 14,
+                        color: Colors.orange[700],
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        'Late Reason:',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.orange[700],
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    lateReason,
+                    style: TextStyle(fontSize: 12, color: Colors.orange[800]),
+                  ),
+                  if (data['lateReasonEditedBy'] != null) ...[
+                    SizedBox(height: 4),
+                    Text(
+                      'Edited by: ${data['lateReasonEditedByName'] ?? 'Admin'}',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.purple[600],
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

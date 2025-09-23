@@ -693,7 +693,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
                 final studentData = student.data() as Map<String, dynamic>;
                 final platform =
-                    (studentData['platform']?.toString() ?? 'mobile')
+                    (studentData['courseGroup']?.toString() ?? 'mobile')
                         .toLowerCase();
 
                 if (_studentFilter == 'Web') {
@@ -767,7 +767,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final studentName =
         '${studentData['firstName'] ?? ''} ${studentData['lastName'] ?? ''}'
             .trim();
-    final platform = (studentData['platform']?.toString() ?? 'mobile')
+    final platform = (studentData['courseGroup']?.toString() ?? 'mobile')
         .toLowerCase();
     final platformIcon =
         platform.contains('web') || platform.contains('browser')
