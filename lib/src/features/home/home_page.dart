@@ -280,12 +280,26 @@ class _HomePageState extends State<HomePage> {
                     });
                   },
                 ),
+                _buildActionContainer(
+                  icon: Icons.task,
+                  label: "Tasks",
+                  color: Colors.purple,
+                  onTap: () {
+                    setState(() {
+                      _selectedAction = "Tasks";
+                      _studentStream = UserService.instance.watchStudentsWithPendingTasks();
+                      _selectedAttendanceStatus = null;
+                    });
+                  },
+                ),
               ],
             ),
           ),
           const SizedBox(height: 20),
           if (_selectedAction == "Calendar")
             _buildCalendarTab()
+          else if (_selectedAction == "Tasks")
+            _buildTasksTab()
           else
             _buildStudentsList(),
         ],
@@ -419,6 +433,53 @@ class _HomePageState extends State<HomePage> {
                   ),
                 );
               },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildTasksTab() {
+    if (_studentStream == null) return const SizedBox();
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: _studentStream,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+        if (snap.hasError) return Center(child: Text("Error: ${snap.error}"));
+
+        final docs = snap.data?.docs ?? [];
+        if (docs.isEmpty) return const Text("No tasks found");
+
+        return ListView.separated(
+          padding: const EdgeInsets.all(16),
+          itemCount: docs.length,
+          separatorBuilder: (_, __) => const Divider(),
+          itemBuilder: (context, index) {
+            final data = docs[index].data();
+            final studentName = "${data['firstName'] ?? ''} ${data['lastName'] ?? ''}".trim();
+            final tasks = List<Map<String, dynamic>>.from(data['tasks'] ?? []);
+
+            if (tasks.isEmpty) return const SizedBox();
+
+            return ExpansionTile(
+              title: Text(studentName, style: const TextStyle(fontWeight: FontWeight.bold)),
+              children: tasks.map((task) {
+                final isCompleted = task['completed'] ?? false;
+                final dueDate = (task['dueDate'] as Timestamp?)?.toDate();
+                final overdue = dueDate != null && dueDate.isBefore(DateTime.now()) && !isCompleted;
+                return ListTile(
+                  leading: Checkbox(
+                    value: isCompleted,
+                    onChanged: (val) {
+                      // Optionally implement task completion toggle
+                    },
+                  ),
+                  title: Text(task['title'] ?? 'Untitled'),
+                  subtitle: dueDate != null ? Text("Due: ${dueDate.day}/${dueDate.month}/${dueDate.year}") : null,
+                  trailing: overdue ? const Icon(Icons.error, color: Colors.red) : null,
+                );
+              }).toList(),
             );
           },
         );
