@@ -712,10 +712,12 @@ class _DayMapModalState extends State<DayMapModal> {
             title: 'Clock In',
             snippet: [
               if (inAt != null) DateFormat.jm().format(inAt!),
-              if (inAddress != null) inAddress!
+              if (inAddress != null) inAddress!,
             ].join("\n"),
           ),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueGreen,
+          ),
         ),
       );
     }
@@ -728,7 +730,7 @@ class _DayMapModalState extends State<DayMapModal> {
             title: 'Clock Out',
             snippet: [
               if (outAt != null) DateFormat.jm().format(outAt!),
-              if (outAddress != null) outAddress!
+              if (outAddress != null) outAddress!,
             ].join("\n"),
           ),
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
@@ -784,9 +786,11 @@ class _DayMapModalState extends State<DayMapModal> {
                       color: Colors.green,
                     ),
                   ),
-                  Text(inAt != null
-                      ? "Time: ${DateFormat.jm().format(inAt!)}"
-                      : "Time: Unknown"),
+                  Text(
+                    inAt != null
+                        ? "Time: ${DateFormat.jm().format(inAt!)}"
+                        : "Time: Unknown",
+                  ),
                   Text("Location: ${inAddress ?? "Fetching..."}"),
                   const SizedBox(height: 8),
                 ],
@@ -798,9 +802,11 @@ class _DayMapModalState extends State<DayMapModal> {
                       color: Colors.red,
                     ),
                   ),
-                  Text(outAt != null
-                      ? "Time: ${DateFormat.jm().format(outAt!)}"
-                      : "Time: Unknown"),
+                  Text(
+                    outAt != null
+                        ? "Time: ${DateFormat.jm().format(outAt!)}"
+                        : "Time: Unknown",
+                  ),
                   Text("Location: ${outAddress ?? "Fetching..."}"),
                 ],
               ],
