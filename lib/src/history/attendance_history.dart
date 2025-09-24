@@ -597,7 +597,6 @@ class _Legend extends StatelessWidget {
 
 // ------------------ Map Modal ------------------
 
-/// -------------------- updated Map Modal --------------------
 
 void _openMapModal(BuildContext context,
     {required String uid, required String dayId}) {
