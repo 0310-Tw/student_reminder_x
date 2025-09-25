@@ -15,6 +15,7 @@ import 'package:students_reminder/src/services/notification_service.dart';
 import 'package:students_reminder/src/admin/pages/admin_profileview_page.dart';
 import 'package:students_reminder/src/admin/pages/admin_public_feeds.dart';
 import 'package:students_reminder/src/admin/pages/attendance_admin_page.dart';
+import 'package:students_reminder/src/timetable/timetable.dart';
 import 'package:students_reminder/src/timetable/timetable_display.dart';
 
 class MainLayoutPage extends StatefulWidget {
@@ -125,14 +126,9 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
       _pages = [
         const HomePage(),
         const MyNotesPage(),
-        TimetableDisplayScreen(
-          timetable: {}, // pass your timetable data here
-          days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
-          times: ["9:00", "10:00", "11:00", "12:00"],
-        ),
+        TimetableGeneratorScreen(),
         PublicFeeds(),
         AttendanceHistory14d(),
-        const ProfilePage(),
       ];
 
     // Reset index if switching between admin/student mode or if current index is out of bounds
@@ -153,11 +149,10 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
     } else {
       return [
         Icon(Icons.home, size: 30, color: Colors.white),
-        Icon(Icons.event_note, size: 30, color: Colors.white),
+        Icon(Icons.book_online, size: 30, color: Colors.white),
         Icon(Icons.calendar_month, size: 30, color: Colors.white), // timetable
         Icon(Icons.public, size: 30, color: Colors.white),
         Icon(Icons.history, size: 30, color: Colors.white),
-        Icon(Icons.person_outline, size: 30, color: Colors.white),
       ];
     }
   }

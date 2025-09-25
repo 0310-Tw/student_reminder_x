@@ -22,11 +22,36 @@ class AttendanceHistory14d extends StatefulWidget {
 
 class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
   bool _showCalendar = false;
+  bool _isClockedIn = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTodayClockStatus();
+  }
+
+  Future<void> _loadTodayClockStatus() async {
+    final currentUser = AuthService.instance.currentUser;
+    if (currentUser == null) return;
+
+    final uid = currentUser.uid;
+    final todayDoc = await FirebaseFirestore.instance
+        .collection('attendance')
+        .doc(uid)
+        .collection('days')
+        .doc(JmTime.dateId(DateTime.now()))
+        .get();
+
+    if (!mounted) return;
+
+    setState(() {
+      _isClockedIn = todayDoc.exists && todayDoc.data()?['inAt'] != null && todayDoc.data()?['outAt'] == null;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final currentUser = AuthService.instance.currentUser;
-    print('AttendanceHistory - Current user: ${currentUser?.uid}');
 
     if (currentUser == null) {
       return const Scaffold(
@@ -38,12 +63,10 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
     final now = JmTime.nowLocal();
     final end = DateTime(now.year, now.month, now.day);
 
-    print('AttendanceHistory - Building for uid: $uid, end date: $end');
-
     return Scaffold(
-      backgroundColor: Color(0xFFF7F9FC),
+      backgroundColor: const Color(0xFFF7F9FC),
       appBar: AppBar(
-        backgroundColor: Color(0xFF2C3E50),
+        backgroundColor: const Color(0xFF2C3E50),
         foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
         title: const Text('Attendance • Last 14 days'),
@@ -58,60 +81,56 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
       body: SuspensionCheck(
         child: Column(
           children: [
-            // Clock In / Clock Out buttons
+            // Single dynamic Clock In / Clock Out button
             Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => _clockIn(uid),
-                      icon: const Icon(Icons.login),
-                      label: const Text("Clock In"),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xFF3498DB),
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size(double.infinity, 48),
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
+              padding: const EdgeInsets.all(8),
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  if (_isClockedIn) {
+                    await _clockOut(uid);
+                  } else {
+                    await _clockIn(uid);
+                  }
+                  await _loadTodayClockStatus();
+                },
+                icon: Icon(
+                  _isClockedIn ? Icons.logout : Icons.login,
+                  size: 16,
+                ),
+                label: Text(
+                  _isClockedIn ? "Clock Out" : "Clock In",
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => _clockOut(uid),
-                      icon: const Icon(Icons.logout),
-                      label: const Text("Clock Out"),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xFFE74C3C),
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size(double.infinity, 48),
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _isClockedIn
+                      ? const Color(0xFFE74C3C)
+                      : const Color(0xFF3498DB),
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(double.infinity, 48),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                ],
+                  elevation: 2,
+                ),
               ),
             ),
             Expanded(
               child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                 stream: AttendanceService.streamLast14Days(uid),
                 builder: (context, snap) {
-                  // Handle different connection states
                   if (snap.connectionState == ConnectionState.waiting) {
                     return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const CircularProgressIndicator(),
-                          const SizedBox(height: 16),
-                          const Text(
+                        children: const [
+                          CircularProgressIndicator(),
+                          SizedBox(height: 16),
+                          Text(
                             'Loading attendance data...',
                             style: TextStyle(fontSize: 16, color: Colors.grey),
                           ),
@@ -148,7 +167,6 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
                     );
                   }
 
-                  // Add error handling
                   if (snap.hasError) {
                     return Center(
                       child: Column(
@@ -160,9 +178,9 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
                             color: Colors.red[400],
                           ),
                           const SizedBox(height: 16),
-                          Text(
+                          const Text(
                             'Error loading attendance data',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
                             ),
@@ -170,10 +188,8 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
                           const SizedBox(height: 8),
                           Text(
                             'Error: ${snap.error}',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                            ),
+                            style:
+                                TextStyle(fontSize: 14, color: Colors.grey[600]),
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 16),
@@ -187,20 +203,16 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
                   }
 
                   final docs =
-                      snap.data?.docs ??
-                      <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                      snap.data?.docs ?? <QueryDocumentSnapshot<Map<String, dynamic>>>[];
                   final byDate = {
-                    for (final d in docs)
-                      (d.data()['dayId'] as String): d.data(),
+                    for (final d in docs) (d.data()['dayId'] as String): d.data(),
                   };
 
                   final items = <_DayItem>[];
                   for (int i = 13; i >= 0; i--) {
                     final day = end.subtract(Duration(days: i));
                     final id = JmTime.dateId(day);
-                    items.add(
-                      _DayItem(date: day, dateId: id, data: byDate[id]),
-                    );
+                    items.add(_DayItem(date: day, dateId: id, data: byDate[id]));
                   }
 
                   return _showCalendar

@@ -1,10 +1,14 @@
-import 'package:flutter/material.dart';
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:students_reminder/src/widgets/suspension_check.dart';
-import 'package:table_calendar/table_calendar.dart';
+import 'package:flutter/material.dart';
+import 'package:students_reminder/src/features/profile/profile_page.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/user_service.dart';
+import 'package:students_reminder/src/widgets/suspension_check.dart';
+import 'package:table_calendar/table_calendar.dart';
+import 'package:students_reminder/src/shared/routes.dart';
+import 'package:students_reminder/src/features/profile/student_profile_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -31,6 +35,8 @@ class _HomePageState extends State<HomePage> {
   int _totalPresent = 0;
   int _totalLate = 0;
   int _totalAbsent = 0;
+
+  DateTime? _selectedDate;
 
   @override
   void initState() {
@@ -134,6 +140,17 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  Future<void> toggleTaskCompletion(String uid, Map<String, dynamic> task) async {
+    final ref = FirebaseFirestore.instance.collection('users').doc(uid);
+    final updatedTask = {...task, 'completed': !(task['completed'] ?? false)};
+    await ref.update({
+      'tasks': FieldValue.arrayRemove([task]),
+    });
+    await ref.update({
+      'tasks': FieldValue.arrayUnion([updatedTask]),
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -142,6 +159,14 @@ class _HomePageState extends State<HomePage> {
         appBar: AppBar(
           title: const Text("Dashboard"),
           centerTitle: true,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.person),
+              onPressed: () {
+                Navigator.pushReplacementNamed(context, AppRoutes.profile);
+              },
+            ),
+          ],
           bottom: const TabBar(
             tabs: [
               Tab(text: "Students"),
@@ -165,8 +190,8 @@ class _HomePageState extends State<HomePage> {
                         setState(() {
                           _selectedAttendanceStatus =
                               _selectedAttendanceStatus == 'present'
-                              ? null
-                              : 'present';
+                                  ? null
+                                  : 'present';
                         });
                       },
                     ),
@@ -178,8 +203,8 @@ class _HomePageState extends State<HomePage> {
                         setState(() {
                           _selectedAttendanceStatus =
                               _selectedAttendanceStatus == 'late'
-                              ? null
-                              : 'late';
+                                  ? null
+                                  : 'late';
                         });
                       },
                     ),
@@ -191,8 +216,8 @@ class _HomePageState extends State<HomePage> {
                         setState(() {
                           _selectedAttendanceStatus =
                               _selectedAttendanceStatus == 'absent'
-                              ? null
-                              : 'absent';
+                                  ? null
+                                  : 'absent';
                         });
                       },
                     ),
@@ -247,7 +272,6 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
           ),
-          
         ),
       ),
     );
@@ -298,8 +322,8 @@ class _HomePageState extends State<HomePage> {
                     setState(() {
                       _selectedAction = "Mobile";
                       _selectedAttendanceStatus = null;
-                      _studentStream = UserService.instance
-                          .watchUserByCourseGroup('mobile');
+                      _studentStream =
+                          UserService.instance.watchUserByCourseGroup('mobile');
                     });
                   },
                 ),
@@ -311,8 +335,8 @@ class _HomePageState extends State<HomePage> {
                     setState(() {
                       _selectedAction = "Web";
                       _selectedAttendanceStatus = null;
-                      _studentStream = UserService.instance
-                          .watchUserByCourseGroup('web');
+                      _studentStream =
+                          UserService.instance.watchUserByCourseGroup('web');
                     });
                   },
                 ),
@@ -323,8 +347,9 @@ class _HomePageState extends State<HomePage> {
                   onTap: () {
                     setState(() {
                       _selectedAction = "Calendar";
-                      _studentStream = UserService.instance
-                          .watchStudentsWithUpcomingEvents();
+                      _studentStream =
+                          UserService.instance.watchStudentsWithUpcomingEvents();
+                      _selectedDate = null;
                     });
                   },
                 ),
@@ -335,7 +360,8 @@ class _HomePageState extends State<HomePage> {
                   onTap: () {
                     setState(() {
                       _selectedAction = "Tasks";
-                      _studentStream = UserService.instance.watchStudentsWithPendingTasks();
+                      _studentStream =
+                          UserService.instance.watchStudentsWithPendingTasks();
                       _selectedAttendanceStatus = null;
                     });
                   },
@@ -393,36 +419,138 @@ class _HomePageState extends State<HomePage> {
               'studentName':
                   "${data['firstName'] ?? ''} ${data['lastName'] ?? ''}".trim(),
               'color': eventColor,
+              'attendanceStatus': status,
             });
           }
         }
 
-        return TableCalendar<Map<String, dynamic>>(
-          firstDay: DateTime.utc(2020, 1, 1),
-          lastDay: DateTime.utc(2030, 12, 31),
-          focusedDay: DateTime.now(),
-          eventLoader: (day) => events[day] ?? [],
-          calendarBuilders: CalendarBuilders<Map<String, dynamic>>(
-            markerBuilder: (context, date, dayEvents) {
-              if (dayEvents.isEmpty) return const SizedBox();
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: dayEvents
-                    .map<Widget>(
-                      (e) => Container(
-                        width: 6,
-                        height: 6,
-                        margin: const EdgeInsets.symmetric(horizontal: 1),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: e['color'],
-                        ),
-                      ),
-                    )
-                    .toList(),
-              );
-            },
-          ),
+        return Column(
+          children: [
+            TableCalendar<Map<String, dynamic>>(
+              firstDay: DateTime.utc(2020, 1, 1),
+              lastDay: DateTime.utc(2030, 12, 31),
+              focusedDay: _selectedDate ?? DateTime.now(),
+              selectedDayPredicate: (day) =>
+                  _selectedDate != null &&
+                  day.year == _selectedDate!.year &&
+                  day.month == _selectedDate!.month &&
+                  day.day == _selectedDate!.day,
+              onDaySelected: (selectedDay, focusedDay) {
+                setState(() {
+                  _selectedDate = selectedDay;
+                });
+                final dayEvents = events[selectedDay] ?? [];
+                showDialog(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    title: Text(
+                        "Attendance on ${selectedDay.day}/${selectedDay.month}/${selectedDay.year}"),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: dayEvents
+                          .map(
+                            (e) => ListTile(
+                              title: Text(e['studentName'] ?? ''),
+                              trailing: Text(
+                                (e['attendanceStatus'] ?? 'present')
+                                    .toString()
+                                    .toUpperCase(),
+                                style: TextStyle(
+                                  color: e['color'] ?? Colors.grey,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text("Close")),
+                    ],
+                  ),
+                );
+              },
+              eventLoader: (day) => events[day] ?? [],
+              calendarBuilders: CalendarBuilders<Map<String, dynamic>>(
+                markerBuilder: (context, date, dayEvents) {
+                  if (dayEvents.isEmpty) return const SizedBox();
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: dayEvents
+                        .map<Widget>(
+                          (e) => Container(
+                            width: 6,
+                            height: 6,
+                            margin: const EdgeInsets.symmetric(horizontal: 1),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: e['color'],
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildTasksTab() {
+    if (_studentStream == null) return const SizedBox();
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: _studentStream,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting)
+          return const Center(child: CircularProgressIndicator());
+        if (snap.hasError) return Center(child: Text("Error: ${snap.error}"));
+
+        final docs = snap.data?.docs ?? [];
+        if (docs.isEmpty) return const Text("No tasks found");
+
+        return ListView.separated(
+          padding: const EdgeInsets.all(16),
+          itemCount: docs.length,
+          separatorBuilder: (_, __) => const Divider(),
+          itemBuilder: (context, index) {
+            final data = docs[index].data();
+            final studentName =
+                "${data['firstName'] ?? ''} ${data['lastName'] ?? ''}".trim();
+            final tasks = List<Map<String, dynamic>>.from(data['tasks'] ?? []);
+
+            if (tasks.isEmpty) return const SizedBox();
+
+            return ExpansionTile(
+              title: Text(studentName,
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
+              children: tasks.map((task) {
+                final isCompleted = task['completed'] ?? false;
+                final dueDate = (task['dueDate'] as Timestamp?)?.toDate();
+                final overdue =
+                    dueDate != null && dueDate.isBefore(DateTime.now()) && !isCompleted;
+                return ListTile(
+                  leading: Checkbox(
+                    value: isCompleted,
+                    onChanged: (_) {
+                      toggleTaskCompletion(data['uid'] ?? '', task);
+                    },
+                  ),
+                  title: Text(task['title'] ?? 'Untitled'),
+                  subtitle: dueDate != null
+                      ? Text(
+                          "Due: ${dueDate.day}/${dueDate.month}/${dueDate.year}")
+                      : null,
+                  trailing:
+                      overdue ? const Icon(Icons.error, color: Colors.red) : null,
+                );
+              }).toList(),
+            );
+          },
         );
       },
     );
@@ -458,32 +586,16 @@ class _HomePageState extends State<HomePage> {
           separatorBuilder: (_, __) => const Divider(height: 1),
           itemBuilder: (_, i) {
             final data = docs[i].data();
-            final name = "${data['firstName'] ?? ''} ${data['lastName'] ?? ''}"
-                .trim();
+            final name =
+                "${data['firstName'] ?? ''} ${data['lastName'] ?? ''}".trim();
             return ListTile(
               title: Text(name),
               onTap: () {
-                showDialog(
-                  context: context,
-                  builder: (_) => AlertDialog(
-                    title: Text(name),
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text("Present: ${data['presentCount'] ?? 0}"),
-                        Text("Late: ${data['lateCount'] ?? 0}"),
-                        Text("Absent: ${data['absentCount'] ?? 0}"),
-                        Text("Location: ${data['location'] ?? 'Unknown'}"),
-                      ],
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text("Close"),
-                      ),
-                    ],
-                  ),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) =>
+                          StudentProfilePage(uid: data['uid'] ?? '')),
                 );
               },
             );
@@ -493,57 +605,8 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildTasksTab() {
-    if (_studentStream == null) return const SizedBox();
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: _studentStream,
-      builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-        if (snap.hasError) return Center(child: Text("Error: ${snap.error}"));
-
-        final docs = snap.data?.docs ?? [];
-        if (docs.isEmpty) return const Text("No tasks found");
-
-        return ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: docs.length,
-          separatorBuilder: (_, __) => const Divider(),
-          itemBuilder: (context, index) {
-            final data = docs[index].data();
-            final studentName = "${data['firstName'] ?? ''} ${data['lastName'] ?? ''}".trim();
-            final tasks = List<Map<String, dynamic>>.from(data['tasks'] ?? []);
-
-            if (tasks.isEmpty) return const SizedBox();
-
-            return ExpansionTile(
-              title: Text(studentName, style: const TextStyle(fontWeight: FontWeight.bold)),
-              children: tasks.map((task) {
-                final isCompleted = task['completed'] ?? false;
-                final dueDate = (task['dueDate'] as Timestamp?)?.toDate();
-                final overdue = dueDate != null && dueDate.isBefore(DateTime.now()) && !isCompleted;
-                return ListTile(
-                  leading: Checkbox(
-                    value: isCompleted,
-                    onChanged: (val) {
-                      // Optionally implement task completion toggle
-                    },
-                  ),
-                  title: Text(task['title'] ?? 'Untitled'),
-                  subtitle: dueDate != null ? Text("Due: ${dueDate.day}/${dueDate.month}/${dueDate.year}") : null,
-                  trailing: overdue ? const Icon(Icons.error, color: Colors.red) : null,
-                );
-              }).toList(),
-            );
-          },
-        );
-      },
-    );
-  }
-
   Widget _buildDocumentsTab() {
-    final docStream = FirebaseFirestore.instance
-        .collection('documents')
-        .snapshots();
+    final docStream = FirebaseFirestore.instance.collection('documents').snapshots();
     String selectedFilter = 'All';
 
     return StatefulBuilder(
@@ -574,31 +637,19 @@ class _HomePageState extends State<HomePage> {
           children: [
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
-                children: filterColors.keys.map((type) {
-                  final isSelected = selectedFilter == type;
-                  final color = filterColors[type]!;
-                  return GestureDetector(
-                    onTap: () => setState(() => selectedFilter = type),
-                    child: Container(
-                      margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSelected ? color : color.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: color, width: 1.5),
-                      ),
-                      child: Text(
-                        type,
-                        style: TextStyle(
-                          color: isSelected ? Colors.white : color,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                children: filterColors.entries.map((e) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                    child: ChoiceChip(
+                      label: Text(e.key),
+                      selectedColor: e.value,
+                      selected: selectedFilter == e.key,
+                      onSelected: (selected) {
+                        setState(() {
+                          selectedFilter = e.key;
+                        });
+                      },
                     ),
                   );
                 }).toList(),
@@ -607,56 +658,33 @@ class _HomePageState extends State<HomePage> {
             Expanded(
               child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                 stream: docStream,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
+                builder: (context, snap) {
+                  if (snap.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  if (snapshot.hasError)
-                    return Center(child: Text('Error: ${snapshot.error}'));
-
-                  List docs = snapshot.data?.docs ?? [];
-
-                  if (selectedFilter != 'All') {
-                    docs = docs.where((d) {
-                      final type = (d.data()['type'] ?? 'general')
-                          .toString()
-                          .toLowerCase();
-                      return type == selectedFilter.toLowerCase();
-                    }).toList();
-                  }
-
-                  if (docs.isEmpty) {
-                    return const Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Text("No documents found"),
-                    );
-                  }
+                  if (snap.hasError) return Center(child: Text("Error: ${snap.error}"));
+                  final docs = snap.data?.docs ?? [];
+                  final filteredDocs = selectedFilter == 'All'
+                      ? docs
+                      : docs
+                          .where((d) =>
+                              (d.data()['type'] ?? '').toString().toLowerCase() ==
+                              selectedFilter.toLowerCase())
+                          .toList();
+                  if (filteredDocs.isEmpty) return const Text("No documents found");
 
                   return ListView.separated(
                     padding: const EdgeInsets.all(16),
-                    itemCount: docs.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemCount: filteredDocs.length,
+                    separatorBuilder: (_, __) => const Divider(),
                     itemBuilder: (context, index) {
-                      final data = docs[index].data();
-                      final title = data['title'] ?? 'Untitled';
-                      final uploadedBy = data['uploadedBy'] ?? 'Unknown';
-                      final timestamp = data['date'] as Timestamp?;
-                      final date = timestamp != null
-                          ? "${timestamp.toDate().day}/${timestamp.toDate().month}/${timestamp.toDate().year}"
-                          : 'Unknown date';
-                      final type = data['type'] ?? 'general';
-                      final badgeColor = getBadgeColor(type);
-
+                      final data = filteredDocs[index].data();
+                      final type = data['type'] ?? 'General';
+                      final color = getBadgeColor(type);
                       return ListTile(
-                        leading: CircleAvatar(
-                          radius: 10,
-                          backgroundColor: badgeColor,
-                        ),
-                        title: Text(
-                          title,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Text("Uploaded by: $uploadedBy\nDate: $date"),
+                        title: Text(data['title'] ?? 'Untitled'),
+                        subtitle: Text(type),
+                        trailing: Icon(Icons.description, color: color),
                       );
                     },
                   );
@@ -673,60 +701,33 @@ class _HomePageState extends State<HomePage> {
     required IconData icon,
     required String label,
     required Color color,
-    required VoidCallback onTap,
+    VoidCallback? onTap,
   }) {
-    final bool isSelected = _selectedAction == label;
-    final count = _counts[label] ?? 0;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 100,
-        height: 130,
-        margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(60),
-          border: Border.all(
-            color: isSelected ? color : Colors.transparent,
-            width: 2,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
           ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 40, color: color),
-            const SizedBox(height: 8),
-            Flexible(
-              child: Text(
+          child: Column(
+            children: [
+              Icon(icon, color: color),
+              const SizedBox(height: 4),
+              Text(
                 label,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: color,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: color, fontWeight: FontWeight.bold),
               ),
-            ),
-            if (count > 0)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: CircleAvatar(
-                  radius: 12,
-                  backgroundColor: Colors.red,
-                  child: Text(
-                    count.toString(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
+              Text(
+                (_counts[label] ?? 0).toString(),
+                style: TextStyle(color: color),
               ),
-          ],
+            ],
+          ),
         ),
       ),
     );
