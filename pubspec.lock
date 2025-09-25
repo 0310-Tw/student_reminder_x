@@ -600,14 +600,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.5.4"
-  image_gallery_saver:
+  image_gallery_saver2_fixed:
     dependency: "direct main"
     description:
-      name: image_gallery_saver
-      sha256: "0aba74216a4d9b0561510cb968015d56b701ba1bd94aace26aacdd8ae5761816"
+      name: image_gallery_saver2_fixed
+      sha256: dd81246250d8cac5eb11ed7362b676feae6694ea3de31329bc4b471587d1ae38
       url: "https://pub.dev"
     source: hosted
-    version: "2.0.3"
+    version: "2.0.9"
   image_picker:
     dependency: "direct main"
     description:

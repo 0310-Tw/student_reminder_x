@@ -2,9 +2,8 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:image_gallery_saver2_fixed/image_gallery_saver2_fixed.dart';
 import 'package:screenshot/screenshot.dart';
-
 
 class TimetableDisplayScreen extends StatefulWidget {
   final Map<String, Map<String, String>> timetable;
@@ -58,7 +57,8 @@ class _TimetableDisplayScreenState extends State<TimetableDisplayScreen> {
         builder: (ctx) => AlertDialog(
           title: const Text("Permission Denied"),
           content: const Text(
-              "Photo/storage permission is required to save the timetable. Please enable it in app settings."),
+            "Photo/storage permission is required to save the timetable. Please enable it in app settings.",
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
@@ -102,9 +102,7 @@ class _TimetableDisplayScreenState extends State<TimetableDisplayScreen> {
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to download timetable.'),
-            ),
+            SnackBar(content: Text('Failed to download timetable.')),
           );
         }
       } catch (e) {
@@ -139,7 +137,10 @@ class _TimetableDisplayScreenState extends State<TimetableDisplayScreen> {
                   color: Colors.deepPurple.shade100,
                   child: Text(
                     day,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -155,13 +156,17 @@ class _TimetableDisplayScreenState extends State<TimetableDisplayScreen> {
                   color: Colors.grey.shade200,
                   child: Text(
                     time,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
                   ),
                 ),
                 ...widget.days.map((day) {
                   String? subject = widget.timetable[day]?[time];
-                  Color bgColor =
-                      subject != null ? getSubjectColor(subject) : Colors.white;
+                  Color bgColor = subject != null
+                      ? getSubjectColor(subject)
+                      : Colors.white;
                   return Container(
                     padding: const EdgeInsets.all(8),
                     alignment: Alignment.center,
@@ -170,8 +175,9 @@ class _TimetableDisplayScreenState extends State<TimetableDisplayScreen> {
                       subject ?? "-",
                       style: TextStyle(
                         fontSize: 14,
-                        fontWeight:
-                            subject != null ? FontWeight.w600 : FontWeight.normal,
+                        fontWeight: subject != null
+                            ? FontWeight.w600
+                            : FontWeight.normal,
                       ),
                     ),
                   );
