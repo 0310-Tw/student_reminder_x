@@ -551,6 +551,7 @@ class AttendanceService {
         .orderBy('dayId')
         .snapshots();
   }
+  
 
   /// Send notification to user for admin actions on their attendance
   static Future<void> _sendAdminActionNotification({
