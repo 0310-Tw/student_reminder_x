@@ -26,6 +26,8 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
   @override
   Widget build(BuildContext context) {
     final currentUser = AuthService.instance.currentUser;
+    print('AttendanceHistory - Current user: ${currentUser?.uid}');
+
     if (currentUser == null) {
       return const Scaffold(
         body: Center(child: Text('Please log in to view attendance')),
@@ -35,6 +37,8 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
     final uid = currentUser.uid;
     final now = JmTime.nowLocal();
     final end = DateTime(now.year, now.month, now.day);
+
+    print('AttendanceHistory - Building for uid: $uid, end date: $end');
 
     return Scaffold(
       backgroundColor: Color(0xFFF7F9FC),
@@ -99,9 +103,89 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
               child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                 stream: AttendanceService.streamLast14Days(uid),
                 builder: (context, snap) {
+                  // Handle different connection states
                   if (snap.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const CircularProgressIndicator(),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Loading attendance data...',
+                            style: TextStyle(fontSize: 16, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    );
                   }
+
+                  if (snap.connectionState == ConnectionState.none) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.wifi_off,
+                            size: 64,
+                            color: Colors.grey[400],
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'No connection',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Please check your internet connection',
+                            style: TextStyle(fontSize: 14, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  // Add error handling
+                  if (snap.hasError) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            size: 64,
+                            color: Colors.red[400],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Error loading attendance data',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Error: ${snap.error}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: () => setState(() {}),
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
                   final docs =
                       snap.data?.docs ??
                       <QueryDocumentSnapshot<Map<String, dynamic>>>[];
