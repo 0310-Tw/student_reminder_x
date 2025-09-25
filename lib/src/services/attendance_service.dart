@@ -4,7 +4,7 @@ import 'package:geolocator/geolocator.dart';
 class AttendanceService {
   static final _firestore = FirebaseFirestore.instance;
 
-  /// ---------------- Stream last 14 days attendance ----------------
+  /// Stream last 14 days attendance
   static Stream<QuerySnapshot<Map<String, dynamic>>> streamLast14Days(String uid) {
     final now = DateTime.now();
     final start = now.subtract(const Duration(days: 14));
@@ -18,7 +18,7 @@ class AttendanceService {
         .snapshots();
   }
 
-  /// ---------------- Clock in ----------------
+  /// Clock in
   static Future<void> clockIn(String uid, Position pos, String placeName) async {
     final now = DateTime.now();
     final dayId = _dateId(now);
@@ -28,7 +28,6 @@ class AttendanceService {
       'inAt': Timestamp.fromDate(now),
       'inLoc': GeoPoint(pos.latitude, pos.longitude),
       'placeIn': placeName,
-      'status': 'early', // optionally compute based on time
     };
 
     await _firestore
@@ -39,7 +38,7 @@ class AttendanceService {
         .set(data, SetOptions(merge: true));
   }
 
-  /// ---------------- Clock out ----------------
+  /// Clock out
   static Future<void> clockOut(String uid, Position pos, String placeName) async {
     final now = DateTime.now();
     final dayId = _dateId(now);
@@ -58,25 +57,7 @@ class AttendanceService {
     }, SetOptions(merge: true));
   }
 
-  /// ---------------- Live location updates ----------------
-  static Future<void> updateLiveLocation(String uid, Position pos, String placeName) async {
-    final now = DateTime.now();
-    final dayId = _dateId(now);
-
-    await _firestore
-        .collection('attendance')
-        .doc(uid)
-        .collection('days')
-        .doc(dayId)
-        .set({
-      'liveLat': pos.latitude,
-      'liveLng': pos.longitude,
-      'livePlace': placeName,
-      'liveUpdated': Timestamp.now(),
-    }, SetOptions(merge: true));
-  }
-
-  /// ---------------- Helper: YYYYMMDD format ----------------
+  /// Helper: YYYYMMDD format
   static String _dateId(DateTime dt) {
     final y = dt.year.toString().padLeft(4, '0');
     final m = dt.month.toString().padLeft(2, '0');
