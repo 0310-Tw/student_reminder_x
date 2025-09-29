@@ -852,22 +852,21 @@ class _HomePageState extends State<HomePage> {
                 itemCount: filteredDocs.length,
                 separatorBuilder: (_, __) => const Divider(height: 1),
                 itemBuilder: (_, i) {
-                  final data = filteredDocs[i].data();
+                  final doc = filteredDocs[i];
+                  final data = doc.data();
+                  final uid = doc.id; // Use document ID as UID
                   final name =
                       "${data['firstName'] ?? ''} ${data['lastName'] ?? ''}"
                           .trim();
                   return ListTile(
                     title: Text(name),
                     onTap: () {
-                      final uid = data['uid'] as String?;
-                      if (uid != null && uid.isNotEmpty) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => StudentProfilePage(uid: uid),
-                          ),
-                        );
-                      }
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => StudentProfilePage(uid: uid),
+                        ),
+                      );
                     },
                   );
                 },
@@ -885,21 +884,20 @@ class _HomePageState extends State<HomePage> {
           itemCount: docs.length,
           separatorBuilder: (_, __) => const Divider(height: 1),
           itemBuilder: (_, i) {
-            final data = docs[i].data();
+            final doc = docs[i];
+            final data = doc.data();
+            final uid = doc.id; // Use document ID as UID
             final name = "${data['firstName'] ?? ''} ${data['lastName'] ?? ''}"
                 .trim();
             return ListTile(
               title: Text(name),
               onTap: () {
-                final uid = data['uid'] as String?;
-                if (uid != null && uid.isNotEmpty) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => StudentProfilePage(uid: uid),
-                    ),
-                  );
-                }
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => StudentProfilePage(uid: uid),
+                  ),
+                );
               },
             );
           },
