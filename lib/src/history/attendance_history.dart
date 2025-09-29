@@ -394,12 +394,8 @@ class _DayItem {
 
     // Check if user clocked in
     final clockedIn = data!['inAt'] != null;
-    final clockedOut = data!['outAt'] != null;
 
     if (!clockedIn) return 'absent';
-
-    // If clocked in but not out, it's in progress
-    if (clockedIn && !clockedOut) return 'in_progress';
 
     // Use the stored status from clock-in
     final storedStatus = rawStatus.toLowerCase();
@@ -407,8 +403,8 @@ class _DayItem {
     if (storedStatus.contains('present') || storedStatus.contains('early'))
       return 'present';
 
-    // Default to present if they have both clock in and out times
-    return clockedIn && clockedOut ? 'present' : 'absent';
+    // Default to present if they have clocked in
+    return clockedIn ? 'present' : 'absent';
   }
 
   String? get reason {
@@ -442,8 +438,6 @@ Color _statusColor(String status) {
       return Color(0xFF27AE60); // Sage Green
     case 'late':
       return Color(0xFFF39C12); // Warm Amber
-    case 'in_progress':
-      return Color(0xFF3498DB); // Sky Blue
     case 'absent':
     default:
       return Color(0xFFE74C3C); // Soft Red
@@ -502,9 +496,6 @@ Widget _statusChip(String status, [String? reason]) {
     case 'late':
       c = Colors.orange;
       break;
-    case 'in_progress':
-      c = Colors.blue;
-      break;
     case 'absent':
     default:
       c = Colors.red;
@@ -544,8 +535,6 @@ class _HistoryList extends StatelessWidget {
         return Colors.orange;
       case 'Absent':
         return Colors.red;
-      case 'In progress':
-        return Colors.blue;
       default:
         return Colors.grey;
     }
@@ -616,7 +605,6 @@ class _CalendarGrid extends StatelessWidget {
               _Legend(color: Color(0xFF27AE60), label: 'Present'),
               _Legend(color: Color(0xFFF39C12), label: 'Late'),
               _Legend(color: Color(0xFFE74C3C), label: 'Absent'),
-              _Legend(color: Color(0xFF3498DB), label: 'In Progress'),
             ],
           ),
           const SizedBox(height: 12),

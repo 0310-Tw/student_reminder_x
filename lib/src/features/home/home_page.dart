@@ -1,8 +1,7 @@
-import 'dart:io';
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:students_reminder/src/features/profile/profile_page.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/user_service.dart';
 import 'package:students_reminder/src/widgets/suspension_check.dart';
@@ -22,6 +21,9 @@ class _HomePageState extends State<HomePage> {
   String? _selectedAttendanceStatus;
   Stream<QuerySnapshot<Map<String, dynamic>>>? _studentStream;
   final uid = AuthService.instance.currentUser?.uid;
+
+  // Cache for student attendance status to avoid repeated queries
+  final Map<String, String> _studentAttendanceCache = {};
 
   final Map<String, int> _counts = {
     "Mobile": 0,
@@ -43,6 +45,18 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _setupLiveCounts();
     _listenAllStudents();
+    // Clear cache daily
+    _setupDailyCacheClear();
+  }
+
+  void _setupDailyCacheClear() {
+    // Clear attendance cache at midnight to ensure fresh data each day
+    Timer.periodic(const Duration(hours: 1), (timer) {
+      final now = DateTime.now();
+      if (now.hour == 0 && now.minute == 0) {
+        _studentAttendanceCache.clear();
+      }
+    });
   }
 
   void _setupLiveCounts() {
@@ -115,32 +129,137 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _listenAllStudents() {
-    UserService.instance.watchAllStudents().listen((snap) {
+    UserService.instance.watchAllStudents().listen((snap) async {
       int present = 0, late = 0, absent = 0;
+
+      // Get today's date in the format used by attendance system
+      final now = DateTime.now();
+      final todayId =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
       for (var doc in snap.docs) {
         final data = doc.data();
-        final status = data['attendanceStatus'] ?? 'present';
-        switch (status) {
-          case 'present':
-            present++;
-            break;
-          case 'late':
-            late++;
-            break;
-          case 'absent':
+        final uid = data['uid'] ?? doc.id;
+
+        try {
+          // Get today's attendance for this student
+          final attendanceDoc = await FirebaseFirestore.instance
+              .collection('attendance')
+              .doc(uid)
+              .collection('days')
+              .doc(todayId)
+              .get();
+
+          if (attendanceDoc.exists) {
+            final attendanceData = attendanceDoc.data()!;
+            final clockedIn = attendanceData['inAt'] != null;
+
+            if (!clockedIn) {
+              // No clock-in means absent
+              absent++;
+            } else {
+              // Use the stored status from clock-in
+              final rawStatus = (attendanceData['status'] ?? 'present')
+                  .toString()
+                  .toLowerCase();
+              if (rawStatus.contains('late')) {
+                late++;
+              } else {
+                present++;
+              }
+            }
+          } else {
+            // No attendance record means absent
             absent++;
-            break;
+          }
+        } catch (e) {
+          // If there's an error, default to absent
+          absent++;
         }
       }
-      setState(() {
-        _totalPresent = present;
-        _totalLate = late;
-        _totalAbsent = absent;
-      });
+
+      if (mounted) {
+        setState(() {
+          _totalPresent = present;
+          _totalLate = late;
+          _totalAbsent = absent;
+        });
+      }
     });
   }
 
-  Future<void> toggleTaskCompletion(String uid, Map<String, dynamic> task) async {
+  Future<String> _getStudentAttendanceStatus(String studentUid) async {
+    // Check cache first
+    if (_studentAttendanceCache.containsKey(studentUid)) {
+      return _studentAttendanceCache[studentUid]!;
+    }
+
+    try {
+      // Get today's date in the format used by attendance system
+      final now = DateTime.now();
+      final todayId =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+      // Get today's attendance for this student
+      final attendanceDoc = await FirebaseFirestore.instance
+          .collection('attendance')
+          .doc(studentUid)
+          .collection('days')
+          .doc(todayId)
+          .get();
+
+      String status = 'absent'; // Default to absent
+
+      if (attendanceDoc.exists) {
+        final attendanceData = attendanceDoc.data()!;
+        final clockedIn = attendanceData['inAt'] != null;
+
+        if (clockedIn) {
+          // Use the stored status from clock-in
+          final rawStatus = (attendanceData['status'] ?? 'present')
+              .toString()
+              .toLowerCase();
+          if (rawStatus.contains('late')) {
+            status = 'late';
+          } else {
+            status = 'present';
+          }
+        }
+      }
+
+      // Cache the result
+      _studentAttendanceCache[studentUid] = status;
+      return status;
+    } catch (e) {
+      // If there's an error, default to absent
+      _studentAttendanceCache[studentUid] = 'absent';
+      return 'absent';
+    }
+  }
+
+  Future<List> _filterStudentsByAttendance(
+    List docs,
+    String targetStatus,
+  ) async {
+    final filteredDocs = <dynamic>[];
+
+    for (var doc in docs) {
+      final data = doc.data();
+      final studentUid = data['uid'] ?? doc.id;
+      final status = await _getStudentAttendanceStatus(studentUid);
+
+      if (status == targetStatus) {
+        filteredDocs.add(doc);
+      }
+    }
+
+    return filteredDocs;
+  }
+
+  Future<void> toggleTaskCompletion(
+    String uid,
+    Map<String, dynamic> task,
+  ) async {
     final ref = FirebaseFirestore.instance.collection('users').doc(uid);
     final updatedTask = {...task, 'completed': !(task['completed'] ?? false)};
     await ref.update({
@@ -190,8 +309,8 @@ class _HomePageState extends State<HomePage> {
                         setState(() {
                           _selectedAttendanceStatus =
                               _selectedAttendanceStatus == 'present'
-                                  ? null
-                                  : 'present';
+                              ? null
+                              : 'present';
                         });
                       },
                     ),
@@ -203,8 +322,8 @@ class _HomePageState extends State<HomePage> {
                         setState(() {
                           _selectedAttendanceStatus =
                               _selectedAttendanceStatus == 'late'
-                                  ? null
-                                  : 'late';
+                              ? null
+                              : 'late';
                         });
                       },
                     ),
@@ -216,8 +335,8 @@ class _HomePageState extends State<HomePage> {
                         setState(() {
                           _selectedAttendanceStatus =
                               _selectedAttendanceStatus == 'absent'
-                                  ? null
-                                  : 'absent';
+                              ? null
+                              : 'absent';
                         });
                       },
                     ),
@@ -322,8 +441,8 @@ class _HomePageState extends State<HomePage> {
                     setState(() {
                       _selectedAction = "Mobile";
                       _selectedAttendanceStatus = null;
-                      _studentStream =
-                          UserService.instance.watchUserByCourseGroup('mobile');
+                      _studentStream = UserService.instance
+                          .watchUserByCourseGroup('mobile');
                     });
                   },
                 ),
@@ -335,8 +454,8 @@ class _HomePageState extends State<HomePage> {
                     setState(() {
                       _selectedAction = "Web";
                       _selectedAttendanceStatus = null;
-                      _studentStream =
-                          UserService.instance.watchUserByCourseGroup('web');
+                      _studentStream = UserService.instance
+                          .watchUserByCourseGroup('web');
                     });
                   },
                 ),
@@ -347,8 +466,8 @@ class _HomePageState extends State<HomePage> {
                   onTap: () {
                     setState(() {
                       _selectedAction = "Calendar";
-                      _studentStream =
-                          UserService.instance.watchStudentsWithUpcomingEvents();
+                      _studentStream = UserService.instance
+                          .watchStudentsWithUpcomingEvents();
                       _selectedDate = null;
                     });
                   },
@@ -360,8 +479,8 @@ class _HomePageState extends State<HomePage> {
                   onTap: () {
                     setState(() {
                       _selectedAction = "Tasks";
-                      _studentStream =
-                          UserService.instance.watchStudentsWithPendingTasks();
+                      _studentStream = UserService.instance
+                          .watchStudentsWithPendingTasks();
                       _selectedAttendanceStatus = null;
                     });
                   },
@@ -444,7 +563,8 @@ class _HomePageState extends State<HomePage> {
                   context: context,
                   builder: (_) => AlertDialog(
                     title: Text(
-                        "Attendance on ${selectedDay.day}/${selectedDay.month}/${selectedDay.year}"),
+                      "Attendance on ${selectedDay.day}/${selectedDay.month}/${selectedDay.year}",
+                    ),
                     content: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: dayEvents
@@ -466,8 +586,9 @@ class _HomePageState extends State<HomePage> {
                     ),
                     actions: [
                       TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text("Close")),
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text("Close"),
+                      ),
                     ],
                   ),
                 );
@@ -526,13 +647,17 @@ class _HomePageState extends State<HomePage> {
             if (tasks.isEmpty) return const SizedBox();
 
             return ExpansionTile(
-              title: Text(studentName,
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
+              title: Text(
+                studentName,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
               children: tasks.map((task) {
                 final isCompleted = task['completed'] ?? false;
                 final dueDate = (task['dueDate'] as Timestamp?)?.toDate();
                 final overdue =
-                    dueDate != null && dueDate.isBefore(DateTime.now()) && !isCompleted;
+                    dueDate != null &&
+                    dueDate.isBefore(DateTime.now()) &&
+                    !isCompleted;
                 return ListTile(
                   leading: Checkbox(
                     value: isCompleted,
@@ -543,10 +668,12 @@ class _HomePageState extends State<HomePage> {
                   title: Text(task['title'] ?? 'Untitled'),
                   subtitle: dueDate != null
                       ? Text(
-                          "Due: ${dueDate.day}/${dueDate.month}/${dueDate.year}")
+                          "Due: ${dueDate.day}/${dueDate.month}/${dueDate.year}",
+                        )
                       : null,
-                  trailing:
-                      overdue ? const Icon(Icons.error, color: Colors.red) : null,
+                  trailing: overdue
+                      ? const Icon(Icons.error, color: Colors.red)
+                      : null,
                 );
               }).toList(),
             );
@@ -568,15 +695,51 @@ class _HomePageState extends State<HomePage> {
 
         List docs = snap.data?.docs ?? [];
 
-        docs = docs.where((d) {
-          final data = d.data();
-          if (_selectedAttendanceStatus != null) {
-            return (data['attendanceStatus'] ?? 'present') ==
-                _selectedAttendanceStatus;
-          }
-          return true;
-        }).toList();
+        // If attendance status filter is selected, filter by actual attendance data
+        if (_selectedAttendanceStatus != null) {
+          return FutureBuilder<List>(
+            future: _filterStudentsByAttendance(
+              docs,
+              _selectedAttendanceStatus!,
+            ),
+            builder: (context, filteredSnapshot) {
+              if (filteredSnapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
+              final filteredDocs = filteredSnapshot.data ?? [];
+
+              if (filteredDocs.isEmpty) return const Text("No students found");
+
+              return ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: filteredDocs.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (_, i) {
+                  final data = filteredDocs[i].data();
+                  final name =
+                      "${data['firstName'] ?? ''} ${data['lastName'] ?? ''}"
+                          .trim();
+                  return ListTile(
+                    title: Text(name),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              StudentProfilePage(uid: data['uid'] ?? ''),
+                        ),
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          );
+        }
+
+        // No attendance filter, show all students
         if (docs.isEmpty) return const Text("No students found");
 
         return ListView.separated(
@@ -586,16 +749,16 @@ class _HomePageState extends State<HomePage> {
           separatorBuilder: (_, __) => const Divider(height: 1),
           itemBuilder: (_, i) {
             final data = docs[i].data();
-            final name =
-                "${data['firstName'] ?? ''} ${data['lastName'] ?? ''}".trim();
+            final name = "${data['firstName'] ?? ''} ${data['lastName'] ?? ''}"
+                .trim();
             return ListTile(
               title: Text(name),
               onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (_) =>
-                          StudentProfilePage(uid: data['uid'] ?? '')),
+                    builder: (_) => StudentProfilePage(uid: data['uid'] ?? ''),
+                  ),
                 );
               },
             );
@@ -606,7 +769,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildDocumentsTab() {
-    final docStream = FirebaseFirestore.instance.collection('documents').snapshots();
+    final docStream = FirebaseFirestore.instance
+        .collection('documents')
+        .snapshots();
     String selectedFilter = 'All';
 
     return StatefulBuilder(
@@ -640,7 +805,10 @@ class _HomePageState extends State<HomePage> {
               child: Row(
                 children: filterColors.entries.map((e) {
                   return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 8,
+                    ),
                     child: ChoiceChip(
                       label: Text(e.key),
                       selectedColor: e.value,
@@ -662,16 +830,22 @@ class _HomePageState extends State<HomePage> {
                   if (snap.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  if (snap.hasError) return Center(child: Text("Error: ${snap.error}"));
+                  if (snap.hasError)
+                    return Center(child: Text("Error: ${snap.error}"));
                   final docs = snap.data?.docs ?? [];
                   final filteredDocs = selectedFilter == 'All'
                       ? docs
                       : docs
-                          .where((d) =>
-                              (d.data()['type'] ?? '').toString().toLowerCase() ==
-                              selectedFilter.toLowerCase())
-                          .toList();
-                  if (filteredDocs.isEmpty) return const Text("No documents found");
+                            .where(
+                              (d) =>
+                                  (d.data()['type'] ?? '')
+                                      .toString()
+                                      .toLowerCase() ==
+                                  selectedFilter.toLowerCase(),
+                            )
+                            .toList();
+                  if (filteredDocs.isEmpty)
+                    return const Text("No documents found");
 
                   return ListView.separated(
                     padding: const EdgeInsets.all(16),
