@@ -854,13 +854,13 @@ class _DayMapModalState extends State<DayMapModal> {
     final center = _outLoc ?? _inLoc ?? const LatLng(18.0179, -76.8099);
 
     // Calculate initial zoom based on available locations
-    double initialZoom = 15.0;
+    double initialZoom = 12.0;
     if (_inLoc != null && _outLoc != null) {
       // If we have both locations, use a wider zoom to fit both
-      initialZoom = 14.0;
+      initialZoom = 11.0;
     } else if (_inLoc != null || _outLoc != null) {
-      // If we have one location, use a closer zoom
-      initialZoom = 16.0;
+      // If we have one location, use a medium zoom
+      initialZoom = 12.5;
     }
 
     return DraggableScrollableSheet(
@@ -939,18 +939,18 @@ class _DayMapModalState extends State<DayMapModal> {
                             'Bounds camera animation failed: $boundsError',
                           );
                           await controller.animateCamera(
-                            CameraUpdate.newLatLngZoom(_outLoc!, 15),
+                            CameraUpdate.newLatLngZoom(_outLoc!, 12),
                           );
                         }
                       } else if (_inLoc != null) {
                         // If only clock-in location, zoom to it
                         await controller.animateCamera(
-                          CameraUpdate.newLatLngZoom(_inLoc!, 16),
+                          CameraUpdate.newLatLngZoom(_inLoc!, 12.5),
                         );
                       } else if (_outLoc != null) {
                         // If only clock-out location, zoom to it
                         await controller.animateCamera(
-                          CameraUpdate.newLatLngZoom(_outLoc!, 16),
+                          CameraUpdate.newLatLngZoom(_outLoc!, 12.5),
                         );
                       }
                     } catch (e) {

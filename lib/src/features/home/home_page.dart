@@ -256,6 +256,174 @@ class _HomePageState extends State<HomePage> {
     return filteredDocs;
   }
 
+  Future<void> _showStudentAttendanceForDate(DateTime selectedDay) async {
+    try {
+      // Get the current user's uid
+      final currentUser = AuthService.instance.currentUser;
+      if (currentUser == null) return;
+
+      final studentUid = currentUser.uid;
+
+      // Format the date for attendance lookup
+      final dateId =
+          '${selectedDay.year}-${selectedDay.month.toString().padLeft(2, '0')}-${selectedDay.day.toString().padLeft(2, '0')}';
+
+      // Get attendance data for this date
+      final attendanceDoc = await FirebaseFirestore.instance
+          .collection('attendance')
+          .doc(studentUid)
+          .collection('days')
+          .doc(dateId)
+          .get();
+
+      String status = 'Absent';
+      String clockInTime = 'Not clocked in';
+      String clockOutTime = 'Not clocked out';
+      Color statusColor = Colors.red;
+
+      if (attendanceDoc.exists) {
+        final attendanceData = attendanceDoc.data()!;
+
+        // Get clock in time
+        if (attendanceData['inAt'] != null) {
+          final clockInTimestamp = attendanceData['inAt'] as Timestamp;
+          final clockInDateTime = clockInTimestamp.toDate();
+          clockInTime =
+              '${clockInDateTime.hour.toString().padLeft(2, '0')}:${clockInDateTime.minute.toString().padLeft(2, '0')}';
+
+          // Get status from stored data
+          final rawStatus = (attendanceData['status'] ?? 'present')
+              .toString()
+              .toLowerCase();
+          if (rawStatus.contains('late')) {
+            status = 'Late';
+            statusColor = Colors.orange;
+          } else {
+            status = 'Present';
+            statusColor = Colors.green;
+          }
+        }
+
+        // Get clock out time if exists
+        if (attendanceData['outAt'] != null) {
+          final clockOutTimestamp = attendanceData['outAt'] as Timestamp;
+          final clockOutDateTime = clockOutTimestamp.toDate();
+          clockOutTime =
+              '${clockOutDateTime.hour.toString().padLeft(2, '0')}:${clockOutDateTime.minute.toString().padLeft(2, '0')}';
+        }
+      }
+
+      // Show the attendance dialog
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(
+              'Attendance - ${selectedDay.day}/${selectedDay.month}/${selectedDay.year}',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      'Status: ',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    Text(
+                      status,
+                      style: TextStyle(
+                        color: statusColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const Icon(Icons.login, size: 16, color: Colors.green),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Clock In: ',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    Text(clockInTime),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.logout, size: 16, color: Colors.red),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Clock Out: ',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    Text(clockOutTime),
+                  ],
+                ),
+                if (status == 'Late') ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.warning, size: 16, color: Colors.orange),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Arrived after 10:00 AM',
+                            style: TextStyle(
+                              color: Colors.orange,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      // Handle error - show simple error dialog
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Error'),
+            content: const Text(
+              'Unable to load attendance data for this date.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> toggleTaskCompletion(
     String uid,
     Map<String, dynamic> task,
@@ -558,40 +726,7 @@ class _HomePageState extends State<HomePage> {
                 setState(() {
                   _selectedDate = selectedDay;
                 });
-                final dayEvents = events[selectedDay] ?? [];
-                showDialog(
-                  context: context,
-                  builder: (_) => AlertDialog(
-                    title: Text(
-                      "Attendance on ${selectedDay.day}/${selectedDay.month}/${selectedDay.year}",
-                    ),
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: dayEvents
-                          .map(
-                            (e) => ListTile(
-                              title: Text(e['studentName'] ?? ''),
-                              trailing: Text(
-                                (e['attendanceStatus'] ?? 'present')
-                                    .toString()
-                                    .toUpperCase(),
-                                style: TextStyle(
-                                  color: e['color'] ?? Colors.grey,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text("Close"),
-                      ),
-                    ],
-                  ),
-                );
+                _showStudentAttendanceForDate(selectedDay);
               },
               eventLoader: (day) => events[day] ?? [],
               calendarBuilders: CalendarBuilders<Map<String, dynamic>>(
