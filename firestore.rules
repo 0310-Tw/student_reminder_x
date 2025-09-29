@@ -94,6 +94,11 @@ service cloud.firestore {
                    request.resource.data.title == resource.data.title &&
                    request.resource.data.body == resource.data.body &&
                    request.resource.data.visibility == resource.data.visibility;
+      
+      // Reports subcollection - allow users to read/write their own reports
+      match /reports/{reporterId} {
+        allow read, write: if isAdmin() || isOwner(reporterId);
+      }
     }
 
     // Global rules for collection group queries (needed for admin dashboard)
@@ -111,7 +116,14 @@ service cloud.firestore {
 
     // Allow reading public notes via collection group queries
     match /{path=**}/notes/{noteId} {
-      allow read: if isAuthenticated() && resource.data.visibility == 'public';
+      allow read: if isAuthenticated() && 
+                     (resource.data.visibility == 'public' || 
+                      resource.data.authorId == request.auth.uid);
+    }
+    
+    // Allow reading reports via collection group queries for admins and report owners
+    match /{path=**}/reports/{reporterId} {
+      allow read: if isAdmin() || request.auth.uid == reporterId;
     }
 
     // Additional rules for admin dashboard data access

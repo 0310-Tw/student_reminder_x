@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:students_reminder/src/features/notes/dialogs/note_editor_dialog.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/note_service.dart';
-import 'package:students_reminder/src/services/notification_service.dart';
 import 'package:students_reminder/src/widgets/user_banner_notifications.dart';
 import 'package:students_reminder/src/widgets/suspension_check.dart';
 
