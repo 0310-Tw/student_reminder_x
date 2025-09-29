@@ -859,13 +859,15 @@ class _HomePageState extends State<HomePage> {
                   return ListTile(
                     title: Text(name),
                     onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              StudentProfilePage(uid: data['uid'] ?? ''),
-                        ),
-                      );
+                      final uid = data['uid'] as String?;
+                      if (uid != null && uid.isNotEmpty) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => StudentProfilePage(uid: uid),
+                          ),
+                        );
+                      }
                     },
                   );
                 },
@@ -889,12 +891,15 @@ class _HomePageState extends State<HomePage> {
             return ListTile(
               title: Text(name),
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => StudentProfilePage(uid: data['uid'] ?? ''),
-                  ),
-                );
+                final uid = data['uid'] as String?;
+                if (uid != null && uid.isNotEmpty) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => StudentProfilePage(uid: uid),
+                    ),
+                  );
+                }
               },
             );
           },

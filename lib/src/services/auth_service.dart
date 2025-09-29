@@ -53,18 +53,38 @@ class AuthService {
   //Logout CODE
   Future<void> logout() async {
     try {
+      print('🔃 Starting logout process...');
+
       // Clear session first to prevent race conditions
       await SessionManager.clear();
+      print('✅ Session cleared');
+
+      // Small delay to let any active listeners settle
+      await Future.delayed(Duration(milliseconds: 100));
+
       // Then sign out from Firebase
       await _auth.signOut();
+      print('✅ Firebase sign out completed');
     } catch (e) {
-      print('Error during logout: $e');
+      print('❌ Error during logout: $e');
+
+      // If it's a permission error during logout, just continue with sign out
+      if (e.toString().contains('permission-denied')) {
+        print(
+          '🔄 Permission denied during logout (expected), continuing with sign out...',
+        );
+      }
+
       // Ensure we still sign out even if session clearing fails
       try {
         await _auth.signOut();
+        print('✅ Firebase sign out completed (fallback)');
       } catch (signOutError) {
-        print('Error signing out: $signOutError');
-        rethrow;
+        print('❌ Error signing out: $signOutError');
+        // Don't rethrow permission errors during logout as they're expected
+        if (!signOutError.toString().contains('permission-denied')) {
+          rethrow;
+        }
       }
     }
   }

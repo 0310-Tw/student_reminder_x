@@ -26,6 +26,12 @@ class _UserBannerNotificationsState extends State<UserBannerNotifications> {
           .where('read', isEqualTo: false)
           .snapshots(),
       builder: (context, snapshot) {
+        // Handle errors (including permission denied during logout)
+        if (snapshot.hasError) {
+          print('UserBannerNotifications error: ${snapshot.error}');
+          return SizedBox.shrink();
+        }
+
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return SizedBox.shrink();
         }

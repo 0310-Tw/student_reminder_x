@@ -218,6 +218,16 @@ class PublicFeeds extends StatelessWidget {
             if (snap.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
+
+            // Handle errors (including permission denied during logout)
+            if (snap.hasError) {
+              print('PublicFeeds error: ${snap.error}');
+              if (snap.error.toString().contains('permission-denied')) {
+                return const Center(child: Text('Authentication required'));
+              }
+              return Center(child: Text('Error: ${snap.error}'));
+            }
+
             if (!snap.hasData) {
               return const Center(child: Text('Loading...'));
             }
@@ -268,6 +278,16 @@ class PublicFeeds extends StatelessWidget {
                             .snapshots(),
                         builder: (context, userSnapshot) {
                           bool isSuspended = false;
+                          if (userSnapshot.hasError) {
+                            // Handle permission errors during logout gracefully
+                            return IconButton(
+                              icon: Icon(
+                                Icons.favorite_border,
+                                color: Colors.grey,
+                              ),
+                              onPressed: null,
+                            );
+                          }
                           if (userSnapshot.hasData) {
                             final userData =
                                 userSnapshot.data!.data()
@@ -342,6 +362,13 @@ class PublicFeeds extends StatelessWidget {
                             .snapshots(),
                         builder: (context, userSnapshot) {
                           bool isSuspended = false;
+                          if (userSnapshot.hasError) {
+                            // Handle permission errors during logout gracefully
+                            return IconButton(
+                              icon: Icon(Icons.more_vert, color: Colors.grey),
+                              onPressed: null,
+                            );
+                          }
                           if (userSnapshot.hasData) {
                             final userData =
                                 userSnapshot.data!.data()
@@ -365,6 +392,13 @@ class PublicFeeds extends StatelessWidget {
                                         uid: uid,
                                       ),
                                   builder: (context, reportSnapshot) {
+                                    if (reportSnapshot.hasError) {
+                                      // Handle permission errors during logout gracefully
+                                      return IconButton(
+                                        icon: Icon(Icons.more_vert),
+                                        onPressed: null,
+                                      );
+                                    }
                                     final isReported =
                                         reportSnapshot.data ?? false;
 

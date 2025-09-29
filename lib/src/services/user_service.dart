@@ -11,6 +11,9 @@ class UserService {
   final _storage = FirebaseStorage.instance;
 
   Stream<DocumentSnapshot<Map<String, dynamic>>> getUser(String uid) {
+    if (uid.isEmpty) {
+      throw ArgumentError('User ID cannot be empty');
+    }
     return _db.collection('users').doc(uid).snapshots();
   }
 
@@ -46,7 +49,9 @@ class UserService {
   }
 
   // Students by course group
-  Stream<QuerySnapshot<Map<String, dynamic>>> watchUserByCourseGroup(String course) {
+  Stream<QuerySnapshot<Map<String, dynamic>>> watchUserByCourseGroup(
+    String course,
+  ) {
     return _db
         .collection('users')
         .where('courseGroup', isEqualTo: course)
@@ -71,7 +76,8 @@ class UserService {
   }
 
   // Students with unread announcements (server-side filtered)
-  Stream<QuerySnapshot<Map<String, dynamic>>> watchStudentsWithUnreadAnnouncements() {
+  Stream<QuerySnapshot<Map<String, dynamic>>>
+  watchStudentsWithUnreadAnnouncements() {
     return _db
         .collection('users')
         .where('hasUnreadAnnouncements', isEqualTo: true)
@@ -79,7 +85,8 @@ class UserService {
   }
 
   // Students with upcoming events (server-side filtered)
-  Stream<QuerySnapshot<Map<String, dynamic>>> watchStudentsWithUpcomingEvents() {
+  Stream<QuerySnapshot<Map<String, dynamic>>>
+  watchStudentsWithUpcomingEvents() {
     return _db
         .collection('users')
         .where('upcomingEventsCount', isGreaterThan: 0)
@@ -88,10 +95,7 @@ class UserService {
 
   // Stream of all students (for totals row)
   Stream<QuerySnapshot<Map<String, dynamic>>> watchAllStudents() {
-    return _db
-        .collection('users')
-        .orderBy('lastName')
-        .snapshots();
+    return _db.collection('users').orderBy('lastName').snapshots();
   }
 
   Future<void> updateMyProfile(

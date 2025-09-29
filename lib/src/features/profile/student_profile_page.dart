@@ -10,6 +10,13 @@ class StudentProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (uid.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: Text('Student Profile')),
+        body: Center(child: Text('Invalid user ID')),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: Text('Student Profile')),
       body: SuspensionCheck(
