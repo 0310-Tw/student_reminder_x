@@ -71,7 +71,10 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
     if (!mounted) return;
 
     setState(() {
-      _isClockedIn = todayDoc.exists && todayDoc.data()?['inAt'] != null && todayDoc.data()?['outAt'] == null;
+      _isClockedIn =
+          todayDoc.exists &&
+          todayDoc.data()?['inAt'] != null &&
+          todayDoc.data()?['outAt'] == null;
     });
   }
 
@@ -119,10 +122,7 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
                   }
                   await _loadTodayClockStatus();
                 },
-                icon: Icon(
-                  _isClockedIn ? Icons.logout : Icons.login,
-                  size: 16,
-                ),
+                icon: Icon(_isClockedIn ? Icons.logout : Icons.login, size: 16),
                 label: Text(
                   _isClockedIn ? "Clock Out" : "Clock In",
                   style: const TextStyle(
@@ -136,8 +136,10 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
                       : const Color(0xFF3498DB),
                   foregroundColor: Colors.white,
                   minimumSize: const Size(double.infinity, 48),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -214,8 +216,10 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
                           const SizedBox(height: 8),
                           Text(
                             'Error: ${snap.error}',
-                            style:
-                                TextStyle(fontSize: 14, color: Colors.grey[600]),
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 16),
@@ -229,16 +233,20 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
                   }
 
                   final docs =
-                      snap.data?.docs ?? <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                      snap.data?.docs ??
+                      <QueryDocumentSnapshot<Map<String, dynamic>>>[];
                   final byDate = {
-                    for (final d in docs) (d.data()['dayId'] as String): d.data(),
+                    for (final d in docs)
+                      (d.data()['dayId'] as String): d.data(),
                   };
 
                   final items = <_DayItem>[];
                   for (int i = 13; i >= 0; i--) {
                     final day = end.subtract(Duration(days: i));
                     final id = JmTime.dateId(day);
-                    items.add(_DayItem(date: day, dateId: id, data: byDate[id]));
+                    items.add(
+                      _DayItem(date: day, dateId: id, data: byDate[id]),
+                    );
                   }
 
                   return _showCalendar
@@ -269,8 +277,11 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
 
     String status;
     String? reason;
-    if (now.isAfter(eightAM) && now.isBefore(eightThirty)) {
-      status = "early";
+    if (now.isBefore(eightAM)) {
+      _showSnack("Too early to clock in. Please wait until 8:00 AM.");
+      return;
+    } else if (now.isAfter(eightAM) && now.isBefore(eightThirty)) {
+      status = "present"; // On time or early
     } else if (now.isAfter(eightThirty) &&
         now.isBefore(DateTime(now.year, now.month, now.day, 16))) {
       status = "late";
@@ -333,12 +344,17 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
       return;
     }
 
+    final existingData = snapshot.data();
+    final currentStatus = existingData?['status'] ?? 'present';
+
+    // Maintain the original status (present/late) when clocking out
     await dayDoc.set({
       'outAt': Timestamp.fromDate(now),
       'outLoc': GeoPoint(location.latitude, location.longitude),
+      'status': currentStatus, // Keep the original clock-in status
     }, SetOptions(merge: true));
 
-    _showSnack("Clocked out at ${location.latitude}, ${location.longitude}");
+    _showSnack("Clocked out successfully.");
   }
 
   Future<Position> _getLocation() async {
@@ -401,11 +417,26 @@ class _DayItem {
   String get rawStatus => (data?['status'] ?? 'absent').toString();
 
   String get status {
-    if (rawStatus.toLowerCase().startsWith('present')) return 'present';
-    if (rawStatus.toLowerCase().startsWith('early')) return 'early';
-    if (rawStatus.toLowerCase().startsWith('late')) return 'late';
-    if (rawStatus.toLowerCase().startsWith('in_progress')) return 'in_progress';
-    return 'absent';
+    // If there's no data for this day, it's absent
+    if (data == null) return 'absent';
+
+    // Check if user clocked in
+    final clockedIn = data!['inAt'] != null;
+    final clockedOut = data!['outAt'] != null;
+
+    if (!clockedIn) return 'absent';
+
+    // If clocked in but not out, it's in progress
+    if (clockedIn && !clockedOut) return 'in_progress';
+
+    // Use the stored status from clock-in
+    final storedStatus = rawStatus.toLowerCase();
+    if (storedStatus.contains('late')) return 'late';
+    if (storedStatus.contains('present') || storedStatus.contains('early'))
+      return 'present';
+
+    // Default to present if they have both clock in and out times
+    return clockedIn && clockedOut ? 'present' : 'absent';
   }
 
   String? get reason {
@@ -592,7 +623,7 @@ class _HistoryList extends StatelessWidget {
                 child: ShiftTimeline(
                   clockIn: d.inAt,
                   clockOut: d.outAt,
-                  color: _statusColor(d.status), // Use status color 
+                  color: _statusColor(d.status), // Use status color
                 ),
               ),
             ],
@@ -624,10 +655,10 @@ class _CalendarGrid extends StatelessWidget {
             spacing: 12,
             runSpacing: 8,
             children: const [
-              _Legend(color: Colors.green, label: 'Early'),
-              _Legend(color: Colors.orange, label: 'Late'),
-              _Legend(color: Colors.red, label: 'Absent'),
-              _Legend(color: Colors.blue, label: 'In progress'),
+              _Legend(color: Color(0xFF27AE60), label: 'Present'),
+              _Legend(color: Color(0xFFF39C12), label: 'Late'),
+              _Legend(color: Color(0xFFE74C3C), label: 'Absent'),
+              _Legend(color: Color(0xFF3498DB), label: 'In Progress'),
             ],
           ),
           const SizedBox(height: 12),
@@ -646,7 +677,8 @@ class _CalendarGrid extends StatelessWidget {
                 final dot = _statusColor(d.status);
 
                 return InkWell(
-                  onTap: () => _openMapModal(context, uid: uid, dayId: d.dateId),
+                  onTap: () =>
+                      _openMapModal(context, uid: uid, dayId: d.dateId),
                   child: Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
@@ -683,7 +715,9 @@ class _CalendarGrid extends StatelessWidget {
                               ),
                               // Mini timeline bar
                               FractionallySizedBox(
-                                widthFactor: d.inAt != null && d.outAt != null ? 1.0 : 0.0,
+                                widthFactor: d.inAt != null && d.outAt != null
+                                    ? 1.0
+                                    : 0.0,
                                 heightFactor: 0.3,
                                 child: Container(
                                   decoration: BoxDecoration(
@@ -707,7 +741,6 @@ class _CalendarGrid extends StatelessWidget {
     );
   }
 }
-
 
 class _Legend extends StatelessWidget {
   const _Legend({required this.color, required this.label});
@@ -733,9 +766,11 @@ class _Legend extends StatelessWidget {
 
 // ------------------ Map Modal ------------------
 
-
-void _openMapModal(BuildContext context,
-    {required String uid, required String dayId}) {
+void _openMapModal(
+  BuildContext context, {
+  required String uid,
+  required String dayId,
+}) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -756,8 +791,6 @@ class DayMapModal extends StatefulWidget {
 }
 
 class _DayMapModalState extends State<DayMapModal> {
-  GoogleMapController? _controller;
-  bool _mapReady = false;
   LatLng? _inLoc;
   LatLng? _outLoc;
   String status = 'absent';
@@ -781,6 +814,7 @@ class _DayMapModalState extends State<DayMapModal> {
         .doc(widget.dayId);
     final snap = await ref.get();
     if (!mounted) return;
+
     final data = snap.data();
     if (data != null) {
       final inTimestamp = data['inAt'] ?? data['clockInAt'];
@@ -791,14 +825,21 @@ class _DayMapModalState extends State<DayMapModal> {
       inAt = (inTimestamp as Timestamp?)?.toDate();
       outAt = (outTimestamp as Timestamp?)?.toDate();
       status = (data['status'] ?? 'absent').toString();
+
+      // Trigger initial UI update with location data
+      if (mounted) setState(() {});
+
+      // Load addresses in background
+      if (_inLoc != null) {
+        inAddress = await _reverseGeocode(_inLoc!);
+      }
+      if (_outLoc != null) {
+        outAddress = await _reverseGeocode(_outLoc!);
+      }
+
+      // Final UI update with addresses
+      if (mounted) setState(() {});
     }
-    if (_inLoc != null) {
-      inAddress = await _reverseGeocode(_inLoc!);
-    }
-    if (_outLoc != null) {
-      outAddress = await _reverseGeocode(_outLoc!);
-    }
-    if (mounted) setState(() {});
   }
 
   LatLng? _toLatLng(dynamic v) {
@@ -809,8 +850,10 @@ class _DayMapModalState extends State<DayMapModal> {
 
   Future<String?> _reverseGeocode(LatLng pos) async {
     try {
-      final placemarks =
-          await placemarkFromCoordinates(pos.latitude, pos.longitude);
+      final placemarks = await placemarkFromCoordinates(
+        pos.latitude,
+        pos.longitude,
+      );
       if (placemarks.isNotEmpty) {
         final pm = placemarks.first;
         return "${pm.street}, ${pm.locality}, ${pm.country}";
@@ -822,32 +865,57 @@ class _DayMapModalState extends State<DayMapModal> {
   @override
   Widget build(BuildContext context) {
     final markers = <Marker>{};
+
+    // Add Clock In marker with green color
     if (_inLoc != null) {
       markers.add(
         Marker(
-          markerId: const MarkerId("in"),
+          markerId: const MarkerId("clock_in"),
           position: _inLoc!,
-          infoWindow: InfoWindow(
-            title: "Clocked In",
-            snippet: inAddress ?? _fmtJM(inAt),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueGreen,
           ),
-        ),
-      );
-    }
-    if (_outLoc != null) {
-      markers.add(
-        Marker(
-          markerId: const MarkerId("out"),
-          position: _outLoc!,
           infoWindow: InfoWindow(
-            title: "Clocked Out",
-            snippet: outAddress ?? _fmtJM(outAt),
+            title: "Clock In Location",
+            snippet: inAt != null
+                ? "Time: ${_fmtJM(inAt)}\n${inAddress ?? 'Loading address...'}"
+                : "Loading...",
           ),
+          consumeTapEvents: true,
         ),
       );
     }
 
-    final center = _outLoc ?? _inLoc ?? const LatLng(18.005, -76.7936);
+    // Add Clock Out marker with red color
+    if (_outLoc != null) {
+      markers.add(
+        Marker(
+          markerId: const MarkerId("clock_out"),
+          position: _outLoc!,
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          infoWindow: InfoWindow(
+            title: "Clock Out Location",
+            snippet: outAt != null
+                ? "Time: ${_fmtJM(outAt)}\n${outAddress ?? 'Loading address...'}"
+                : "Loading...",
+          ),
+          consumeTapEvents: true,
+        ),
+      );
+    }
+
+    // Use the most recent location as center, or fallback to Kingston, Jamaica
+    final center = _outLoc ?? _inLoc ?? const LatLng(18.0179, -76.8099);
+
+    // Calculate initial zoom based on available locations
+    double initialZoom = 15.0;
+    if (_inLoc != null && _outLoc != null) {
+      // If we have both locations, use a wider zoom to fit both
+      initialZoom = 14.0;
+    } else if (_inLoc != null || _outLoc != null) {
+      // If we have one location, use a closer zoom
+      initialZoom = 16.0;
+    }
 
     return DraggableScrollableSheet(
       expand: false,
@@ -865,26 +933,98 @@ class _DayMapModalState extends State<DayMapModal> {
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
-            Text("Day: ${widget.dayId}"),
+            Text(
+              "Day: ${widget.dayId}",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             Text("Status: $status"),
             if (inAt != null) Text("Clock In: ${_fmtJM(inAt)}"),
             if (outAt != null) Text("Clock Out: ${_fmtJM(outAt)}"),
-            const SizedBox(height: 8),
-            if (!_mapReady)
-              const Expanded(
-                  child: Center(child: CircularProgressIndicator()))
-            else
-              Expanded(
+            const SizedBox(height: 12),
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                clipBehavior: Clip.hardEdge,
                 child: GoogleMap(
-                  initialCameraPosition:
-                      CameraPosition(target: center, zoom: 15),
-                  onMapCreated: (c) {
-                    _controller = c;
-                    setState(() => _mapReady = true);
+                  key: ValueKey("map_${widget.dayId}_${markers.length}"),
+                  initialCameraPosition: CameraPosition(
+                    target: center,
+                    zoom: initialZoom,
+                  ),
+                  onMapCreated: (GoogleMapController controller) async {
+                    try {
+                      // Add a longer delay to ensure map is fully initialized
+                      await Future.delayed(const Duration(milliseconds: 1000));
+
+                      // Check if widget is still mounted before camera operations
+                      if (!mounted) return;
+
+                      // Try to animate camera with multiple fallback strategies
+                      if (_inLoc != null && _outLoc != null) {
+                        // Strategy 1: Try bounds fitting
+                        try {
+                          final bounds = LatLngBounds(
+                            southwest: LatLng(
+                              _inLoc!.latitude < _outLoc!.latitude
+                                  ? _inLoc!.latitude
+                                  : _outLoc!.latitude,
+                              _inLoc!.longitude < _outLoc!.longitude
+                                  ? _inLoc!.longitude
+                                  : _outLoc!.longitude,
+                            ),
+                            northeast: LatLng(
+                              _inLoc!.latitude > _outLoc!.latitude
+                                  ? _inLoc!.latitude
+                                  : _outLoc!.latitude,
+                              _inLoc!.longitude > _outLoc!.longitude
+                                  ? _inLoc!.longitude
+                                  : _outLoc!.longitude,
+                            ),
+                          );
+                          await controller.animateCamera(
+                            CameraUpdate.newLatLngBounds(bounds, 100),
+                          );
+                        } catch (boundsError) {
+                          // Fallback: Just zoom to the most recent location
+                          debugPrint(
+                            'Bounds camera animation failed: $boundsError',
+                          );
+                          await controller.animateCamera(
+                            CameraUpdate.newLatLngZoom(_outLoc!, 15),
+                          );
+                        }
+                      } else if (_inLoc != null) {
+                        // If only clock-in location, zoom to it
+                        await controller.animateCamera(
+                          CameraUpdate.newLatLngZoom(_inLoc!, 16),
+                        );
+                      } else if (_outLoc != null) {
+                        // If only clock-out location, zoom to it
+                        await controller.animateCamera(
+                          CameraUpdate.newLatLngZoom(_outLoc!, 16),
+                        );
+                      }
+                    } catch (e) {
+                      // Silently handle camera animation errors
+                      debugPrint('Map camera animation error: $e');
+                    }
                   },
-                  markers: markers,
+                  markers: Set<Marker>.from(markers),
+                  mapType: MapType.normal,
+                  myLocationEnabled:
+                      false, // Disable to avoid permission issues
+                  myLocationButtonEnabled: false,
+                  zoomControlsEnabled: true,
+                  compassEnabled: true,
+                  buildingsEnabled: true,
+                  trafficEnabled: false,
+                  mapToolbarEnabled: false,
                 ),
               ),
+            ),
           ],
         );
       },

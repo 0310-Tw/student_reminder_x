@@ -430,6 +430,7 @@ class PublicFeeds extends StatelessWidget {
           }
 
           return FloatingActionButton(
+            heroTag: "public_notes_fab",
             onPressed: isSuspended
                 ? null
                 : () async {

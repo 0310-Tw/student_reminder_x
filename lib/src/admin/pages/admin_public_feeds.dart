@@ -485,6 +485,7 @@ class _AdminPublicFeedsState extends State<AdminPublicFeeds> {
       ),
 
       floatingActionButton: FloatingActionButton(
+        heroTag: "admin_public_feeds_fab",
         onPressed: () async {
           await showModalBottomSheet(
             context: context,

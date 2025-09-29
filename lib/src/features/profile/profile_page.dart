@@ -464,6 +464,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       bottom: 16,
                       right: 16,
                       child: FloatingActionButton(
+                        heroTag: "profile_cover_fab",
                         mini: true,
                         backgroundColor: Color(0xFF3498DB),
                         foregroundColor: Colors.white,

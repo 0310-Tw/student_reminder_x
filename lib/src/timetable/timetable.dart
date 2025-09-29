@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:students_reminder/src/models/timetable_model.dart';
 import 'package:students_reminder/src/timetable/timetable_display.dart';
 
-
 class TimetableGeneratorScreen extends StatefulWidget {
   const TimetableGeneratorScreen({super.key});
 
   @override
-  _TimetableGeneratorScreenState createState() => _TimetableGeneratorScreenState();
+  _TimetableGeneratorScreenState createState() =>
+      _TimetableGeneratorScreenState();
 }
 
 class _TimetableGeneratorScreenState extends State<TimetableGeneratorScreen> {
@@ -25,15 +25,16 @@ class _TimetableGeneratorScreenState extends State<TimetableGeneratorScreen> {
     final subject = _subjectController.text.trim();
 
     if (subject.isEmpty || selectedDay == null || selectedTime == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all fields.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please fill all fields.')));
       return;
     }
 
     // Prevent duplicate time-slot entry
-    final alreadyExists = entries.any((e) =>
-        e.day == selectedDay && e.time == selectedTime);
+    final alreadyExists = entries.any(
+      (e) => e.day == selectedDay && e.time == selectedTime,
+    );
 
     if (alreadyExists) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -43,19 +44,21 @@ class _TimetableGeneratorScreenState extends State<TimetableGeneratorScreen> {
     }
 
     setState(() {
-      entries.add(TimetableEntry(
-        day: selectedDay!,
-        time: selectedTime!,
-        subject: subject,
-      ));
+      entries.add(
+        TimetableEntry(
+          day: selectedDay!,
+          time: selectedTime!,
+          subject: subject,
+        ),
+      );
       _subjectController.clear();
       selectedDay = null;
       selectedTime = null;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Course added!')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Course added!')));
   }
 
   void generateTimetable() {
@@ -179,6 +182,7 @@ class _TimetableGeneratorScreenState extends State<TimetableGeneratorScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: "timetable_generate_fab",
         onPressed: generateTimetable,
         label: const Text("Generate Timetable"),
         icon: const Icon(Icons.table_chart),
