@@ -207,6 +207,7 @@ class _TimetableDisplayScreenState extends State<TimetableDisplayScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: "timetable_display_download_fab",
         onPressed: saveTimetable,
         label: const Text("Download"),
         icon: const Icon(Icons.download),

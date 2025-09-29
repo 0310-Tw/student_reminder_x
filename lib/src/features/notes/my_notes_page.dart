@@ -65,6 +65,7 @@ class _MyNotesPageState extends State<MyNotesPage> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: "my_notes_fab",
         backgroundColor: const Color(0xFF3498DB),
         foregroundColor: Colors.white,
         onPressed: () async {
@@ -155,8 +156,9 @@ class _MyNotesPageState extends State<MyNotesPage> {
                               'Tag: $tag',
                               style: const TextStyle(fontSize: 10),
                             ),
-                            backgroundColor:
-                                const Color(0xFF3498DB).withOpacity(0.1),
+                            backgroundColor: const Color(
+                              0xFF3498DB,
+                            ).withOpacity(0.1),
                             deleteIcon: const Icon(Icons.close, size: 14),
                             onDeleted: () =>
                                 setState(() => _selectedTags.remove(tag)),
@@ -182,7 +184,9 @@ class _MyNotesPageState extends State<MyNotesPage> {
 
                   final filteredDocs = docs.where((doc) {
                     final data = doc.data();
-                    final title = (data['title'] ?? '').toString().toLowerCase();
+                    final title = (data['title'] ?? '')
+                        .toString()
+                        .toLowerCase();
                     final body = (data['body'] ?? '').toString().toLowerCase();
                     final visibility = data['visibility'] ?? 'private';
                     final dueDate = data['dueDate']?.toDate();
@@ -221,8 +225,12 @@ class _MyNotesPageState extends State<MyNotesPage> {
 
                     switch (_sortBy) {
                       case 'title':
-                        final titleA = (dataA['title'] ?? '').toString().toLowerCase();
-                        final titleB = (dataB['title'] ?? '').toString().toLowerCase();
+                        final titleA = (dataA['title'] ?? '')
+                            .toString()
+                            .toLowerCase();
+                        final titleB = (dataB['title'] ?? '')
+                            .toString()
+                            .toLowerCase();
                         final comparison = titleA.compareTo(titleB);
                         return _sortAscending ? comparison : -comparison;
                       case 'dueDate':
@@ -298,8 +306,10 @@ class _MyNotesPageState extends State<MyNotesPage> {
                                   const SizedBox(width: 8),
                                   IconButton(
                                     onPressed: () async {
-                                      await NotesService.instance
-                                          .deleteNote(uid, data.id);
+                                      await NotesService.instance.deleteNote(
+                                        uid,
+                                        data.id,
+                                      );
                                     },
                                     icon: const Icon(Icons.delete_outlined),
                                     iconSize: 20,
@@ -311,8 +321,9 @@ class _MyNotesPageState extends State<MyNotesPage> {
                                 body,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                                style:
-                                    const TextStyle(color: Color(0xFF5D6D7E)),
+                                style: const TextStyle(
+                                  color: Color(0xFF5D6D7E),
+                                ),
                               ),
                               const SizedBox(height: 8),
                               Row(
@@ -348,8 +359,9 @@ class _MyNotesPageState extends State<MyNotesPage> {
                                                     fontSize: 10,
                                                   ),
                                                 ),
-                                                backgroundColor:
-                                                    const Color(0xFFF8F9FA),
+                                                backgroundColor: const Color(
+                                                  0xFFF8F9FA,
+                                                ),
                                                 materialTapTargetSize:
                                                     MaterialTapTargetSize
                                                         .shrinkWrap,
@@ -376,8 +388,9 @@ class _MyNotesPageState extends State<MyNotesPage> {
                                 },
                                 child: Container(
                                   width: double.infinity,
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 8),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                  ),
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: const [
@@ -389,8 +402,9 @@ class _MyNotesPageState extends State<MyNotesPage> {
                                       SizedBox(width: 4),
                                       Text(
                                         'Edit',
-                                        style:
-                                            TextStyle(color: Color(0xFF3498DB)),
+                                        style: TextStyle(
+                                          color: Color(0xFF3498DB),
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -412,8 +426,12 @@ class _MyNotesPageState extends State<MyNotesPage> {
   }
 
   // Filter dialog
-  void _showFilterDialog() { /* ... unchanged ... */ }
+  void _showFilterDialog() {
+    /* ... unchanged ... */
+  }
 
   // Sort dialog
-  void _showSortDialog() { /* ... unchanged ... */ }
+  void _showSortDialog() {
+    /* ... unchanged ... */
+  }
 }
