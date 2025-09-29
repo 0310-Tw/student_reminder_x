@@ -179,6 +179,28 @@ class _MyNotesPageState extends State<MyNotesPage> {
                     return const Center(child: CircularProgressIndicator());
                   }
 
+                  if (snap.hasError) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            size: 64,
+                            color: Colors.red,
+                          ),
+                          SizedBox(height: 16),
+                          Text('Error loading notes: ${snap.error}'),
+                          SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: () => setState(() {}),
+                            child: Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
                   final docs = snap.data?.docs ?? [];
 
                   final filteredDocs = docs.where((doc) {

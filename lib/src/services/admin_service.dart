@@ -513,40 +513,72 @@ class AdminService {
         notificationType = 'account_unsuspended';
       }
 
-      // Store notification in user's notifications collection
-      await _db
+      // Check for existing recent notification to prevent duplicates
+      final recentNotifications = await _db
           .collection('users')
           .doc(userId)
           .collection('notifications')
-          .add({
-            'title': title,
-            'body': body,
-            'type': notificationType,
-            'priority': 'high',
-            'read': false,
-            'actionBy': currentUser.uid,
-            'adminName': adminName,
-            'action': action,
-            'reason': reason,
-            'suspendedUntil': until != null ? Timestamp.fromDate(until) : null,
-            'createdAt': FieldValue.serverTimestamp(),
-          });
+          .where('type', isEqualTo: notificationType)
+          .where('actionBy', isEqualTo: currentUser.uid)
+          .orderBy('createdAt', descending: true)
+          .limit(1)
+          .get();
 
-      // Send push notification if user has FCM token
-      if (userData?['fcmToken'] != null) {
-        try {
-          await NotificationService.sendPushNotification(
-            deviceToken: userData!['fcmToken'],
-            title: title,
-            body: body,
+      // Don't send notification if one was sent in the last 5 minutes
+      bool shouldSendNotification = true;
+      if (recentNotifications.docs.isNotEmpty) {
+        final lastNotification = recentNotifications.docs.first;
+        final lastNotificationTime =
+            lastNotification['createdAt'] as Timestamp?;
+        if (lastNotificationTime != null) {
+          final timeDifference = DateTime.now().difference(
+            lastNotificationTime.toDate(),
           );
-          print('Push notification sent to $userName for $action');
-        } catch (e) {
-          print('Failed to send push notification: $e');
+          if (timeDifference.inMinutes < 5) {
+            shouldSendNotification = false;
+            print('Skipping duplicate $action notification for user $userName');
+          }
         }
       }
 
-      print('$action notification sent to user $userName');
+      if (shouldSendNotification) {
+        // Store notification in user's notifications collection
+        await _db
+            .collection('users')
+            .doc(userId)
+            .collection('notifications')
+            .add({
+              'title': title,
+              'body': body,
+              'type': notificationType,
+              'priority': 'high',
+              'read': false,
+              'actionBy': currentUser.uid,
+              'adminName': adminName,
+              'action': action,
+              'reason': reason,
+              'suspendedUntil': until != null
+                  ? Timestamp.fromDate(until)
+                  : null,
+              'createdAt': FieldValue.serverTimestamp(),
+            });
+
+        // Send push notification if user has FCM token
+        if (userData?['fcmToken'] != null) {
+          try {
+            await NotificationService.sendPushNotification(
+              deviceToken: userData!['fcmToken'],
+              title: title,
+              body: body,
+            );
+            print('Push notification sent to $userName for $action');
+          } catch (e) {
+            print('Failed to send push notification: $e');
+          }
+        }
+
+        print('$action notification sent to user $userName');
+      }
     } catch (e) {
       print('Error sending suspension notification: $e');
     }
@@ -596,39 +628,69 @@ class AdminService {
         notificationType = 'account_unflagged';
       }
 
-      // Store notification in user's notifications collection
-      await _db
+      // Check for existing recent notification to prevent duplicates
+      final recentNotifications = await _db
           .collection('users')
           .doc(userId)
           .collection('notifications')
-          .add({
-            'title': title,
-            'body': body,
-            'type': notificationType,
-            'priority': 'medium',
-            'read': false,
-            'actionBy': currentUser.uid,
-            'adminName': adminName,
-            'action': action,
-            'reason': reason,
-            'createdAt': FieldValue.serverTimestamp(),
-          });
+          .where('type', isEqualTo: notificationType)
+          .where('actionBy', isEqualTo: currentUser.uid)
+          .orderBy('createdAt', descending: true)
+          .limit(1)
+          .get();
 
-      // Send push notification if user has FCM token
-      if (userData?['fcmToken'] != null) {
-        try {
-          await NotificationService.sendPushNotification(
-            deviceToken: userData!['fcmToken'],
-            title: title,
-            body: body,
+      // Don't send notification if one was sent in the last 5 minutes
+      bool shouldSendNotification = true;
+      if (recentNotifications.docs.isNotEmpty) {
+        final lastNotification = recentNotifications.docs.first;
+        final lastNotificationTime =
+            lastNotification['createdAt'] as Timestamp?;
+        if (lastNotificationTime != null) {
+          final timeDifference = DateTime.now().difference(
+            lastNotificationTime.toDate(),
           );
-          print('Push notification sent to $userName for $action');
-        } catch (e) {
-          print('Failed to send push notification: $e');
+          if (timeDifference.inMinutes < 5) {
+            shouldSendNotification = false;
+            print('Skipping duplicate $action notification for user $userName');
+          }
         }
       }
 
-      print('$action notification sent to user $userName');
+      if (shouldSendNotification) {
+        // Store notification in user's notifications collection
+        await _db
+            .collection('users')
+            .doc(userId)
+            .collection('notifications')
+            .add({
+              'title': title,
+              'body': body,
+              'type': notificationType,
+              'priority': 'medium',
+              'read': false,
+              'actionBy': currentUser.uid,
+              'adminName': adminName,
+              'action': action,
+              'reason': reason,
+              'createdAt': FieldValue.serverTimestamp(),
+            });
+
+        // Send push notification if user has FCM token
+        if (userData?['fcmToken'] != null) {
+          try {
+            await NotificationService.sendPushNotification(
+              deviceToken: userData!['fcmToken'],
+              title: title,
+              body: body,
+            );
+            print('Push notification sent to $userName for $action');
+          } catch (e) {
+            print('Failed to send push notification: $e');
+          }
+        }
+
+        print('$action notification sent to user $userName');
+      }
     } catch (e) {
       print('Error sending flag notification: $e');
     }

@@ -675,7 +675,13 @@ class _HomePageState extends State<HomePage> {
         if (snap.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        if (snap.hasError) return Center(child: Text("Error: ${snap.error}"));
+        if (snap.hasError) {
+          // Handle permission errors during logout gracefully
+          if (snap.error.toString().contains('permission-denied')) {
+            return Center(child: Text("Please log in to view data"));
+          }
+          return Center(child: Text("Error: ${snap.error}"));
+        }
 
         final events = <DateTime, List<Map<String, dynamic>>>{};
 
@@ -764,7 +770,13 @@ class _HomePageState extends State<HomePage> {
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting)
           return const Center(child: CircularProgressIndicator());
-        if (snap.hasError) return Center(child: Text("Error: ${snap.error}"));
+        if (snap.hasError) {
+          // Handle permission errors during logout gracefully
+          if (snap.error.toString().contains('permission-denied')) {
+            return Center(child: Text("Please log in to view data"));
+          }
+          return Center(child: Text("Error: ${snap.error}"));
+        }
 
         final docs = snap.data?.docs ?? [];
         if (docs.isEmpty) return const Text("No tasks found");
@@ -826,7 +838,13 @@ class _HomePageState extends State<HomePage> {
         if (snap.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        if (snap.hasError) return Center(child: Text("Error: ${snap.error}"));
+        if (snap.hasError) {
+          // Handle permission errors during logout gracefully
+          if (snap.error.toString().contains('permission-denied')) {
+            return Center(child: Text("Please log in to view data"));
+          }
+          return Center(child: Text("Error: ${snap.error}"));
+        }
 
         List docs = snap.data?.docs ?? [];
 
@@ -968,8 +986,13 @@ class _HomePageState extends State<HomePage> {
                   if (snap.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  if (snap.hasError)
+                  if (snap.hasError) {
+                    // Handle permission errors during logout gracefully
+                    if (snap.error.toString().contains('permission-denied')) {
+                      return Center(child: Text("Please log in to view data"));
+                    }
                     return Center(child: Text("Error: ${snap.error}"));
+                  }
                   final docs = snap.data?.docs ?? [];
                   final filteredDocs = selectedFilter == 'All'
                       ? docs

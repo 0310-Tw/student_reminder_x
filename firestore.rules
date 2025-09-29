@@ -29,6 +29,8 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isAuthenticated();
       allow write: if isAdmin() || isOwner(userId);
+      // Allow list/query operations for authenticated users (needed for dashboard)
+      allow list: if isAuthenticated();
     }
 
     // Attendance collection - main attendance documents
@@ -85,6 +87,8 @@ service cloud.firestore {
     match /users/{userId}/notes/{noteId} {
       allow read: if isAdmin() || isOwner(userId) || resource.data.visibility == 'public';
       allow write: if isAdmin() || isOwner(userId);
+      // Allow list operations for users on their own notes
+      allow list: if isAdmin() || isOwner(userId);
       // Allow authenticated users to like/unlike public notes
       allow update: if isAuthenticated() && 
                    resource.data.visibility == 'public' &&
@@ -123,7 +127,8 @@ service cloud.firestore {
     
     // Allow reading reports via collection group queries for admins and report owners
     match /{path=**}/reports/{reporterId} {
-      allow read: if isAdmin() || request.auth.uid == reporterId;
+      allow read: if isAdmin() || 
+                     (request.auth != null && request.auth.uid == reporterId);
     }
 
     // Additional rules for admin dashboard data access
