@@ -1,6 +1,7 @@
+import 'dart:async';
 import 'dart:math';
 
-//import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -23,11 +24,36 @@ class AttendanceHistory14d extends StatefulWidget {
 class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
   bool _showCalendar = false;
   bool _isClockedIn = false;
+  Timer? _autoClockOutTimer;
 
   @override
   void initState() {
     super.initState();
     _loadTodayClockStatus();
+    _startAutoClockOut();
+  }
+
+  void _startAutoClockOut() {
+    // Check every 1 minute
+    _autoClockOutTimer = Timer.periodic(const Duration(minutes: 1), (timer) async {
+      if (!_isClockedIn) return;
+
+      final now = DateTime.now();
+      final autoClockOutTime = DateTime(now.year, now.month, now.day, 16, 30); // 4:30 PM
+      if (now.isAfter(autoClockOutTime)) {
+        final currentUser = AuthService.instance.currentUser;
+        if (currentUser == null) return;
+        final uid = currentUser.uid;
+
+        // Perform auto clock-out
+        await _clockOut(uid);
+
+        if (!mounted) return;
+        setState(() => _isClockedIn = false);
+
+        _showSnack("Auto clocked out at ${DateFormat.jm().format(now)}");
+      }
+    });
   }
 
   Future<void> _loadTodayClockStatus() async {
@@ -541,9 +567,22 @@ class _HistoryList extends StatelessWidget {
                   if (d.inAt != null)
                     Padding(
                       padding: const EdgeInsets.only(right: 12),
-                      child: Text('In: ${_fmtJM(d.inAt)}'),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.login, size: 16, color: Colors.green), // Clock In icon
+                          const SizedBox(width: 4),
+                          Text('In: ${_fmtJM(d.inAt)}'),
+                        ],
+                      ),
                     ),
-                  if (d.outAt != null) Text('Out: ${_fmtJM(d.outAt)}'),
+                  if (d.outAt != null)
+                    Row(
+                      children: [
+                        const Icon(Icons.logout, size: 16, color: Colors.red), // Clock Out icon
+                        const SizedBox(width: 4),
+                        Text('Out: ${_fmtJM(d.outAt)}'),
+                      ],
+                    ),
                 ],
               ),
               const SizedBox(height: 6),
@@ -565,6 +604,7 @@ class _HistoryList extends StatelessWidget {
     );
   }
 }
+
 
 // ------------------ Calendar Grid ------------------
 

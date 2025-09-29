@@ -1,8 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:students_reminder/src/features/profile/profile_page.dart';
+//import 'package:students_reminder/src/features/profile/profile_page.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/user_service.dart';
 import 'package:students_reminder/src/widgets/suspension_check.dart';
@@ -22,6 +23,9 @@ class _HomePageState extends State<HomePage> {
   String? _selectedAttendanceStatus;
   Stream<QuerySnapshot<Map<String, dynamic>>>? _studentStream;
   final uid = AuthService.instance.currentUser?.uid;
+
+  // Cache for student attendance status to avoid repeated queries
+  final Map<String, String> _studentAttendanceCache = {};
 
   final Map<String, int> _counts = {
     "Mobile": 0,
@@ -43,6 +47,18 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _setupLiveCounts();
     _listenAllStudents();
+     // Clear cache daily
+    _setupDailyCacheClear();
+  }
+
+  void _setupDailyCacheClear() {
+    // Clear attendance cache at midnight to ensure fresh data each day
+    Timer.periodic(const Duration(hours: 1), (timer) {
+      final now = DateTime.now();
+      if (now.hour == 0 && now.minute == 0) {
+        _studentAttendanceCache.clear();
+      }
+    });
   }
 
   void _setupLiveCounts() {
@@ -114,32 +130,132 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  void _listenAllStudents() {
-    UserService.instance.watchAllStudents().listen((snap) {
+   void _listenAllStudents() {
+    UserService.instance.watchAllStudents().listen((snap) async {
       int present = 0, late = 0, absent = 0;
+
+      // Get today's date in the format used by attendance system
+      final now = DateTime.now();
+      final todayId =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
       for (var doc in snap.docs) {
         final data = doc.data();
-        final status = data['attendanceStatus'] ?? 'present';
-        switch (status) {
-          case 'present':
-            present++;
-            break;
-          case 'late':
-            late++;
-            break;
-          case 'absent':
+        final uid = data['uid'] ?? doc.id;
+
+        try {
+          // Get today's attendance for this student
+          final attendanceDoc = await FirebaseFirestore.instance
+              .collection('attendance')
+              .doc(uid)
+              .collection('days')
+              .doc(todayId)
+              .get();
+
+          if (attendanceDoc.exists) {
+            final attendanceData = attendanceDoc.data()!;
+            final clockedIn = attendanceData['inAt'] != null;
+
+            if (!clockedIn) {
+              // No clock-in means absent
+              absent++;
+            } else {
+              // Use the stored status from clock-in
+              final rawStatus = (attendanceData['status'] ?? 'present')
+                  .toString()
+                  .toLowerCase();
+              if (rawStatus.contains('late')) {
+                late++;
+              } else {
+                present++;
+              }
+            }
+          } else {
+            // No attendance record means absent
             absent++;
-            break;
+          }
+        } catch (e) {
+          // If there's an error, default to absent
+          absent++;
         }
       }
-      setState(() {
-        _totalPresent = present;
-        _totalLate = late;
-        _totalAbsent = absent;
-      });
+
+      if (mounted) {
+        setState(() {
+          _totalPresent = present;
+          _totalLate = late;
+          _totalAbsent = absent;
+        });
+      }
     });
   }
+   Future<String> _getStudentAttendanceStatus(String studentUid) async {
+    // Check cache first
+    if (_studentAttendanceCache.containsKey(studentUid)) {
+      return _studentAttendanceCache[studentUid]!;
+    }
 
+    try {
+      // Get today's date in the format used by attendance system
+      final now = DateTime.now();
+      final todayId =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+      // Get today's attendance for this student
+      final attendanceDoc = await FirebaseFirestore.instance
+          .collection('attendance')
+          .doc(studentUid)
+          .collection('days')
+          .doc(todayId)
+          .get();
+
+      String status = 'absent'; // Default to absent
+
+      if (attendanceDoc.exists) {
+        final attendanceData = attendanceDoc.data()!;
+        final clockedIn = attendanceData['inAt'] != null;
+
+        if (clockedIn) {
+          // Use the stored status from clock-in
+          final rawStatus = (attendanceData['status'] ?? 'present')
+              .toString()
+              .toLowerCase();
+          if (rawStatus.contains('late')) {
+            status = 'late';
+          } else {
+            status = 'present';
+          }
+        }
+      }
+
+      // Cache the result
+      _studentAttendanceCache[studentUid] = status;
+      return status;
+    } catch (e) {
+      // If there's an error, default to absent
+      _studentAttendanceCache[studentUid] = 'absent';
+      return 'absent';
+    }
+  }
+
+  Future<List> _filterStudentsByAttendance(
+    List docs,
+    String targetStatus,
+  ) async {
+    final filteredDocs = <dynamic>[];
+
+    for (var doc in docs) {
+      final data = doc.data();
+      final studentUid = data['uid'] ?? doc.id;
+      final status = await _getStudentAttendanceStatus(studentUid);
+
+      if (status == targetStatus) {
+        filteredDocs.add(doc);
+      }
+    }
+
+    return filteredDocs;
+  }
   Future<void> toggleTaskCompletion(String uid, Map<String, dynamic> task) async {
     final ref = FirebaseFirestore.instance.collection('users').doc(uid);
     final updatedTask = {...task, 'completed': !(task['completed'] ?? false)};
