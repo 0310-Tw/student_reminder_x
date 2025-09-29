@@ -427,11 +427,293 @@ class _MyNotesPageState extends State<MyNotesPage> {
 
   // Filter dialog
   void _showFilterDialog() {
-    /* ... unchanged ... */
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: NotesService.instance.watchMyNotes(
+            AuthService.instance.currentUser!.uid,
+          ),
+          builder: (context, snapshot) {
+            final docs = snapshot.data?.docs ?? [];
+            final allTags = _getAllTags(docs);
+
+            return StatefulBuilder(
+              builder: (context, setDialogState) {
+                return AlertDialog(
+                  title: const Text('Filter Notes'),
+                  content: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Visibility Filter
+                        const Text(
+                          'Visibility:',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          value: _visibilityFilter,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'all',
+                              child: Text('All Notes'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'public',
+                              child: Text('Public Only'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'private',
+                              child: Text('Private Only'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            setDialogState(() {
+                              _visibilityFilter = value ?? 'all';
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Due Date Range Filter
+                        const Text(
+                          'Due Date Range:',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () async {
+                                  final DateTimeRange? picked =
+                                      await showDateRangePicker(
+                                        context: context,
+                                        firstDate: DateTime(2020),
+                                        lastDate: DateTime(2030),
+                                        initialDateRange: _dueDateRange,
+                                      );
+                                  if (picked != null) {
+                                    setDialogState(() {
+                                      _dueDateRange = picked;
+                                    });
+                                  }
+                                },
+                                icon: const Icon(
+                                  Icons.calendar_today,
+                                  size: 16,
+                                ),
+                                label: Text(
+                                  _dueDateRange == null
+                                      ? 'Select Date Range'
+                                      : '${_dueDateRange!.start.toString().split(' ').first} - ${_dueDateRange!.end.toString().split(' ').first}',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ),
+                            ),
+                            if (_dueDateRange != null)
+                              IconButton(
+                                onPressed: () {
+                                  setDialogState(() {
+                                    _dueDateRange = null;
+                                  });
+                                },
+                                icon: const Icon(Icons.clear, size: 16),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Tags Filter
+                        const Text(
+                          'Tags:',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        if (allTags.isEmpty)
+                          const Text(
+                            'No tags available',
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          )
+                        else
+                          Container(
+                            constraints: const BoxConstraints(maxHeight: 200),
+                            child: SingleChildScrollView(
+                              child: Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: allTags.map((tag) {
+                                  final isSelected = _selectedTags.contains(
+                                    tag,
+                                  );
+                                  return FilterChip(
+                                    label: Text(
+                                      tag,
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                    selected: isSelected,
+                                    onSelected: (selected) {
+                                      setDialogState(() {
+                                        if (selected) {
+                                          _selectedTags.add(tag);
+                                        } else {
+                                          _selectedTags.remove(tag);
+                                        }
+                                      });
+                                    },
+                                    backgroundColor: Colors.grey[100],
+                                    selectedColor: const Color(
+                                      0xFF3498DB,
+                                    ).withOpacity(0.2),
+                                    checkmarkColor: const Color(0xFF3498DB),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        setDialogState(() {
+                          _visibilityFilter = 'all';
+                          _dueDateRange = null;
+                          _selectedTags.clear();
+                        });
+                      },
+                      child: const Text('Clear All'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          // Filters are already updated in real-time
+                        });
+                        Navigator.pop(context);
+                      },
+                      child: const Text('Apply'),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    );
   }
 
   // Sort dialog
   void _showSortDialog() {
-    /* ... unchanged ... */
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Sort Notes'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Sort by:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  RadioListTile<String>(
+                    title: const Text('Date Created/Modified'),
+                    subtitle: const Text('Most recent changes first'),
+                    value: 'aud_dt',
+                    groupValue: _sortBy,
+                    onChanged: (value) {
+                      setDialogState(() {
+                        _sortBy = value!;
+                      });
+                    },
+                  ),
+                  RadioListTile<String>(
+                    title: const Text('Title'),
+                    subtitle: const Text('Alphabetical order'),
+                    value: 'title',
+                    groupValue: _sortBy,
+                    onChanged: (value) {
+                      setDialogState(() {
+                        _sortBy = value!;
+                      });
+                    },
+                  ),
+                  RadioListTile<String>(
+                    title: const Text('Due Date'),
+                    subtitle: const Text('Earliest due dates first'),
+                    value: 'dueDate',
+                    groupValue: _sortBy,
+                    onChanged: (value) {
+                      setDialogState(() {
+                        _sortBy = value!;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Order:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  SwitchListTile(
+                    title: Text(_sortAscending ? 'Ascending' : 'Descending'),
+                    subtitle: Text(
+                      _sortAscending
+                          ? 'A to Z, oldest to newest'
+                          : 'Z to A, newest to oldest',
+                    ),
+                    value: _sortAscending,
+                    onChanged: (value) {
+                      setDialogState(() {
+                        _sortAscending = value;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      // Sort options are already updated
+                    });
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Apply'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 }
