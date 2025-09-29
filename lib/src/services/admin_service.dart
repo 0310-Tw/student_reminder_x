@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/attendance_service.dart';
+import 'package:students_reminder/src/services/notification_service.dart';
 
 class AdminService {
   AdminService._();
@@ -46,6 +47,14 @@ class AdminService {
 
     await _db.collection('users').doc(userId).update(data);
 
+    // Send notification to user
+    await _sendSuspensionNotification(
+      userId,
+      'suspended',
+      reason: reason,
+      until: until,
+    );
+
     // Log admin action
     await _logAdminAction('user_suspend', {
       'userId': userId,
@@ -63,6 +72,9 @@ class AdminService {
       'suspensionReason': FieldValue.delete(),
       'suspendedUntil': FieldValue.delete(),
     });
+
+    // Send notification to user
+    await _sendSuspensionNotification(userId, 'unsuspended');
 
     // Log admin action
     await _logAdminAction('user_unsuspend', {'userId': userId});
@@ -82,6 +94,9 @@ class AdminService {
       'flagReason': reason,
     });
 
+    // Send notification to user
+    await _sendFlagNotification(userId, 'flagged', reason: reason);
+
     // Log admin action
     await _logAdminAction('user_flag', {'userId': userId, 'reason': reason});
   }
@@ -99,6 +114,9 @@ class AdminService {
       'flaggedBy': FieldValue.delete(),
       'flagReason': FieldValue.delete(),
     });
+
+    // Send notification to user
+    await _sendFlagNotification(userId, 'unflagged');
 
     // Log admin action
     await _logAdminAction('user_unflag', {'userId': userId});
@@ -446,5 +464,173 @@ class AdminService {
       'overrideBy': currentUser.uid,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  /// Send suspension/unsuspension notification to user
+  Future<void> _sendSuspensionNotification(
+    String userId,
+    String action, {
+    String? reason,
+    DateTime? until,
+  }) async {
+    try {
+      final currentUser = AuthService.instance.currentUser;
+      if (currentUser == null) return;
+
+      // Get admin info
+      final adminDoc = await _db.collection('users').doc(currentUser.uid).get();
+      final adminData = adminDoc.data();
+      final adminName = adminData != null
+          ? '${adminData['firstName'] ?? ''} ${adminData['lastName'] ?? ''}'
+                .trim()
+          : 'Administrator';
+
+      // Get user info
+      final userDoc = await _db.collection('users').doc(userId).get();
+      final userData = userDoc.data();
+      final userName = userData != null
+          ? '${userData['firstName'] ?? ''} ${userData['lastName'] ?? ''}'
+                .trim()
+          : 'User';
+
+      String title, body;
+      String notificationType;
+
+      if (action == 'suspended') {
+        title = 'Account Suspended';
+        body = reason != null
+            ? 'Your account has been suspended. Reason: $reason'
+            : 'Your account has been suspended by an administrator.';
+        if (until != null) {
+          final untilStr = until.toLocal().toString().split(' ')[0];
+          body += ' Suspension will be lifted on $untilStr.';
+        }
+        notificationType = 'account_suspended';
+      } else {
+        title = 'Account Restored';
+        body =
+            'Your account suspension has been lifted. You now have full access to the app.';
+        notificationType = 'account_unsuspended';
+      }
+
+      // Store notification in user's notifications collection
+      await _db
+          .collection('users')
+          .doc(userId)
+          .collection('notifications')
+          .add({
+            'title': title,
+            'body': body,
+            'type': notificationType,
+            'priority': 'high',
+            'read': false,
+            'actionBy': currentUser.uid,
+            'adminName': adminName,
+            'action': action,
+            'reason': reason,
+            'suspendedUntil': until != null ? Timestamp.fromDate(until) : null,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+
+      // Send push notification if user has FCM token
+      if (userData?['fcmToken'] != null) {
+        try {
+          await NotificationService.sendPushNotification(
+            deviceToken: userData!['fcmToken'],
+            title: title,
+            body: body,
+          );
+          print('Push notification sent to $userName for $action');
+        } catch (e) {
+          print('Failed to send push notification: $e');
+        }
+      }
+
+      print('$action notification sent to user $userName');
+    } catch (e) {
+      print('Error sending suspension notification: $e');
+    }
+  }
+
+  /// Send flag/unflag notification to user
+  Future<void> _sendFlagNotification(
+    String userId,
+    String action, {
+    String? reason,
+  }) async {
+    try {
+      final currentUser = AuthService.instance.currentUser;
+      if (currentUser == null) return;
+
+      // Get admin info
+      final adminDoc = await _db.collection('users').doc(currentUser.uid).get();
+      final adminData = adminDoc.data();
+      final adminName = adminData != null
+          ? '${adminData['firstName'] ?? ''} ${adminData['lastName'] ?? ''}'
+                .trim()
+          : 'Administrator';
+
+      // Get user info
+      final userDoc = await _db.collection('users').doc(userId).get();
+      final userData = userDoc.data();
+      final userName = userData != null
+          ? '${userData['firstName'] ?? ''} ${userData['lastName'] ?? ''}'
+                .trim()
+          : 'User';
+
+      String title, body;
+      String notificationType;
+
+      if (action == 'flagged') {
+        title = 'Account Flagged';
+        body = reason != null
+            ? 'Your account has been flagged. Reason: $reason'
+            : 'Your account has been flagged by an administrator.';
+        body +=
+            ' Please review your recent activity and follow community guidelines.';
+        notificationType = 'account_flagged';
+      } else {
+        title = 'Flag Removed';
+        body =
+            'The flag on your account has been removed. Thank you for following community guidelines.';
+        notificationType = 'account_unflagged';
+      }
+
+      // Store notification in user's notifications collection
+      await _db
+          .collection('users')
+          .doc(userId)
+          .collection('notifications')
+          .add({
+            'title': title,
+            'body': body,
+            'type': notificationType,
+            'priority': 'medium',
+            'read': false,
+            'actionBy': currentUser.uid,
+            'adminName': adminName,
+            'action': action,
+            'reason': reason,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+
+      // Send push notification if user has FCM token
+      if (userData?['fcmToken'] != null) {
+        try {
+          await NotificationService.sendPushNotification(
+            deviceToken: userData!['fcmToken'],
+            title: title,
+            body: body,
+          );
+          print('Push notification sent to $userName for $action');
+        } catch (e) {
+          print('Failed to send push notification: $e');
+        }
+      }
+
+      print('$action notification sent to user $userName');
+    } catch (e) {
+      print('Error sending flag notification: $e');
+    }
   }
 }

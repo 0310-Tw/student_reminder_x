@@ -51,23 +51,48 @@ class _UserBannerNotificationsState extends State<UserBannerNotifications> {
         if (sortedNotifications.isNotEmpty) {
           final latestNotification = sortedNotifications.first;
           final data = latestNotification.data() as Map<String, dynamic>;
-          final severity = data['severity'] ?? 'info';
+          final notificationType = data['type'] ?? '';
+
+          // Assign severity based on notification type
+          String severity = data['severity'] ?? 'info';
+          if (notificationType == 'account_suspended') {
+            severity = 'critical';
+          } else if (notificationType == 'account_flagged') {
+            severity = 'warning';
+          } else if ([
+            'account_unsuspended',
+            'account_unflagged',
+          ].contains(notificationType)) {
+            severity = 'info';
+          }
+
           final title = data['title'] ?? '';
           final createdAt = data['createdAt'] as Timestamp?;
 
-          // Filter out suspension-related notifications (both suspended and unsuspended)
-          if (title.contains('Suspended') ||
+          // Allow account status notifications (suspended/unsuspended/flagged/unflagged)
+          final isAccountStatusNotification = [
+            'account_suspended',
+            'account_unsuspended',
+            'account_flagged',
+            'account_unflagged',
+          ].contains(notificationType);
+
+          // Show account status notifications prominently
+          if (isAccountStatusNotification) {
+            // These are important - don't auto-hide them
+          } else if (title.contains('Suspended') ||
               title.contains('Unsuspended') ||
               data['message']?.toString().contains('suspended') == true ||
               data['message']?.toString().contains('unsuspended') == true ||
               data['message']?.toString().contains('suspension') == true) {
-            // Always hide suspension-related notifications
+            // Hide old-style suspension notifications
             _markAsRead(latestNotification.id);
             return SizedBox.shrink();
           }
 
           // Auto-dismiss old notifications (older than 1 hour)
-          if (createdAt != null) {
+          // BUT NOT for account status notifications - they stay until manually dismissed
+          if (createdAt != null && !isAccountStatusNotification) {
             final notificationAge = DateTime.now().difference(
               createdAt.toDate(),
             );

@@ -16,7 +16,8 @@ class ShiftTimeline extends StatelessWidget {
     this.clockOutAuto = false,
     this.placeIn,
     this.placeOut,
-    this.livePlace, required Color color,
+    this.livePlace,
+    required Color color,
   });
 
   @override
@@ -24,33 +25,27 @@ class ShiftTimeline extends StatelessWidget {
     final status = _getStatus(clockIn, clockOut);
 
     Color color;
-    IconData icon;
     String label;
 
     switch (status) {
       case 'early':
         color = Colors.green;
-        icon = Icons.check_circle;
         label = 'Early';
         break;
       case 'late':
         color = Colors.orange;
-        icon = Icons.warning_amber_rounded;
         label = 'Late';
         break;
       case 'left_early':
         color = Colors.deepOrange;
-        icon = Icons.access_time;
         label = 'Left Early';
         break;
       case 'absent':
         color = Colors.red;
-        icon = Icons.cancel;
         label = 'Absent';
         break;
       default:
         color = Colors.grey;
-        icon = Icons.schedule;
         label = 'Pending';
     }
 
@@ -61,21 +56,11 @@ class ShiftTimeline extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 6,
-            offset: Offset(0, 3),
-          ),
+          BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 3)),
         ],
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            backgroundColor: color.withOpacity(0.15),
-            radius: 24,
-            child: Icon(icon, color: color, size: 28),
-          ),
-          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -83,8 +68,8 @@ class ShiftTimeline extends StatelessWidget {
                 Text(
                   "Shift Timeline",
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -132,10 +117,7 @@ class ShiftTimeline extends StatelessWidget {
                 if (livePlace != null)
                   Text(
                     "Live: $livePlace",
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                     overflow: TextOverflow.ellipsis,
                   ),
               ],

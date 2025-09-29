@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:image_gallery_saver2_fixed/image_gallery_saver2_fixed.dart';
 import 'package:screenshot/screenshot.dart';
+import 'package:students_reminder/src/widgets/suspension_check.dart';
 
 class TimetableDisplayScreen extends StatefulWidget {
   final Map<String, Map<String, String>> timetable;
@@ -197,12 +198,14 @@ class _TimetableDisplayScreenState extends State<TimetableDisplayScreen> {
         title: const Text("Generated Timetable"),
         centerTitle: true,
       ),
-      body: Center(
-        child: Screenshot(
-          controller: screenshotController,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: buildTimetableGrid(),
+      body: SuspensionCheck(
+        child: Center(
+          child: Screenshot(
+            controller: screenshotController,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: buildTimetableGrid(),
+            ),
           ),
         ),
       ),

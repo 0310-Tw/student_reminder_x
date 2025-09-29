@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:students_reminder/src/models/timetable_model.dart';
 import 'package:students_reminder/src/timetable/timetable_display.dart';
+import 'package:students_reminder/src/widgets/suspension_check.dart';
 
 class TimetableGeneratorScreen extends StatefulWidget {
   const TimetableGeneratorScreen({super.key});
@@ -92,93 +93,96 @@ class _TimetableGeneratorScreenState extends State<TimetableGeneratorScreen> {
         title: const Text("Create Your Timetable"),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            TextField(
-              controller: _subjectController,
-              decoration: const InputDecoration(
-                labelText: "Course Name",
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(
-                      labelText: "Select Day",
-                      border: OutlineInputBorder(),
-                    ),
-                    value: selectedDay,
-                    items: allDays.map((day) {
-                      return DropdownMenuItem(value: day, child: Text(day));
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        selectedDay = value;
-                      });
-                    },
-                  ),
+      body: SuspensionCheck(
+        restrictWriteAccess: true,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              TextField(
+                controller: _subjectController,
+                decoration: const InputDecoration(
+                  labelText: "Course Name",
+                  border: OutlineInputBorder(),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(
-                      labelText: "Select Time",
-                      border: OutlineInputBorder(),
-                    ),
-                    value: selectedTime,
-                    items: allTimes.map((time) {
-                      return DropdownMenuItem(value: time, child: Text(time));
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        selectedTime = value;
-                      });
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: addEntry,
-              icon: const Icon(Icons.add),
-              label: const Text("Add Course"),
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size.fromHeight(50),
               ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              "Courses to be added: (${entries.length})",
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 8),
-            entries.isEmpty
-                ? const Text(
-                    "No courses added yet.",
-                    style: TextStyle(color: Colors.grey),
-                  )
-                : Wrap(
-                    spacing: 8.0,
-                    runSpacing: 4.0,
-                    children: entries.map((e) {
-                      return Chip(
-                        label: Text("${e.subject} (${e.day} ${e.time})"),
-                        deleteIcon: const Icon(Icons.close),
-                        onDeleted: () {
-                          setState(() {
-                            entries.remove(e);
-                          });
-                        },
-                      );
-                    }).toList(),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      decoration: const InputDecoration(
+                        labelText: "Select Day",
+                        border: OutlineInputBorder(),
+                      ),
+                      value: selectedDay,
+                      items: allDays.map((day) {
+                        return DropdownMenuItem(value: day, child: Text(day));
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          selectedDay = value;
+                        });
+                      },
+                    ),
                   ),
-          ],
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      decoration: const InputDecoration(
+                        labelText: "Select Time",
+                        border: OutlineInputBorder(),
+                      ),
+                      value: selectedTime,
+                      items: allTimes.map((time) {
+                        return DropdownMenuItem(value: time, child: Text(time));
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          selectedTime = value;
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: addEntry,
+                icon: const Icon(Icons.add),
+                label: const Text("Add Course"),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(50),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                "Courses to be added: (${entries.length})",
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 8),
+              entries.isEmpty
+                  ? const Text(
+                      "No courses added yet.",
+                      style: TextStyle(color: Colors.grey),
+                    )
+                  : Wrap(
+                      spacing: 8.0,
+                      runSpacing: 4.0,
+                      children: entries.map((e) {
+                        return Chip(
+                          label: Text("${e.subject} (${e.day} ${e.time})"),
+                          deleteIcon: const Icon(Icons.close),
+                          onDeleted: () {
+                            setState(() {
+                              entries.remove(e);
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+            ],
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
