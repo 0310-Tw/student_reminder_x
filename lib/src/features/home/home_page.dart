@@ -470,7 +470,7 @@ class _HomePageState extends State<HomePage> {
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     _buildAttendanceSummary(
-                      "Present",
+                      "Early",
                       _totalPresent,
                       Colors.green,
                       onTap: () {
@@ -519,7 +519,7 @@ class _HomePageState extends State<HomePage> {
                       PieChartSectionData(
                         value: _totalPresent.toDouble(),
                         color: Colors.green,
-                        title: 'Present',
+                        title: 'Early',
                         radius: 50,
                         titleStyle: const TextStyle(
                           color: Colors.white,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
@@ -21,11 +22,21 @@ class AttendanceHistory14d extends StatefulWidget {
 class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
   bool _showCalendar = false;
   bool _isClockedIn = false;
+  StreamSubscription<Position>? _locationSub;
+  Timer? _autoClockOutTimer;
 
   @override
   void initState() {
     super.initState();
     _loadTodayClockStatus();
+    _scheduleAutoClockOut();
+  }
+
+  @override
+  void dispose() {
+    _locationSub?.cancel();
+    _autoClockOutTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadTodayClockStatus() async {
@@ -267,10 +278,14 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
       return;
     }
 
+    // Get place name for better user experience
+    final placeName = await _getPlaceName(location);
+
     final attendanceData = {
       'dayId': JmTime.dateId(now),
       'inAt': Timestamp.fromDate(now),
       'inLoc': GeoPoint(location.latitude, location.longitude),
+      'placeIn': placeName,
       'status': status,
     };
 
@@ -285,9 +300,15 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
         .doc(JmTime.dateId(now))
         .set(attendanceData, SetOptions(merge: true));
 
+    // Start live location tracking
+    await _startLiveTracking(uid);
+
+    // Reschedule auto clock-out after clock-in
+    _scheduleAutoClockOut();
+
     final displayMessage = reason != null && reason.trim().isNotEmpty
-        ? "Clocked in: $status (Reason: $reason) at ${location.latitude}, ${location.longitude}"
-        : "Clocked in: $status at ${location.latitude}, ${location.longitude}";
+        ? "Clocked in: $status (Reason: $reason) at $placeName"
+        : "Clocked in: $status at $placeName";
 
     _showSnack(displayMessage);
   }
@@ -319,14 +340,24 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
     final existingData = snapshot.data();
     final currentStatus = existingData?['status'] ?? 'present';
 
+    // Get place name for better user experience
+    final placeName = await _getPlaceName(location);
+
     // Maintain the original status (present/late) when clocking out
     await dayDoc.set({
       'outAt': Timestamp.fromDate(now),
       'outLoc': GeoPoint(location.latitude, location.longitude),
+      'placeOut': placeName,
       'status': currentStatus, // Keep the original clock-in status
     }, SetOptions(merge: true));
 
-    _showSnack("Clocked out successfully.");
+    // Stop live location tracking
+    await _stopLiveTracking();
+
+    // Cancel auto clock-out timer
+    _autoClockOutTimer?.cancel();
+
+    _showSnack("Clocked out successfully at $placeName");
   }
 
   Future<Position> _getLocation() async {
@@ -375,6 +406,84 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
 
   void _showSnack(String msg) {
     displaySnackBar(context, msg);
+  }
+
+  // ------------------ Auto Clock Out ------------------
+  void _scheduleAutoClockOut() {
+    _autoClockOutTimer?.cancel();
+
+    final now = DateTime.now();
+    final clockOutTime = DateTime(now.year, now.month, now.day, 16, 0); // 4 PM
+    Duration durationUntil4PM = clockOutTime.difference(now);
+
+    if (durationUntil4PM.isNegative) {
+      // Already past 4 PM today, no timer needed
+      return;
+    }
+
+    _autoClockOutTimer = Timer(durationUntil4PM, () async {
+      final currentUser = AuthService.instance.currentUser;
+      if (currentUser != null && _isClockedIn) {
+        await _clockOut(currentUser.uid);
+        await _loadTodayClockStatus();
+        _showSnack("Automatically clocked out at 4:00 PM");
+      }
+    });
+  }
+
+  // ------------------ Live Location Tracking ------------------
+  Future<void> _startLiveTracking(String uid) async {
+    _locationSub?.cancel();
+    _locationSub =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 10, // Update every 10 meters
+          ),
+        ).listen((pos) async {
+          final placeName = await _getPlaceName(pos);
+          await _updateLiveLocation(uid, pos, placeName);
+        });
+  }
+
+  Future<void> _stopLiveTracking() async {
+    await _locationSub?.cancel();
+    _locationSub = null;
+  }
+
+  Future<void> _updateLiveLocation(
+    String uid,
+    Position pos,
+    String placeName,
+  ) async {
+    final now = DateTime.now();
+    final dayId = JmTime.dateId(now);
+
+    await FirebaseFirestore.instance
+        .collection('attendance')
+        .doc(uid)
+        .collection('days')
+        .doc(dayId)
+        .set({
+          'liveLat': pos.latitude,
+          'liveLng': pos.longitude,
+          'livePlace': placeName,
+          'liveUpdated': Timestamp.now(),
+        }, SetOptions(merge: true));
+  }
+
+  Future<String> _getPlaceName(Position pos) async {
+    try {
+      final placemarks = await placemarkFromCoordinates(
+        pos.latitude,
+        pos.longitude,
+      );
+      if (placemarks.isNotEmpty) {
+        final p = placemarks.first;
+        return "${p.name ?? ''}, ${p.locality ?? ''}".trim();
+      }
+    } catch (_) {}
+    return "Unknown location";
   }
 }
 
@@ -554,16 +663,50 @@ class _HistoryList extends StatelessWidget {
           subtitle: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  if (d.inAt != null)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 12),
-                      child: Text('In: ${_fmtJM(d.inAt)}'),
+              if (d.inAt != null)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'In: ${_fmtJM(d.inAt)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                  if (d.outAt != null) Text('Out: ${_fmtJM(d.outAt)}'),
-                ],
-              ),
+                    if (d.data?['placeIn'] != null)
+                      Text(
+                        d.data!['placeIn'],
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 12,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              if (d.outAt != null)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Out: ${_fmtJM(d.outAt)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    if (d.data?['placeOut'] != null)
+                      Text(
+                        d.data!['placeOut'],
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 12,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              if (d.data?['livePlace'] != null)
+                Text(
+                  'Live: ${d.data!['livePlace']}',
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                  overflow: TextOverflow.ellipsis,
+                ),
               const SizedBox(height: 6),
               // Shift timeline with status color
               SizedBox(
@@ -739,12 +882,16 @@ class DayMapModal extends StatefulWidget {
 class _DayMapModalState extends State<DayMapModal> {
   LatLng? _inLoc;
   LatLng? _outLoc;
+  LatLng? _liveLoc;
   String status = 'absent';
   DateTime? inAt;
   DateTime? outAt;
 
   String? inAddress;
   String? outAddress;
+  String? inPlace;
+  String? outPlace;
+  String? livePlace;
 
   @override
   void initState() {
@@ -768,18 +915,29 @@ class _DayMapModalState extends State<DayMapModal> {
 
       _inLoc = _toLatLng(data['inLoc'] ?? data['clockInLoc']);
       _outLoc = _toLatLng(data['outLoc'] ?? data['clockOutLoc']);
+
+      // Add live location support
+      _liveLoc = (data['liveLat'] != null && data['liveLng'] != null)
+          ? LatLng(data['liveLat'], data['liveLng'])
+          : null;
+
       inAt = (inTimestamp as Timestamp?)?.toDate();
       outAt = (outTimestamp as Timestamp?)?.toDate();
       status = (data['status'] ?? 'absent').toString();
 
+      // Get place names from stored data
+      inPlace = data['placeIn'] as String?;
+      outPlace = data['placeOut'] as String?;
+      livePlace = data['livePlace'] as String?;
+
       // Trigger initial UI update with location data
       if (mounted) setState(() {});
 
-      // Load addresses in background
-      if (_inLoc != null) {
+      // Load addresses in background for fallback
+      if (_inLoc != null && inPlace == null) {
         inAddress = await _reverseGeocode(_inLoc!);
       }
-      if (_outLoc != null) {
+      if (_outLoc != null && outPlace == null) {
         outAddress = await _reverseGeocode(_outLoc!);
       }
 
@@ -824,7 +982,7 @@ class _DayMapModalState extends State<DayMapModal> {
           infoWindow: InfoWindow(
             title: "Clock In Location",
             snippet: inAt != null
-                ? "Time: ${_fmtJM(inAt)}\n${inAddress ?? 'Loading address...'}"
+                ? "Time: ${_fmtJM(inAt)}\n${inPlace ?? inAddress ?? 'Loading address...'}"
                 : "Loading...",
           ),
           consumeTapEvents: true,
@@ -842,7 +1000,7 @@ class _DayMapModalState extends State<DayMapModal> {
           infoWindow: InfoWindow(
             title: "Clock Out Location",
             snippet: outAt != null
-                ? "Time: ${_fmtJM(outAt)}\n${outAddress ?? 'Loading address...'}"
+                ? "Time: ${_fmtJM(outAt)}\n${outPlace ?? outAddress ?? 'Loading address...'}"
                 : "Loading...",
           ),
           consumeTapEvents: true,
@@ -850,15 +1008,34 @@ class _DayMapModalState extends State<DayMapModal> {
       );
     }
 
-    // Use the most recent location as center, or fallback to Kingston, Jamaica
-    final center = _outLoc ?? _inLoc ?? const LatLng(18.0179, -76.8099);
+    // Add Live Location marker with blue color
+    if (_liveLoc != null) {
+      markers.add(
+        Marker(
+          markerId: const MarkerId("live_location"),
+          position: _liveLoc!,
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueAzure,
+          ),
+          infoWindow: InfoWindow(
+            title: "Live Location",
+            snippet: livePlace ?? 'Current location',
+          ),
+          consumeTapEvents: true,
+        ),
+      );
+    }
+
+    // Use the most recent location as center, prioritizing live location
+    final center =
+        _liveLoc ?? _outLoc ?? _inLoc ?? const LatLng(18.0179, -76.8099);
 
     // Calculate initial zoom based on available locations
     double initialZoom = 12.0;
-    if (_inLoc != null && _outLoc != null) {
-      // If we have both locations, use a wider zoom to fit both
+    if (_inLoc != null && (_outLoc != null || _liveLoc != null)) {
+      // If we have multiple locations, use a wider zoom to fit both
       initialZoom = 11.0;
-    } else if (_inLoc != null || _outLoc != null) {
+    } else if (_inLoc != null || _outLoc != null || _liveLoc != null) {
       // If we have one location, use a medium zoom
       initialZoom = 12.5;
     }
@@ -884,8 +1061,16 @@ class _DayMapModalState extends State<DayMapModal> {
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             Text("Status: $status"),
-            if (inAt != null) Text("Clock In: ${_fmtJM(inAt)}"),
-            if (outAt != null) Text("Clock Out: ${_fmtJM(outAt)}"),
+            if (inAt != null)
+              Text(
+                "Clock In: ${_fmtJM(inAt)}${inPlace != null ? ' • $inPlace' : ''}",
+              ),
+            if (outAt != null)
+              Text(
+                "Clock Out: ${_fmtJM(outAt)}${outPlace != null ? ' • $outPlace' : ''}",
+              ),
+            if (_liveLoc != null)
+              Text("Live: ${livePlace ?? 'Current location'}"),
             const SizedBox(height: 12),
             Expanded(
               child: Container(
