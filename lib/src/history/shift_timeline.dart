@@ -16,7 +16,8 @@ class ShiftTimeline extends StatelessWidget {
     this.clockOutAuto = false,
     this.placeIn,
     this.placeOut,
-    this.livePlace, required Color color,
+    this.livePlace,
+    required Color color,
   });
 
   @override
@@ -24,33 +25,27 @@ class ShiftTimeline extends StatelessWidget {
     final status = _getStatus(clockIn, clockOut);
 
     Color color;
-    IconData icon;
     String label;
 
     switch (status) {
       case 'early':
         color = Colors.green;
-        icon = Icons.check_circle;
         label = 'Early';
         break;
       case 'late':
         color = Colors.orange;
-        icon = Icons.warning_amber_rounded;
         label = 'Late';
         break;
       case 'left_early':
         color = Colors.deepOrange;
-        icon = Icons.access_time;
         label = 'Left Early';
         break;
       case 'absent':
         color = Colors.red;
-        icon = Icons.cancel;
         label = 'Absent';
         break;
       default:
         color = Colors.grey;
-        icon = Icons.schedule;
         label = 'Pending';
     }
 
@@ -61,86 +56,52 @@ class ShiftTimeline extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 6,
-            offset: Offset(0, 3),
-          ),
+          BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 3)),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          // Title + Status Row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "Shift Timeline",
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              Text(
-                label,
-                style: TextStyle(color: color, fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          // Clock In Row
-          if (clockIn != null)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.login, size: 16, color: Colors.green),
-                        const SizedBox(width: 4),
-                        Text(
-                          "Clock In: ${_fmtJM(clockIn)}",
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                    if (placeIn != null)
-                      Text(
-                        placeIn!,
-                        style: TextStyle(
-                          color: Colors.grey.shade600,
-                          fontSize: 12,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                  ],
+                Text(
+                  "Shift Timeline",
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                Icon(icon, color: color),
-              ],
-            ),
-
-          // Clock Out Row
-          if (clockOut != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
+                const SizedBox(height: 4),
+                Text(
+                  "Status: $label",
+                  style: TextStyle(color: color, fontWeight: FontWeight.w600),
+                ),
+                if (clockIn != null)
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.logout, size: 16, color: Colors.red),
-                          const SizedBox(width: 4),
-                          Text(
-                            "Clock Out: ${_fmtJM(clockOut)}${clockOutAuto ? ' (Auto)' : ''}",
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                      Text(
+                        "Clock In: ${_fmtJM(clockIn)}",
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      if (placeIn != null)
+                        Text(
+                          placeIn!,
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 12,
                           ),
-                        ],
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
+                  ),
+                if (clockOut != null)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Clock Out: ${_fmtJM(clockOut)}${clockOutAuto ? ' (Auto)' : ''}",
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       if (placeOut != null)
                         Text(
@@ -153,30 +114,15 @@ class ShiftTimeline extends StatelessWidget {
                         ),
                     ],
                   ),
-                  Icon(icon, color: color),
-                ],
-              ),
-            ),
-
-          // Live Place Row
-          if (livePlace != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
+                if (livePlace != null)
                   Text(
                     "Live: $livePlace",
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                     overflow: TextOverflow.ellipsis,
                   ),
-                  Icon(icon, color: color),
-                ],
-              ),
+              ],
             ),
+          ),
         ],
       ),
     );

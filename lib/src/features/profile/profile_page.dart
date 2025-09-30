@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -360,25 +361,46 @@ class _ProfilePageState extends State<ProfilePage> {
   Uint8List? _imageData;
   final _cropController = CropController();
 
+  // Stream subscription for cleanup
+  StreamSubscription? _userDataSubscription;
+
   @override
   void initState() {
     super.initState();
     final user = AuthService.instance.currentUser;
     if (user != null) {
-      UserService.instance.getUser(user.uid).listen((doc) {
-        final data = doc.data();
-        if (data != null && mounted) {
-          _firstName.text = (data['firstName'] ?? '') as String;
-          _lastName.text = (data['lastName'] ?? '') as String;
-          _bio.text = (data['bio'] ?? '') as String;
-          _phone.text = (data['phone'] ?? '') as String;
-          setState(() {
-            _photoUrl = data['photoUrl'] as String?;
-            _coverUrl = data['coverUrl'] as String?; // Listen for cover URL
-          });
-        }
-      });
+      _userDataSubscription = UserService.instance
+          .getUser(user.uid)
+          .listen(
+            (doc) {
+              final data = doc.data();
+              if (data != null && mounted) {
+                _firstName.text = (data['firstName'] ?? '') as String;
+                _lastName.text = (data['lastName'] ?? '') as String;
+                _bio.text = (data['bio'] ?? '') as String;
+                _phone.text = (data['phone'] ?? '') as String;
+                setState(() {
+                  _photoUrl = data['photoUrl'] as String?;
+                  _coverUrl =
+                      data['coverUrl'] as String?; // Listen for cover URL
+                });
+              }
+            },
+            onError: (error) {
+              // Handle permission errors during logout gracefully
+              if (error.toString().contains('permission-denied')) {
+                // User logged out, stop listening
+                return;
+              }
+            },
+          );
     }
+  }
+
+  @override
+  void dispose() {
+    _userDataSubscription?.cancel();
+    super.dispose();
   }
 
   @override
@@ -409,7 +431,13 @@ class _ProfilePageState extends State<ProfilePage> {
               pinned: true,
               actions: [
                 IconButton(
-                  onPressed: () => _onLogout(context),
+                  onPressed: () async {
+                    try {
+                      await _onLogout(context);
+                    } catch (e) {
+                      // Handle any errors silently for the app bar button
+                    }
+                  },
                   icon: Icon(Icons.logout),
                 ),
               ],
@@ -649,9 +677,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     SizedBox(
                       width: double.infinity,
                       child: TextButton(
-                        onPressed: () async {
-                          await AuthService.instance.logout();
-                        },
+                        onPressed: () => _onLogout(context),
                         child: const Text('Logout'),
                       ),
                     ),

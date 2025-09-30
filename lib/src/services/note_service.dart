@@ -23,17 +23,30 @@ class NotesService {
 
   Stream<QuerySnapshot<Map<String, dynamic>>> publicFeeds() {
     print('🔍 Querying public feeds...');
-    return _db
-        .collectionGroup('notes')
-        .where('visibility', isEqualTo: 'public')
-        .orderBy('aud_dt', descending: true)
-        .limit(100)
-        .snapshots()
-        .handleError((error) {
-          print('❌ Error in publicFeeds stream: $error');
-          print('Error type: ${error.runtimeType}');
-          print('This is likely a Firestore security rules issue');
-        });
+    try {
+      return _db
+          .collectionGroup('notes')
+          .where('visibility', isEqualTo: 'public')
+          .orderBy('aud_dt', descending: true)
+          .limit(100)
+          .snapshots()
+          .handleError((error) {
+            print('❌ Error in publicFeeds stream: $error');
+            print('Error type: ${error.runtimeType}');
+            if (error.toString().contains('permission-denied')) {
+              print('🔐 Permission denied: Check Firestore security rules');
+              print('Make sure collection group queries for notes are allowed');
+              print(
+                'Try updating Firestore rules or check user authentication',
+              );
+            }
+            throw error; // Re-throw to let UI handle it
+          });
+    } catch (e) {
+      print('❌ Exception in publicFeeds setup: $e');
+      // Return an empty stream in case of setup errors
+      return Stream.empty();
+    }
   }
 
   Future<String> createNote(
@@ -161,6 +174,26 @@ class NotesService {
     required String uid,
   }) async {
     await noteRef.collection('reports').doc(uid).delete();
+  }
+
+  /// Check if the current user has reported a specific note
+  Stream<bool> isNoteReportedByUser({
+    required DocumentReference<Map<String, dynamic>> noteRef,
+    required String uid,
+  }) {
+    return noteRef
+        .collection('reports')
+        .doc(uid)
+        .snapshots()
+        .map((snapshot) => snapshot.exists);
+  }
+
+  /// Get user's report details for a specific note
+  Stream<DocumentSnapshot<Map<String, dynamic>>> getUserReportForNote({
+    required DocumentReference<Map<String, dynamic>> noteRef,
+    required String uid,
+  }) {
+    return noteRef.collection('reports').doc(uid).snapshots();
   }
 
   /// Admin: stream all report docs across all notes (newest first)
