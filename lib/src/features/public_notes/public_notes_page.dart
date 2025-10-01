@@ -203,7 +203,13 @@ class PublicFeeds extends StatelessWidget {
     final uid = user.uid;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Public Feeds')),
+      backgroundColor: Color(0xFFF7F9FC),
+      appBar: AppBar(
+        backgroundColor: Color(0xFF2C3E50),
+        foregroundColor: Colors.white,
+        automaticallyImplyLeading: false,
+        title: const Text('Public Feeds'),
+      ),
       body: SuspensionCheck(
         restrictWriteAccess: true,
         child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -212,6 +218,16 @@ class PublicFeeds extends StatelessWidget {
             if (snap.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
+
+            // Handle errors (including permission denied during logout)
+            if (snap.hasError) {
+              print('PublicFeeds error: ${snap.error}');
+              if (snap.error.toString().contains('permission-denied')) {
+                return const Center(child: Text('Authentication required'));
+              }
+              return Center(child: Text('Error: ${snap.error}'));
+            }
+
             if (!snap.hasData) {
               return const Center(child: Text('Loading...'));
             }
@@ -262,6 +278,16 @@ class PublicFeeds extends StatelessWidget {
                             .snapshots(),
                         builder: (context, userSnapshot) {
                           bool isSuspended = false;
+                          if (userSnapshot.hasError) {
+                            // Handle permission errors during logout gracefully
+                            return IconButton(
+                              icon: Icon(
+                                Icons.favorite_border,
+                                color: Colors.grey,
+                              ),
+                              onPressed: null,
+                            );
+                          }
                           if (userSnapshot.hasData) {
                             final userData =
                                 userSnapshot.data!.data()
@@ -275,32 +301,55 @@ class PublicFeeds extends StatelessWidget {
                                 : (isLiked ? 'Unlike' : 'Like'),
                             icon: Icon(
                               isLiked ? Icons.favorite : Icons.favorite_border,
-                              color: isSuspended ? Colors.grey : null,
+                              color: isSuspended
+                                  ? Colors.grey
+                                  : (isLiked
+                                        ? Color(0xFFE74C3C)
+                                        : Color(0xFF5D6D7E)),
                             ),
                             onPressed: isSuspended
                                 ? null
                                 : () async {
-                                    // Toggle the like
-                                    await NotesService.instance.toggleLike(
-                                      noteRef: ref,
-                                      uid: uid,
-                                    );
+                                    try {
+                                      print(
+                                        '🔍 Attempting to toggle like for note: ${ref.id}',
+                                      );
+                                      print('🔍 Current user uid: $uid');
+                                      print(
+                                        '🔍 Current isLiked status: $isLiked',
+                                      );
+                                      print('🔍 Current likes count: $likes');
 
-                                    // Send notification if note was just liked (not unliked)
-                                    if (!isLiked) {
-                                      try {
-                                        await NotificationService.sendPushNotification(
-                                          deviceToken:
-                                              'user_${data['authorId']}', // This should be the actual FCM token
-                                          title: 'Your note was liked!',
-                                          body:
-                                              'Someone liked your note: "$title"',
-                                        );
-                                      } catch (e) {
-                                        print(
-                                          'Error sending like notification: $e',
-                                        );
+                                      // Toggle the like
+                                      await NotesService.instance.toggleLike(
+                                        noteRef: ref,
+                                        uid: uid,
+                                      );
+
+                                      print('✅ Successfully toggled like');
+
+                                      // Send notification if note was just liked (not unliked)
+                                      if (!isLiked) {
+                                        try {
+                                          await NotificationService.sendPushNotification(
+                                            deviceToken:
+                                                'user_${data['authorId']}', // This should be the actual FCM token
+                                            title: 'Your note was liked!',
+                                            body:
+                                                'Someone liked your note: "$title"',
+                                          );
+                                        } catch (e) {
+                                          print(
+                                            'Error sending like notification: $e',
+                                          );
+                                        }
                                       }
+                                    } catch (e) {
+                                      print('❌ Error toggling like: $e');
+                                      displaySnackBar(
+                                        context,
+                                        'Failed to like note: $e',
+                                      );
                                     }
                                   },
                           );
@@ -313,6 +362,13 @@ class PublicFeeds extends StatelessWidget {
                             .snapshots(),
                         builder: (context, userSnapshot) {
                           bool isSuspended = false;
+                          if (userSnapshot.hasError) {
+                            // Handle permission errors during logout gracefully
+                            return IconButton(
+                              icon: Icon(Icons.more_vert, color: Colors.grey),
+                              onPressed: null,
+                            );
+                          }
                           if (userSnapshot.hasData) {
                             final userData =
                                 userSnapshot.data!.data()
@@ -325,52 +381,141 @@ class PublicFeeds extends StatelessWidget {
                                   tooltip: 'Actions disabled (suspended)',
                                   icon: Icon(
                                     Icons.more_vert,
-                                    color: Colors.grey,
+                                    color: Color(0xFF95A5BC),
                                   ),
                                   onPressed: null,
                                 )
-                              : PopupMenuButton<String>(
-                                  onSelected: (v) async {
-                                    if (v == 'report') {
-                                      final reason = await askReportReason(
-                                        context,
-                                      );
-                                      if (reason != null &&
-                                          reason.trim().isNotEmpty) {
-                                        await NotesService.instance.reportNote(
-                                          noteRef: ref,
-                                          uid: uid,
-                                          reason: reason.trim(),
-                                        );
-                                        displaySnackBar(
-                                          context,
-                                          'Thanks — report submitted.',
-                                          backgroundColor: Colors.green,
-                                        );
-                                      }
-                                    } else if (v == 'unreport') {
-                                      await NotesService.instance.unreportNote(
+                              : StreamBuilder<bool>(
+                                  stream: NotesService.instance
+                                      .isNoteReportedByUser(
                                         noteRef: ref,
                                         uid: uid,
-                                      );
-                                      displaySnackBar(
-                                        context,
-                                        'Your report was removed.',
-                                        backgroundColor: Colors.blue,
+                                      ),
+                                  builder: (context, reportSnapshot) {
+                                    if (reportSnapshot.hasError) {
+                                      // Handle permission errors during logout gracefully
+                                      return IconButton(
+                                        icon: Icon(Icons.more_vert),
+                                        onPressed: null,
                                       );
                                     }
-                                  },
-                                  itemBuilder: (BuildContext context) {
-                                    return const [
-                                      PopupMenuItem(
-                                        value: 'report',
-                                        child: Text('Report'),
-                                      ),
-                                      PopupMenuItem(
-                                        value: 'unreport',
-                                        child: Text('Undo report'),
-                                      ),
-                                    ];
+                                    final isReported =
+                                        reportSnapshot.data ?? false;
+
+                                    return Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        // Report status indicator
+                                        if (isReported)
+                                          Container(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 6,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.orange.shade100,
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                              border: Border.all(
+                                                color: Colors.orange.shade300,
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.flag,
+                                                  size: 12,
+                                                  color: Colors.orange.shade700,
+                                                ),
+                                                SizedBox(width: 2),
+                                                Text(
+                                                  'Reported',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w500,
+                                                    color:
+                                                        Colors.orange.shade700,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        SizedBox(width: 4),
+                                        // Actions menu
+                                        PopupMenuButton<String>(
+                                          onSelected: (v) async {
+                                            if (v == 'report') {
+                                              final reason =
+                                                  await askReportReason(
+                                                    context,
+                                                  );
+                                              if (reason != null &&
+                                                  reason.trim().isNotEmpty) {
+                                                await NotesService.instance
+                                                    .reportNote(
+                                                      noteRef: ref,
+                                                      uid: uid,
+                                                      reason: reason.trim(),
+                                                    );
+                                                displaySnackBar(
+                                                  context,
+                                                  'Thanks — report submitted.',
+                                                  backgroundColor: Colors.green,
+                                                );
+                                              }
+                                            } else if (v == 'unreport') {
+                                              await NotesService.instance
+                                                  .unreportNote(
+                                                    noteRef: ref,
+                                                    uid: uid,
+                                                  );
+                                              displaySnackBar(
+                                                context,
+                                                'Your report was removed.',
+                                                backgroundColor: Color(
+                                                  0xFF3498DB,
+                                                ),
+                                              );
+                                            }
+                                          },
+                                          itemBuilder: (BuildContext context) {
+                                            return [
+                                              if (!isReported)
+                                                PopupMenuItem(
+                                                  value: 'report',
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(
+                                                        Icons.flag_outlined,
+                                                        size: 16,
+                                                        color: Colors.red,
+                                                      ),
+                                                      SizedBox(width: 8),
+                                                      Text('Report Note'),
+                                                    ],
+                                                  ),
+                                                ),
+                                              if (isReported)
+                                                PopupMenuItem(
+                                                  value: 'unreport',
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(
+                                                        Icons.flag_circle,
+                                                        size: 16,
+                                                        color: Colors.orange,
+                                                      ),
+                                                      SizedBox(width: 8),
+                                                      Text('Remove Report'),
+                                                    ],
+                                                  ),
+                                                ),
+                                            ];
+                                          },
+                                        ),
+                                      ],
+                                    );
                                   },
                                 );
                         },
@@ -401,6 +546,7 @@ class PublicFeeds extends StatelessWidget {
           }
 
           return FloatingActionButton(
+            heroTag: "public_notes_fab",
             onPressed: isSuspended
                 ? null
                 : () async {

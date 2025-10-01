@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/attendance_service.dart';
+import 'package:students_reminder/src/services/notification_service.dart';
 
 class AdminService {
   AdminService._();
@@ -18,64 +19,9 @@ class AdminService {
     return userData?['role'] == 'admin';
   }
 
-  // REPORTS MANAGEMENT
-
-  // Get all reports for admin review
-  Stream<QuerySnapshot<Map<String, dynamic>>> getAllReports() {
-    return _db
-        .collection('reports')
-        .orderBy('createdAt', descending: true)
-        .snapshots();
-  }
-
-  // Get reports by status (pending, reviewed, resolved)
-  Stream<QuerySnapshot<Map<String, dynamic>>> getReportsByStatus(
-    String status,
-  ) {
-    return _db
-        .collection('reports')
-        .where('status', isEqualTo: status)
-        .orderBy('createdAt', descending: true)
-        .snapshots();
-  }
-
-  // Update report status
-  Future<void> updateReportStatus(
-    String reportId,
-    String status, {
-    String? adminNotes,
-  }) async {
-    final currentUser = AuthService.instance.currentUser;
-    if (currentUser == null) {
-      throw Exception('User not authenticated');
-    }
-
-    final data = <String, dynamic>{
-      'status': status,
-      'reviewedAt': FieldValue.serverTimestamp(),
-      'reviewedBy': currentUser.uid,
-    };
-
-    if (adminNotes != null) {
-      data['adminNotes'] = adminNotes;
-    }
-
-    await _db.collection('reports').doc(reportId).update(data);
-
-    // Log admin action
-    await _logAdminAction('report_status_update', {
-      'reportId': reportId,
-      'newStatus': status,
-      'adminNotes': adminNotes,
-    });
-  }
+  // REPORTS MANAGEMENT - Functions removed as they were unused
 
   // USER MANAGEMENT
-
-  // Get all users for admin management
-  Stream<QuerySnapshot<Map<String, dynamic>>> getAllUsers() {
-    return _db.collection('users').orderBy('lastName').snapshots();
-  }
 
   // Suspend a user
   Future<void> suspendUser(
@@ -101,6 +47,14 @@ class AdminService {
 
     await _db.collection('users').doc(userId).update(data);
 
+    // Send notification to user
+    await _sendSuspensionNotification(
+      userId,
+      'suspended',
+      reason: reason,
+      until: until,
+    );
+
     // Log admin action
     await _logAdminAction('user_suspend', {
       'userId': userId,
@@ -118,6 +72,9 @@ class AdminService {
       'suspensionReason': FieldValue.delete(),
       'suspendedUntil': FieldValue.delete(),
     });
+
+    // Send notification to user
+    await _sendSuspensionNotification(userId, 'unsuspended');
 
     // Log admin action
     await _logAdminAction('user_unsuspend', {'userId': userId});
@@ -137,6 +94,9 @@ class AdminService {
       'flagReason': reason,
     });
 
+    // Send notification to user
+    await _sendFlagNotification(userId, 'flagged', reason: reason);
+
     // Log admin action
     await _logAdminAction('user_flag', {'userId': userId, 'reason': reason});
   }
@@ -154,6 +114,9 @@ class AdminService {
       'flaggedBy': FieldValue.delete(),
       'flagReason': FieldValue.delete(),
     });
+
+    // Send notification to user
+    await _sendFlagNotification(userId, 'unflagged');
 
     // Log admin action
     await _logAdminAction('user_unflag', {'userId': userId});
@@ -235,23 +198,6 @@ class AdminService {
 
   // NOTE MODERATION
 
-  // Get all notes for moderation
-  Stream<QuerySnapshot<Map<String, dynamic>>> getAllNotesForModeration() {
-    return _db
-        .collectionGroup('notes')
-        .orderBy('aud_dt', descending: true)
-        .snapshots();
-  }
-
-  // Get flagged notes
-  Stream<QuerySnapshot<Map<String, dynamic>>> getFlaggedNotes() {
-    return _db
-        .collectionGroup('notes')
-        .where('flagged', isEqualTo: true)
-        .orderBy('aud_dt', descending: true)
-        .snapshots();
-  }
-
   // Flag a note
   Future<void> flagNote(String userId, String noteId, String reason) async {
     final currentUser = AuthService.instance.currentUser;
@@ -279,8 +225,8 @@ class AdminService {
     });
   }
 
-  // Suspend a note (hide from public view)
-  Future<void> suspendNote(String userId, String noteId, String reason) async {
+  // Unflag a note
+  Future<void> unflagNote(String userId, String noteId) async {
     final currentUser = AuthService.instance.currentUser;
     if (currentUser == null) {
       throw Exception('User not authenticated');
@@ -292,19 +238,14 @@ class AdminService {
         .collection('notes')
         .doc(noteId)
         .update({
-          'suspended': true,
-          'suspendedAt': FieldValue.serverTimestamp(),
-          'suspendedBy': currentUser.uid,
-          'suspensionReason': reason,
-          'visibility': 'private', // Force to private when suspended
+          'flagged': false,
+          'unflaggedAt': FieldValue.serverTimestamp(),
+          'unflaggedBy': currentUser.uid,
+          'flagReason': FieldValue.delete(), // Remove the flag reason
         });
 
     // Log admin action
-    await _logAdminAction('note_suspend', {
-      'userId': userId,
-      'noteId': noteId,
-      'reason': reason,
-    });
+    await _logAdminAction('note_unflag', {'userId': userId, 'noteId': noteId});
   }
 
   // Delete a note
@@ -322,28 +263,6 @@ class AdminService {
         .collection('notes')
         .doc(noteId)
         .delete();
-  }
-
-  // Restore a suspended note
-  Future<void> restoreNote(String userId, String noteId) async {
-    await _db
-        .collection('users')
-        .doc(userId)
-        .collection('notes')
-        .doc(noteId)
-        .update({
-          'suspended': FieldValue.delete(),
-          'suspendedAt': FieldValue.delete(),
-          'suspendedBy': FieldValue.delete(),
-          'suspensionReason': FieldValue.delete(),
-          'flagged': FieldValue.delete(),
-          'flaggedAt': FieldValue.delete(),
-          'flaggedBy': FieldValue.delete(),
-          'flagReason': FieldValue.delete(),
-        });
-
-    // Log admin action
-    await _logAdminAction('note_restore', {'userId': userId, 'noteId': noteId});
   }
 
   // ADMIN ACTIONS LOGGING
@@ -366,74 +285,7 @@ class AdminService {
     });
   }
 
-  // Get admin action logs
-  Stream<QuerySnapshot<Map<String, dynamic>>> getAdminActionLogs() {
-    return _db
-        .collection('adminActions')
-        .orderBy('timestamp', descending: true)
-        .snapshots();
-  }
-
-  // Get admin action logs by action type
-  Stream<QuerySnapshot<Map<String, dynamic>>> getAdminActionLogsByType(
-    String actionType,
-  ) {
-    return _db
-        .collection('adminActions')
-        .where('actionType', isEqualTo: actionType)
-        .orderBy('timestamp', descending: true)
-        .snapshots();
-  }
-
-  // REPORTING SYSTEM
-
-  // Create a report
-  Future<void> createReport({
-    required String reportType, // 'note', 'user', 'behavior'
-    required String targetId, // noteId or userId
-    required String targetUserId, // owner of the reported content/user
-    required String reason,
-    String? description,
-    Map<String, dynamic>? metadata,
-  }) async {
-    final currentUser = AuthService.instance.currentUser;
-    if (currentUser == null) {
-      throw Exception('User not authenticated');
-    }
-
-    await _db.collection('reports').add({
-      'reportType': reportType,
-      'targetId': targetId,
-      'targetUserId': targetUserId,
-      'reporterId': currentUser.uid,
-      'reporterEmail': currentUser.email,
-      'reason': reason,
-      'description': description,
-      'metadata': metadata ?? {},
-      'status': 'pending',
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-  }
-
-  // Get reports for a specific user
-  Stream<QuerySnapshot<Map<String, dynamic>>> getReportsForUser(String userId) {
-    return _db
-        .collection('reports')
-        .where('targetUserId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
-        .snapshots();
-  }
-
-  // Get reports by a specific reporter
-  Stream<QuerySnapshot<Map<String, dynamic>>> getReportsByReporter(
-    String reporterId,
-  ) {
-    return _db
-        .collection('reports')
-        .where('reporterId', isEqualTo: reporterId)
-        .orderBy('createdAt', descending: true)
-        .snapshots();
-  }
+  // REPORTING SYSTEM - Functions removed as they were unused
 
   // ATTENDANCE MANAGEMENT
 
@@ -612,5 +464,235 @@ class AdminService {
       'overrideBy': currentUser.uid,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  /// Send suspension/unsuspension notification to user
+  Future<void> _sendSuspensionNotification(
+    String userId,
+    String action, {
+    String? reason,
+    DateTime? until,
+  }) async {
+    try {
+      final currentUser = AuthService.instance.currentUser;
+      if (currentUser == null) return;
+
+      // Get admin info
+      final adminDoc = await _db.collection('users').doc(currentUser.uid).get();
+      final adminData = adminDoc.data();
+      final adminName = adminData != null
+          ? '${adminData['firstName'] ?? ''} ${adminData['lastName'] ?? ''}'
+                .trim()
+          : 'Administrator';
+
+      // Get user info
+      final userDoc = await _db.collection('users').doc(userId).get();
+      final userData = userDoc.data();
+      final userName = userData != null
+          ? '${userData['firstName'] ?? ''} ${userData['lastName'] ?? ''}'
+                .trim()
+          : 'User';
+
+      String title, body;
+      String notificationType;
+
+      if (action == 'suspended') {
+        title = 'Account Suspended';
+        body = reason != null
+            ? 'Your account has been suspended. Reason: $reason'
+            : 'Your account has been suspended by an administrator.';
+        if (until != null) {
+          final untilStr = until.toLocal().toString().split(' ')[0];
+          body += ' Suspension will be lifted on $untilStr.';
+        }
+        notificationType = 'account_suspended';
+      } else {
+        title = 'Account Restored';
+        body =
+            'Your account suspension has been lifted. You now have full access to the app.';
+        notificationType = 'account_unsuspended';
+      }
+
+      // Check for existing recent notification to prevent duplicates
+      final recentNotifications = await _db
+          .collection('users')
+          .doc(userId)
+          .collection('notifications')
+          .where('type', isEqualTo: notificationType)
+          .where('actionBy', isEqualTo: currentUser.uid)
+          .orderBy('createdAt', descending: true)
+          .limit(1)
+          .get();
+
+      // Don't send notification if one was sent in the last 5 minutes
+      bool shouldSendNotification = true;
+      if (recentNotifications.docs.isNotEmpty) {
+        final lastNotification = recentNotifications.docs.first;
+        final lastNotificationTime =
+            lastNotification['createdAt'] as Timestamp?;
+        if (lastNotificationTime != null) {
+          final timeDifference = DateTime.now().difference(
+            lastNotificationTime.toDate(),
+          );
+          if (timeDifference.inMinutes < 5) {
+            shouldSendNotification = false;
+            print('Skipping duplicate $action notification for user $userName');
+          }
+        }
+      }
+
+      if (shouldSendNotification) {
+        // Store notification in user's notifications collection
+        await _db
+            .collection('users')
+            .doc(userId)
+            .collection('notifications')
+            .add({
+              'title': title,
+              'body': body,
+              'type': notificationType,
+              'priority': 'high',
+              'read': false,
+              'actionBy': currentUser.uid,
+              'adminName': adminName,
+              'action': action,
+              'reason': reason,
+              'suspendedUntil': until != null
+                  ? Timestamp.fromDate(until)
+                  : null,
+              'createdAt': FieldValue.serverTimestamp(),
+            });
+
+        // Send push notification if user has FCM token
+        if (userData?['fcmToken'] != null) {
+          try {
+            await NotificationService.sendPushNotification(
+              deviceToken: userData!['fcmToken'],
+              title: title,
+              body: body,
+            );
+            print('Push notification sent to $userName for $action');
+          } catch (e) {
+            print('Failed to send push notification: $e');
+          }
+        }
+
+        print('$action notification sent to user $userName');
+      }
+    } catch (e) {
+      print('Error sending suspension notification: $e');
+    }
+  }
+
+  /// Send flag/unflag notification to user
+  Future<void> _sendFlagNotification(
+    String userId,
+    String action, {
+    String? reason,
+  }) async {
+    try {
+      final currentUser = AuthService.instance.currentUser;
+      if (currentUser == null) return;
+
+      // Get admin info
+      final adminDoc = await _db.collection('users').doc(currentUser.uid).get();
+      final adminData = adminDoc.data();
+      final adminName = adminData != null
+          ? '${adminData['firstName'] ?? ''} ${adminData['lastName'] ?? ''}'
+                .trim()
+          : 'Administrator';
+
+      // Get user info
+      final userDoc = await _db.collection('users').doc(userId).get();
+      final userData = userDoc.data();
+      final userName = userData != null
+          ? '${userData['firstName'] ?? ''} ${userData['lastName'] ?? ''}'
+                .trim()
+          : 'User';
+
+      String title, body;
+      String notificationType;
+
+      if (action == 'flagged') {
+        title = 'Account Flagged';
+        body = reason != null
+            ? 'Your account has been flagged. Reason: $reason'
+            : 'Your account has been flagged by an administrator.';
+        body +=
+            ' Please review your recent activity and follow community guidelines.';
+        notificationType = 'account_flagged';
+      } else {
+        title = 'Flag Removed';
+        body =
+            'The flag on your account has been removed. Thank you for following community guidelines.';
+        notificationType = 'account_unflagged';
+      }
+
+      // Check for existing recent notification to prevent duplicates
+      final recentNotifications = await _db
+          .collection('users')
+          .doc(userId)
+          .collection('notifications')
+          .where('type', isEqualTo: notificationType)
+          .where('actionBy', isEqualTo: currentUser.uid)
+          .orderBy('createdAt', descending: true)
+          .limit(1)
+          .get();
+
+      // Don't send notification if one was sent in the last 5 minutes
+      bool shouldSendNotification = true;
+      if (recentNotifications.docs.isNotEmpty) {
+        final lastNotification = recentNotifications.docs.first;
+        final lastNotificationTime =
+            lastNotification['createdAt'] as Timestamp?;
+        if (lastNotificationTime != null) {
+          final timeDifference = DateTime.now().difference(
+            lastNotificationTime.toDate(),
+          );
+          if (timeDifference.inMinutes < 5) {
+            shouldSendNotification = false;
+            print('Skipping duplicate $action notification for user $userName');
+          }
+        }
+      }
+
+      if (shouldSendNotification) {
+        // Store notification in user's notifications collection
+        await _db
+            .collection('users')
+            .doc(userId)
+            .collection('notifications')
+            .add({
+              'title': title,
+              'body': body,
+              'type': notificationType,
+              'priority': 'medium',
+              'read': false,
+              'actionBy': currentUser.uid,
+              'adminName': adminName,
+              'action': action,
+              'reason': reason,
+              'createdAt': FieldValue.serverTimestamp(),
+            });
+
+        // Send push notification if user has FCM token
+        if (userData?['fcmToken'] != null) {
+          try {
+            await NotificationService.sendPushNotification(
+              deviceToken: userData!['fcmToken'],
+              title: title,
+              body: body,
+            );
+            print('Push notification sent to $userName for $action');
+          } catch (e) {
+            print('Failed to send push notification: $e');
+          }
+        }
+
+        print('$action notification sent to user $userName');
+      }
+    } catch (e) {
+      print('Error sending flag notification: $e');
+    }
   }
 }

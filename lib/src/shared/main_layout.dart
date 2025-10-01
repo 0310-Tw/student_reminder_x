@@ -1,6 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:curved_navigation_bar/curved_navigation_bar.dart';
+import 'package:students_reminder/src/admin/pages/admin_dashborad.dart';
 import 'package:students_reminder/src/features/auth/login_page.dart';
 import 'package:students_reminder/src/features/home/home_page.dart';
 import 'package:students_reminder/src/features/notes/my_notes_page.dart';
@@ -10,9 +12,11 @@ import 'package:students_reminder/src/history/attendance_history.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/admin_service.dart';
 import 'package:students_reminder/src/services/notification_service.dart';
-import 'package:students_reminder/src/admin/pages/admin_home_page.dart';
+import 'package:students_reminder/src/admin/pages/admin_profileview_page.dart';
 import 'package:students_reminder/src/admin/pages/admin_public_feeds.dart';
 import 'package:students_reminder/src/admin/pages/attendance_admin_page.dart';
+import 'package:students_reminder/src/timetable/timetable.dart';
+import 'package:students_reminder/src/timetable/timetable_display.dart';
 
 class MainLayoutPage extends StatefulWidget {
   const MainLayoutPage({super.key});
@@ -38,7 +42,7 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
   Future<void> _initializeNotifications() async {
     try {
       await NotificationService.initialize();
-      print('Foreground notifications initialized for logged-in user');
+      // print('Foreground notifications initialized for logged-in user');
 
       // Update FCM token for this user
       final token = await NotificationService.getToken();
@@ -110,60 +114,45 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
   }
 
   void _updatePages() {
+    final previousPageCount = _pages.length;
     if (_isAdmin) {
       _pages = [
-        const AdminHomePage(), // Users tab
-        const AdminPublicFeeds(), // Content tab
-        const AttendanceAdminPage(), // Attendance tab
-        const ProfilePage(), // Profile tab
+        const AdminDashboard(),
+        const AdminPublicFeeds(),
+        const AttendanceAdminPage(),
+        const ProfilePage(),
       ];
     } else {
       _pages = [
         const HomePage(),
         const MyNotesPage(),
+        TimetableGeneratorScreen(),
         PublicFeeds(),
         AttendanceHistory14d(),
-        const ProfilePage(),
       ];
+
+    // Reset index if switching between admin/student mode or if current index is out of bounds
+    if (previousPageCount != _pages.length || _index >= _pages.length) {
+      _index = 0;
+     }
     }
   }
 
-  List<NavigationDestination> _buildNavigationDestinations() {
+  List<Widget> _buildNavigationIcons() {
     if (_isAdmin) {
       return [
-        const NavigationDestination(icon: Icon(Icons.people), label: 'Users'),
-        const NavigationDestination(
-          icon: Icon(Icons.content_copy),
-          label: 'Content',
-        ),
-        const NavigationDestination(
-          icon: Icon(Icons.assessment),
-          label: 'Attendance',
-        ),
-        const NavigationDestination(
-          icon: Icon(Icons.person_outline),
-          label: 'Profile',
-        ),
+        Icon(Icons.people, size: 30, color: Colors.white),
+        Icon(Icons.content_copy, size: 30, color: Colors.white),
+        Icon(Icons.assessment, size: 30, color: Colors.white),
+        Icon(Icons.person_outline, size: 30, color: Colors.white),
       ];
     } else {
       return [
-        const NavigationDestination(icon: Icon(Icons.home), label: 'Home'),
-        const NavigationDestination(
-          icon: Icon(Icons.event_note),
-          label: 'Notes',
-        ),
-        const NavigationDestination(
-          icon: Icon(Icons.public),
-          label: 'Public Feeds',
-        ),
-        const NavigationDestination(
-          icon: Icon(Icons.history),
-          label: 'Attendance',
-        ),
-        const NavigationDestination(
-          icon: Icon(Icons.person_outline),
-          label: 'Profile',
-        ),
+        Icon(Icons.home, size: 30, color: Colors.white),
+        Icon(Icons.book_online, size: 30, color: Colors.white),
+        Icon(Icons.calendar_month, size: 30, color: Colors.white), // timetable
+        Icon(Icons.public, size: 30, color: Colors.white),
+        Icon(Icons.history, size: 30, color: Colors.white),
       ];
     }
   }
@@ -173,19 +162,47 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
     return StreamBuilder<User?>(
       stream: AuthService.instance.authStateChanged(),
       builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting ||
-            _isLoadingAdminStatus) {
-          return Scaffold(body: Center(child: CircularProgressIndicator()));
-        }
         final user = snap.data;
         if (user == null) return LoginPage();
+
+        // Show loading only on initial load, not during navigation
+        if (snap.connectionState == ConnectionState.waiting && _pages.isEmpty) {
+          return Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+
+        // Show loading for admin status only if pages aren't initialized yet
+        if (_isLoadingAdminStatus && _pages.isEmpty) {
+          return Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+
+        // Use IndexedStack to prevent page rebuilds and maintain state
         return Scaffold(
-          body: _pages[_index],
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: _index,
-            destinations: _buildNavigationDestinations(),
-            onDestinationSelected: (i) => setState(() => _index = i),
+          body: IndexedStack(
+            key: ValueKey(_isAdmin ? 'admin' : 'student'),
+            index: _index,
+            children: _pages.isNotEmpty ? _pages : [Container()],
           ),
+          bottomNavigationBar: _pages.isNotEmpty
+              ? CurvedNavigationBar(
+                  index: _index,
+                  height: 60.0,
+                  items: _buildNavigationIcons(),
+                  color: _isAdmin
+                      ? const Color(0xFF6366F1)
+                      : const Color(0xFF3498DB),
+                  buttonBackgroundColor: _isAdmin
+                      ? const Color(0xFF4F46E5)
+                      : const Color(0xFF2980B9),
+                  backgroundColor: Colors.transparent,
+                  animationCurve: Curves.easeInOutCubic,
+                  animationDuration: const Duration(milliseconds: 250),
+                  onTap: (index) {
+                    if (index != _index && index < _pages.length) {
+                      setState(() => _index = index);
+                    }
+                  },
+                )
+              : null,
         );
       },
     );

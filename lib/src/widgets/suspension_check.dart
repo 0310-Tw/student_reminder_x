@@ -30,14 +30,14 @@ class SuspensionCheck extends StatelessWidget {
         final isFlagged = userData?['flagged'] == true;
 
         // Show notification banners for flagged/suspended users
-        if (isSuspended || (isFlagged && restrictWriteAccess)) {
+        if (isSuspended || isFlagged) {
           return Column(
             children: [
               // Suspension/Flag notification banner
               if (isSuspended) _buildSuspensionBanner(userData),
               if (isFlagged && !isSuspended) _buildFlagBanner(userData),
 
-              // If suspended and restrictWriteAccess is true, show read-only mode
+              // Only suspended users get restricted access, flagged users just get a warning
               if (isSuspended && restrictWriteAccess)
                 Expanded(child: _buildReadOnlyMode(userData))
               else
@@ -215,7 +215,7 @@ class SuspensionCheck extends StatelessWidget {
                   // You can implement a contact support feature here
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFF1976D2),
+                  backgroundColor: Color(0xFF3498DB),
                   foregroundColor: Colors.white,
                   padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   shape: RoundedRectangleBorder(

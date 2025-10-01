@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../services/attendance_service.dart';
 import '../../shared/misc.dart';
 
@@ -18,6 +19,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
   DateTime _endDate = DateTime.now();
   bool _isAdmin = false;
   bool _isLoading = true;
+  String _platformFilter = 'All'; // 'All', 'Web', 'Mobile'
 
   // Real-time synchronization
   StreamSubscription<QuerySnapshot>? _attendanceSubscription;
@@ -70,7 +72,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     if (!_isAdmin) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Access Denied'),
+          title: Text('Access Denied'),
           backgroundColor: Color(0xFF1A237E),
           foregroundColor: Colors.white,
         ),
@@ -129,23 +131,19 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Attendance'),
-        backgroundColor: Color(0xFF1A237E), // Deep indigo
+        backgroundColor: Color(0xFF1A237E),
         foregroundColor: Colors.white,
         elevation: 2,
       ),
-      backgroundColor: Color(0xFFF8F9FA), // Light gray background
+      backgroundColor: Color(0xFFF8F9FA),
       body: Column(
         children: [
-          // Professional header
           Container(
             width: double.infinity,
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [
-                  Color(0xFF3F51B5),
-                  Color(0xFF1A237E),
-                ], // Indigo gradient
+                colors: [Color(0xFF3F51B5), Color(0xFF1A237E)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -159,6 +157,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
             ),
           ),
           _buildDateRangePicker(),
+          _buildPlatformFilter(),
           Expanded(child: _buildStudentsList()),
         ],
       ),
@@ -236,6 +235,92 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     );
   }
 
+  Widget _buildPlatformFilter() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Filter by Platform',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: Color(0xFF2E3440),
+            ),
+          ),
+          SizedBox(height: 12),
+          Row(
+            children: [
+              _buildFilterButton('All'),
+              SizedBox(width: 8),
+              _buildFilterButton('Web'),
+              SizedBox(width: 8),
+              _buildFilterButton('Mobile'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterButton(String filter) {
+    final isSelected = _platformFilter == filter;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _platformFilter = filter;
+        });
+      },
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? Color(0xFF1976D2) : Colors.grey[100],
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? Color(0xFF1976D2) : Colors.grey[300]!,
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              filter == 'All'
+                  ? Icons.people
+                  : filter == 'Web'
+                  ? Icons.web
+                  : Icons.phone_android,
+              size: 16,
+              color: isSelected ? Colors.white : Colors.grey[600],
+            ),
+            SizedBox(width: 6),
+            Text(
+              filter,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.grey[600],
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildStudentsList() {
     return StreamBuilder<QuerySnapshot>(
       stream: AttendanceService.getStudentsStream(),
@@ -254,7 +339,31 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
         final students = allUsers.where((doc) {
           final userData = doc.data() as Map<String, dynamic>;
           final userRole = userData['role'] as String?;
-          return userRole != 'admin'; // Exclude admin users
+
+          // First filter: exclude admin users
+          if (userRole == 'admin') return false;
+
+          // Second filter: platform filtering
+          if (_platformFilter != 'All') {
+            // Use courseGroup field (which contains 'web' or 'mobile') instead of platform
+            final courseGroup =
+                (userData['courseGroup']?.toString() ?? 'mobile').toLowerCase();
+
+            if (_platformFilter == 'Web') {
+              return courseGroup.contains('web') ||
+                  courseGroup.contains('browser');
+            } else if (_platformFilter == 'Mobile') {
+              return courseGroup.contains('mobile') ||
+                  courseGroup.contains('app') ||
+                  courseGroup.contains('android') ||
+                  courseGroup.contains('ios') ||
+                  !courseGroup.contains(
+                    'web',
+                  ); // Default to mobile if not specified
+            }
+          }
+
+          return true;
         }).toList();
 
         if (students.isEmpty) {
@@ -299,62 +408,140 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     String studentUid,
     Map<String, dynamic> studentData,
   ) {
-    return Card(
+    final studentName =
+        '${studentData['firstName'] ?? ''} ${studentData['lastName'] ?? ''}'
+            .trim()
+            .isEmpty
+        ? 'Unknown Student'
+        : '${studentData['firstName'] ?? ''} ${studentData['lastName'] ?? ''}'
+              .trim();
+
+    return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: ExpansionTile(
-        title: Text(
-          '${studentData['firstName'] ?? ''} ${studentData['lastName'] ?? ''}'
-                  .trim()
-                  .isEmpty
-              ? 'Unknown Student'
-              : '${studentData['firstName'] ?? ''} ${studentData['lastName'] ?? ''}'
-                    .trim(),
-          style: const TextStyle(fontWeight: FontWeight.bold),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+        border: Border.all(color: Colors.grey[200]!, width: 1),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: ExpansionTile(
+          backgroundColor: Colors.white,
+          collapsedBackgroundColor: Colors.white,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          childrenPadding: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          leading: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: Color(0xFF1976D2).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Icon(Icons.person, color: Color(0xFF1976D2), size: 24),
+          ),
+          title: Text(
+            studentName,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+              color: Color(0xFF2E3440),
+            ),
+          ),
+          subtitle: Text(
+            studentData['email'] ?? 'No email',
+            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+          ),
+          trailing: Icon(
+            Icons.keyboard_arrow_down,
+            color: Colors.grey[600],
+            size: 24,
+          ),
+          children: [_buildAttendanceList(studentUid)],
         ),
-        subtitle: Text(studentData['email'] ?? 'No email'),
-        children: [_buildAttendanceList(studentUid)],
       ),
     );
   }
 
   Widget _buildAttendanceList(String studentUid) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: AttendanceService.getStudentAttendanceStream(
-        studentUid,
-        _startDate,
-        _endDate,
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(16),
+          bottomRight: Radius.circular(16),
+        ),
       ),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
+      child: StreamBuilder<QuerySnapshot>(
+        stream: AttendanceService.getStudentAttendanceStream(
+          studentUid,
+          _startDate,
+          _endDate,
+        ),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Padding(
+              padding: EdgeInsets.all(20),
+              child: Center(
+                child: Text(
+                  'Error loading attendance: ${snapshot.error}',
+                  style: TextStyle(color: Colors.red[600]),
+                ),
+              ),
+            );
+          }
+
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Padding(
+              padding: EdgeInsets.all(20),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          final attendanceDocs = snapshot.data?.docs ?? [];
+
+          // Generate all dates in range for display
+          final allDates = _generateDateRange(_startDate, _endDate);
+
           return Padding(
             padding: const EdgeInsets.all(16),
-            child: Text('Error loading attendance: ${snapshot.error}'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Attendance Details',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                    color: Color(0xFF2E3440),
+                  ),
+                ),
+                SizedBox(height: 12),
+                ...allDates.map((date) {
+                  final dateStr = _formatDateString(date);
+                  final attendanceDoc = attendanceDocs
+                      .cast<QueryDocumentSnapshot?>()
+                      .firstWhere(
+                        (doc) => doc?.id == dateStr,
+                        orElse: () => null,
+                      );
+
+                  return _buildAttendanceRow(studentUid, date, attendanceDoc);
+                }).toList(),
+              ],
+            ),
           );
-        }
-
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Padding(
-            padding: EdgeInsets.all(16),
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
-
-        final attendanceDocs = snapshot.data?.docs ?? [];
-
-        // Generate all dates in range for display
-        final allDates = _generateDateRange(_startDate, _endDate);
-
-        return Column(
-          children: allDates.map((date) {
-            final dateStr = _formatDateString(date);
-            final attendanceDoc = attendanceDocs
-                .cast<QueryDocumentSnapshot?>()
-                .firstWhere((doc) => doc?.id == dateStr, orElse: () => null);
-
-            return _buildAttendanceRow(studentUid, date, attendanceDoc);
-          }).toList(),
-        );
-      },
+        },
+      ),
     );
   }
 
@@ -404,134 +591,216 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     }
 
     return Container(
+      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: Colors.grey[300]!)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!, width: 1),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Expanded(
-            flex: 2,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _formatDisplayDate(date),
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                Row(
+          Row(
+            children: [
+              // Date Section
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildStatusChip(
-                      status,
-                      isRealTime: _attendanceSubscription != null,
+                    Text(
+                      _formatDisplayDate(date),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: Color(0xFF2E3440),
+                      ),
                     ),
-                    if (timingStatus != null && status == 'present') ...[
-                      const SizedBox(width: 8),
-                      _buildTimingBadge(timingStatus),
-                    ],
+                    SizedBox(height: 4),
+                    Row(
+                      children: [
+                        _buildStatusChip(
+                          status,
+                          isRealTime: _attendanceSubscription != null,
+                        ),
+                        if (timingStatus != null && status == 'present') ...[
+                          const SizedBox(width: 8),
+                          _buildTimingBadge(timingStatus),
+                        ],
+                      ],
+                    ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (clockInAt != null)
-                  Text(
-                    'In: ${_formatTime(clockInAt.toDate())}',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                if (clockOutAt != null)
-                  Text(
-                    'Out: ${_formatTime(clockOutAt.toDate())}',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                if (lateReason != null)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Reason: $lateReason',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.orange,
-                        ),
-                      ),
-                      if (data['lateReasonEditedBy'] != null)
-                        Text(
-                          'Edited by: ${data['lateReasonEditedByName'] ?? 'Admin'}',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: Colors.purple,
-                            fontStyle: FontStyle.italic,
+              ),
+
+              // Time Section
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (clockInAt != null)
+                      Row(
+                        children: [
+                          Icon(Icons.login, size: 14, color: Colors.grey[600]),
+                          SizedBox(width: 4),
+                          Text(
+                            _formatTime(clockInAt.toDate()),
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[700],
+                            ),
                           ),
-                        ),
+                        ],
+                      ),
+                    if (clockOutAt != null) ...[
+                      SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Icon(Icons.logout, size: 14, color: Colors.grey[600]),
+                          SizedBox(width: 4),
+                          Text(
+                            _formatTime(clockOutAt.toDate()),
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
-                  ),
-              ],
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Column(
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(
-                        Icons.check,
-                        color: Colors.green,
-                        size: 20,
-                      ),
-                      onPressed: () => _markPresent(studentUid, dateStr),
-                      tooltip: 'Mark Present',
-                    ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.close,
-                        color: Colors.red,
-                        size: 20,
-                      ),
-                      onPressed: () => _markAbsent(studentUid, dateStr),
-                      tooltip: 'Mark Absent',
-                    ),
                   ],
                 ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(
-                        Icons.edit,
-                        color: Colors.blue,
-                        size: 20,
+              ),
+
+              // Action Section - modern dropdown menu
+              Container(
+                child: PopupMenuButton<String>(
+                  icon: Icon(
+                    Icons.more_vert,
+                    color: Colors.grey[600],
+                    size: 20,
+                  ),
+                  tooltip: 'Actions',
+                  onSelected: (String value) {
+                    switch (value) {
+                      case 'present':
+                        _markPresent(studentUid, dateStr);
+                        break;
+                      case 'absent':
+                        _markAbsent(studentUid, dateStr);
+                        break;
+                      case 'edit_reason':
+                        _editLateReason(studentUid, dateStr, lateReason);
+                        break;
+                      case 'view_location':
+                        _showLocationMap(data);
+                        break;
+                    }
+                  },
+                  itemBuilder: (BuildContext context) => [
+                    PopupMenuItem<String>(
+                      value: 'present',
+                      child: Row(
+                        children: [
+                          Icon(Icons.check, color: Colors.green, size: 18),
+                          SizedBox(width: 8),
+                          Text('Mark Present'),
+                        ],
                       ),
-                      onPressed: () =>
-                          _editLateReason(studentUid, dateStr, lateReason),
-                      tooltip: 'Edit Reason',
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'absent',
+                      child: Row(
+                        children: [
+                          Icon(Icons.close, color: Colors.red, size: 18),
+                          SizedBox(width: 8),
+                          Text('Mark Absent'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'edit_reason',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, color: Colors.blue, size: 18),
+                          SizedBox(width: 8),
+                          Text('Edit Reason'),
+                        ],
+                      ),
                     ),
                     if (data['inLoc'] != null ||
                         data['outLoc'] != null ||
                         data['clockInLoc'] != null ||
                         data['clockOutLoc'] != null)
-                      IconButton(
-                        icon: const Icon(
-                          Icons.map,
-                          color: Colors.purple,
-                          size: 20,
+                      PopupMenuItem<String>(
+                        value: 'view_location',
+                        child: Row(
+                          children: [
+                            Icon(Icons.map, color: Colors.purple, size: 18),
+                            SizedBox(width: 8),
+                            Text('View Location'),
+                          ],
                         ),
-                        onPressed: () => _showLocationMap(data),
-                        tooltip: 'View Location',
                       ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
+
+          // Late reason and additional details
+          if (lateReason != null) ...[
+            SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange[200]!, width: 1),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 14,
+                        color: Colors.orange[700],
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        'Late Reason:',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.orange[700],
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    lateReason,
+                    style: TextStyle(fontSize: 12, color: Colors.orange[800]),
+                  ),
+                  if (data['lateReasonEditedBy'] != null) ...[
+                    SizedBox(height: 4),
+                    Text(
+                      'Edited by: ${data['lateReasonEditedByName'] ?? 'Admin'}',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.purple[600],
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -570,7 +839,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
@@ -580,7 +849,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 14, color: color),
-          const SizedBox(width: 4),
+          SizedBox(width: 4),
           Text(
             label,
             style: TextStyle(
@@ -590,7 +859,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
             ),
           ),
           if (isRealTime) ...[
-            const SizedBox(width: 4),
+            SizedBox(width: 4),
             Container(
               width: 6,
               height: 6,
@@ -624,7 +893,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: color.withOpacity(0.2),
         borderRadius: BorderRadius.circular(8),
@@ -644,8 +913,8 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
   Future<void> _showDateRangePicker() async {
     final DateTimeRange? picked = await showDateRangePicker(
       context: context,
-      firstDate: DateTime.now().subtract(const Duration(days: 365)),
-      lastDate: DateTime.now().add(const Duration(days: 30)),
+      firstDate: DateTime.now().subtract(Duration(days: 365)),
+      lastDate: DateTime.now().add(Duration(days: 30)),
       initialDateRange: DateTimeRange(start: _startDate, end: _endDate),
     );
 
@@ -671,7 +940,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
 
       await AttendanceService.adminMarkPresent(user.uid, studentUid, dateStr);
       _showSuccessSnackBar(
-        '✅ Student marked as present for $dateStr and notified',
+        ' Student marked as present for $dateStr and notified',
       );
     } catch (e) {
       _showErrorSnackBar('Failed to mark present: $e');
@@ -683,15 +952,15 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Mark Absent'),
+        title: Text('Mark Absent'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text('Mark this student as absent for $dateStr?'),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             TextField(
               controller: reasonController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Reason (optional)',
                 border: OutlineInputBorder(),
               ),
@@ -702,11 +971,11 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Mark Absent'),
+            child: Text('Mark Absent'),
           ),
         ],
       ),
@@ -725,7 +994,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
         reason: reasonController.text.isNotEmpty ? reasonController.text : null,
       );
       _showSuccessSnackBar(
-        '✅ Student marked as absent for $dateStr and notified',
+        ' Student marked as absent for $dateStr and notified',
       );
     } catch (e) {
       _showErrorSnackBar('Failed to mark absent: $e');
@@ -741,10 +1010,10 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Edit Late Reason'),
+        title: Text('Edit Late Reason'),
         content: TextField(
           controller: reasonController,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Late Reason',
             border: OutlineInputBorder(),
           ),
@@ -753,11 +1022,11 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Save'),
+            child: Text('Save'),
           ),
         ],
       ),
@@ -819,151 +1088,230 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
         data['outAt'] ?? data['clockOutAt'] ?? data['clockOut'];
     final lateReason = data['lateReason'] as String?;
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.location_on, color: Colors.red),
-            SizedBox(width: 8),
-            Text('Attendance Location Details'),
-          ],
-        ),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 400,
-          child: SingleChildScrollView(
+    // If no location data available, show the old dialog
+    if (clockInLoc == null && clockOutLoc == null) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.location_off, color: Colors.grey),
+              SizedBox(width: 8),
+              Text('No Location Data'),
+            ],
+          ),
+          content: Container(
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                if (clockInLoc != null) ...[
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.green.shade200),
-                    ),
-                    width: double.infinity,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.login, color: Colors.green, size: 16),
-                            SizedBox(width: 4),
-                            Text(
-                              'Clock In Location:',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text('📍 Coordinates:'),
-                        Text(
-                          '   Latitude: ${clockInLoc.latitude.toStringAsFixed(6)}',
-                        ),
-                        Text(
-                          '   Longitude: ${clockInLoc.longitude.toStringAsFixed(6)}',
-                        ),
-                        if (clockInTime != null) ...[
-                          const SizedBox(height: 4),
-                          Text('🕐 Time: ${_formatTimestamp(clockInTime)}'),
-                        ],
-                        if (lateReason != null && lateReason.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text('📝 Late Reason: $lateReason'),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                if (clockOutLoc != null) ...[
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.orange.shade200),
-                    ),
-                    width: double.infinity,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.logout, color: Colors.orange, size: 16),
-                            SizedBox(width: 4),
-                            Text(
-                              'Clock Out Location:',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text('📍 Coordinates:'),
-                        Text(
-                          '   Latitude: ${clockOutLoc.latitude.toStringAsFixed(6)}',
-                        ),
-                        Text(
-                          '   Longitude: ${clockOutLoc.longitude.toStringAsFixed(6)}',
-                        ),
-                        if (clockOutTime != null) ...[
-                          const SizedBox(height: 4),
-                          Text('🕐 Time: ${_formatTimestamp(clockOutTime)}'),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                if (clockInLoc == null && clockOutLoc == null) ...[
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    width: double.infinity,
-                    child: const Column(
-                      children: [
-                        Icon(Icons.location_off, size: 48, color: Colors.grey),
-                        SizedBox(height: 8),
-                        Text(
-                          'No location data available',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          'This attendance record was created without location tracking.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                Icon(Icons.location_off, size: 48, color: Colors.grey),
+                SizedBox(height: 8),
+                Text(
+                  'No location data available',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  'This attendance record was created without location tracking.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey),
+                ),
               ],
             ),
           ),
-        ),
-        actions: [
-          if (clockInLoc != null || clockOutLoc != null)
-            TextButton.icon(
-              onPressed: () {
-                final coords = clockInLoc ?? clockOutLoc!;
-                _showSuccessSnackBar(
-                  'Coordinates: ${coords.latitude.toStringAsFixed(6)}, ${coords.longitude.toStringAsFixed(6)}',
-                );
-              },
-              icon: const Icon(Icons.copy),
-              label: const Text('Copy Coords'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Close'),
             ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // Show map dialog with Google Maps
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.9,
+          height: MediaQuery.of(context).size.height * 0.8,
+          child: Column(
+            children: [
+              // Header
+              Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Color(0xFF2C3E50),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(8),
+                    topRight: Radius.circular(8),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.location_on, color: Colors.white),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Attendance Locations',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(Icons.close, color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+              // Map
+              Expanded(
+                flex: 3,
+                child: _buildLocationMap(clockInLoc, clockOutLoc),
+              ),
+              // Location details
+              Expanded(
+                flex: 2,
+                child: Container(
+                  padding: EdgeInsets.all(16),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (clockInLoc != null) ...[
+                          _buildLocationCard(
+                            'Clock In Location',
+                            Icons.login,
+                            Colors.green,
+                            clockInLoc,
+                            clockInTime,
+                            lateReason,
+                          ),
+                          SizedBox(height: 12),
+                        ],
+                        if (clockOutLoc != null) ...[
+                          _buildLocationCard(
+                            'Clock Out Location',
+                            Icons.logout,
+                            Colors.orange,
+                            clockOutLoc,
+                            clockOutTime,
+                            null,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocationMap(GeoPoint? clockInLoc, GeoPoint? clockOutLoc) {
+    Set<Marker> markers = {};
+    LatLng center;
+
+    if (clockInLoc != null) {
+      markers.add(
+        Marker(
+          markerId: MarkerId('clock_in'),
+          position: LatLng(clockInLoc.latitude, clockInLoc.longitude),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueGreen,
+          ),
+          infoWindow: InfoWindow(title: 'Clock In Location'),
+        ),
+      );
+      center = LatLng(clockInLoc.latitude, clockInLoc.longitude);
+    } else {
+      center = LatLng(clockOutLoc!.latitude, clockOutLoc.longitude);
+    }
+
+    if (clockOutLoc != null) {
+      markers.add(
+        Marker(
+          markerId: MarkerId('clock_out'),
+          position: LatLng(clockOutLoc.latitude, clockOutLoc.longitude),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueOrange,
+          ),
+          infoWindow: InfoWindow(title: 'Clock Out Location'),
+        ),
+      );
+    }
+
+    return GoogleMap(
+      onMapCreated: (GoogleMapController controller) {
+        // Multiple attempts to ensure zoom works
+        Future.delayed(Duration(milliseconds: 100), () {
+          controller.animateCamera(CameraUpdate.newLatLngZoom(center, 19.0));
+        });
+        Future.delayed(Duration(milliseconds: 1000), () {
+          controller.animateCamera(CameraUpdate.newLatLngZoom(center, 19.0));
+        });
+      },
+      initialCameraPosition: CameraPosition(target: center, zoom: 19.0),
+      markers: markers,
+      mapType: MapType.normal,
+      myLocationButtonEnabled: false,
+      zoomControlsEnabled: true,
+      minMaxZoomPreference: MinMaxZoomPreference(15.0, 21.0),
+    );
+  }
+
+  Widget _buildLocationCard(
+    String title,
+    IconData icon,
+    Color color,
+    GeoPoint location,
+    dynamic time,
+    String? reason,
+  ) {
+    return Container(
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 16),
+              SizedBox(width: 4),
+              Text(title, style: TextStyle(fontWeight: FontWeight.bold)),
+            ],
+          ),
+          SizedBox(height: 8),
+          Text('📍 Coordinates:'),
+          Text(
+            '   ${location.latitude.toStringAsFixed(6)}, ${location.longitude.toStringAsFixed(6)}',
+          ),
+          if (time != null) ...[
+            SizedBox(height: 4),
+            Text('🕐 Time: ${_formatTimestamp(time)}'),
+          ],
+          if (reason != null && reason.isNotEmpty) ...[
+            SizedBox(height: 4),
+            Text('📝 Late Reason: $reason'),
+          ],
         ],
       ),
     );
@@ -993,11 +1341,11 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Confirm'),
+            child: Text('Confirm'),
           ),
         ],
       ),
@@ -1020,7 +1368,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
 
     while (!current.isAfter(endDate)) {
       dates.add(current);
-      current = current.add(const Duration(days: 1));
+      current = current.add(Duration(days: 1));
     }
 
     return dates;

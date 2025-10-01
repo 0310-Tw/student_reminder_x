@@ -22,15 +22,31 @@ class NotesService {
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> publicFeeds() {
-    return _db
-        .collectionGroup('notes')
-        .where('visibility', isEqualTo: 'public')
-        .orderBy(
-          'aud_dt',
-          descending: true,
-        ) // or orderBy('likesCount', descending: true)
-        .limit(100)
-        .snapshots();
+    print('🔍 Querying public feeds...');
+    try {
+      return _db
+          .collectionGroup('notes')
+          .where('visibility', isEqualTo: 'public')
+          .orderBy('aud_dt', descending: true)
+          .limit(100)
+          .snapshots()
+          .handleError((error) {
+            print('❌ Error in publicFeeds stream: $error');
+            print('Error type: ${error.runtimeType}');
+            if (error.toString().contains('permission-denied')) {
+              print('🔐 Permission denied: Check Firestore security rules');
+              print('Make sure collection group queries for notes are allowed');
+              print(
+                'Try updating Firestore rules or check user authentication',
+              );
+            }
+            throw error; // Re-throw to let UI handle it
+          });
+    } catch (e) {
+      print('❌ Exception in publicFeeds setup: $e');
+      // Return an empty stream in case of setup errors
+      return Stream.empty();
+    }
   }
 
   Future<String> createNote(
@@ -49,6 +65,9 @@ class NotesService {
       'dueDate': dueDate != null ? Timestamp.fromDate(dueDate) : null,
       'tags': tags ?? [],
       'aud_dt': FieldValue.serverTimestamp(),
+      // Initialize like-related fields
+      'likesCount': 0,
+      'likedBy': <String, dynamic>{},
     });
     return doc.id;
   }
@@ -81,33 +100,60 @@ class NotesService {
     required DocumentReference<Map<String, dynamic>> noteRef,
     required String uid,
   }) async {
+    print(
+      '🔍 NotesService.toggleLike called with noteRef: ${noteRef.path}, uid: $uid',
+    );
     final db = FirebaseFirestore.instance;
 
     await db.runTransaction((tx) async {
+      print('🔍 Starting transaction for toggleLike');
       final snap = await tx.get(noteRef);
-      if (!snap.exists) return;
+      if (!snap.exists) {
+        print('❌ Note document does not exist: ${noteRef.path}');
+        return;
+      }
 
       final data = snap.data()!;
+      print('🔍 Current note data keys: ${data.keys}');
+
+      // Ensure likedBy and likesCount fields exist
       final Map<String, dynamic> likedBy = Map<String, dynamic>.from(
-        data['likedBy'] ?? const {},
+        data['likedBy'] ?? <String, dynamic>{},
       );
       final bool alreadyLiked = likedBy[uid] == true;
       final int currentCount = (data['likesCount'] ?? 0) as int;
 
+      print('🔍 Current likedBy: $likedBy');
+      print('🔍 User $uid already liked: $alreadyLiked');
+      print('🔍 Current likes count: $currentCount');
+
       if (alreadyLiked) {
         // UNLIKE
-        likedBy.remove(uid);
+        print('🔄 Performing UNLIKE operation');
         final newCount = (currentCount - 1).clamp(0, 1 << 30);
         tx.update(noteRef, {
           'likesCount': newCount,
           'likedBy.$uid': FieldValue.delete(),
         });
+        print('✅ UNLIKE: New count will be $newCount');
       } else {
         // LIKE
+        print('🔄 Performing LIKE operation');
         final newCount = currentCount + 1;
-        tx.update(noteRef, {'likesCount': newCount, 'likedBy.$uid': true});
+        // Initialize likedBy field if it doesn't exist
+        final updateData = <String, dynamic>{
+          'likesCount': newCount,
+          'likedBy.$uid': true,
+        };
+        // If likedBy field doesn't exist in the document, initialize it
+        if (!data.containsKey('likedBy')) {
+          updateData['likedBy'] = <String, dynamic>{uid: true};
+        }
+        tx.update(noteRef, updateData);
+        print('✅ LIKE: New count will be $newCount');
       }
     });
+    print('✅ Transaction completed successfully');
   }
 
   Future<void> reportNote({
@@ -128,6 +174,26 @@ class NotesService {
     required String uid,
   }) async {
     await noteRef.collection('reports').doc(uid).delete();
+  }
+
+  /// Check if the current user has reported a specific note
+  Stream<bool> isNoteReportedByUser({
+    required DocumentReference<Map<String, dynamic>> noteRef,
+    required String uid,
+  }) {
+    return noteRef
+        .collection('reports')
+        .doc(uid)
+        .snapshots()
+        .map((snapshot) => snapshot.exists);
+  }
+
+  /// Get user's report details for a specific note
+  Stream<DocumentSnapshot<Map<String, dynamic>>> getUserReportForNote({
+    required DocumentReference<Map<String, dynamic>> noteRef,
+    required String uid,
+  }) {
+    return noteRef.collection('reports').doc(uid).snapshots();
   }
 
   /// Admin: stream all report docs across all notes (newest first)

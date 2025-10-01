@@ -41,15 +41,13 @@ class AttendanceService {
   static Stream<QuerySnapshot<Map<String, dynamic>>> streamLast14Days(
     String uid,
   ) {
-    final now = JmTime.nowLocal();
-    final start = DateUtils.dateOnly(now).subtract(const Duration(days: 13));
+    // Simplified query to avoid index requirements - using ascending order
     return FirebaseFirestore.instance
         .collection('attendance')
         .doc(uid)
         .collection('days')
-        .where('dayId', isGreaterThanOrEqualTo: JmTime.dateId(start))
-        .orderBy('dayId', descending: true)
-        .limit(14)
+        .orderBy('dayId') // ascending order to avoid index requirements
+        .limit(30) // Get more than 14 to ensure we have recent data
         .snapshots();
   }
 
@@ -79,7 +77,7 @@ class AttendanceService {
         .collection('days')
         .where('dayId', isGreaterThanOrEqualTo: startId)
         .where('dayId', isLessThanOrEqualTo: endId)
-        .orderBy('dayId', descending: true)
+        .orderBy('dayId') // Remove descending to avoid index requirement
         .snapshots();
   }
 
@@ -93,7 +91,7 @@ class AttendanceService {
     return FirebaseFirestore.instance
         .collectionGroup('days')
         .where('dayId', isGreaterThanOrEqualTo: startId)
-        .orderBy('dayId', descending: true)
+        .orderBy('dayId') // Remove descending to avoid index requirement
         .snapshots();
   }
 
@@ -152,11 +150,11 @@ class AttendanceService {
   static Future<void> adminMarkPresent(
     String adminUid,
     String targetUid,
-    String dateId, // Changed from yyyyMMdd to dateId (YYYY-MM-DD format)
+    String dateId,
   ) async {
     try {
       // Get admin and target user info for notifications
-      final adminUserDoc = await FirebaseFirestore.instance
+      final appUserDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(adminUid)
           .get();
@@ -166,7 +164,7 @@ class AttendanceService {
           .doc(targetUid)
           .get();
 
-      final adminData = adminUserDoc.data() ?? {};
+      final adminData = appUserDoc.data() ?? {};
       final targetData = targetUserDoc.data() ?? {};
 
       final adminName =
@@ -279,7 +277,7 @@ class AttendanceService {
   }) async {
     try {
       // Get admin and target user info for notifications
-      final adminUserDoc = await FirebaseFirestore.instance
+      final appUserDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(adminUid)
           .get();
@@ -289,7 +287,7 @@ class AttendanceService {
           .doc(targetUid)
           .get();
 
-      final adminData = adminUserDoc.data() ?? {};
+      final adminData = appUserDoc.data() ?? {};
       final targetData = targetUserDoc.data() ?? {};
 
       final adminName =
@@ -324,15 +322,15 @@ class AttendanceService {
         Map<String, dynamic> updateData = {
           'dayId': dateId,
           'status': 'absent',
-          'timingStatus': null, // Clear timing status when marked absent
-          'inAt': null, // Clear check-in when marked absent
-          'clockInAt': null, // backward compatibility
-          'inLoc': null, // Clear location when marked absent
-          'clockInLoc': null, // backward compatibility
-          'outAt': null, // Clear check-out when marked absent
-          'clockOutAt': null, // backward compatibility
-          'outLoc': null, // Clear location when marked absent
-          'clockOutLoc': null, // backward compatibility
+          'timingStatus': null,
+          'inAt': null,
+          'clockInAt': null,
+          'inLoc': null,
+          'clockInLoc': null,
+          'outAt': null,
+          'clockOutAt': null,
+          'outLoc': null,
+          'clockOutLoc': null,
           'adminMarked': true,
           'markedByAdmin': adminUid,
           'markedByAdminEmail': adminEmail,
@@ -416,7 +414,7 @@ class AttendanceService {
   ) async {
     try {
       // Get admin and target user info for notifications
-      final adminUserDoc = await FirebaseFirestore.instance
+      final appUserDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(adminUid)
           .get();
@@ -426,7 +424,7 @@ class AttendanceService {
           .doc(targetUid)
           .get();
 
-      final adminData = adminUserDoc.data() ?? {};
+      final adminData = appUserDoc.data() ?? {};
       final targetData = targetUserDoc.data() ?? {};
 
       final adminName =
@@ -553,6 +551,7 @@ class AttendanceService {
         .orderBy('dayId')
         .snapshots();
   }
+  
 
   /// Send notification to user for admin actions on their attendance
   static Future<void> _sendAdminActionNotification({

@@ -134,6 +134,32 @@ class _AdminPublicFeedsState extends State<AdminPublicFeeds> {
                 if (snap.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
+                if (snap.hasError) {
+                  print('Public feeds error: ${snap.error}');
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error, color: Colors.red, size: 48),
+                        SizedBox(height: 16),
+                        Text(
+                          'Error loading public notes',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          '${snap.error}',
+                          style: TextStyle(color: Colors.red),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  );
+                }
                 if (!snap.hasData) {
                   return const Center(child: Text('Loading...'));
                 }
@@ -459,6 +485,7 @@ class _AdminPublicFeedsState extends State<AdminPublicFeeds> {
       ),
 
       floatingActionButton: FloatingActionButton(
+        heroTag: "admin_public_feeds_fab",
         onPressed: () async {
           await showModalBottomSheet(
             context: context,
@@ -482,18 +509,57 @@ class _AdminPublicFeedsState extends State<AdminPublicFeeds> {
     try {
       switch (action) {
         case 'flag':
-          final reason = await _askActionReason(
-            context,
-            'Flag Note',
-            'Why are you flagging this note?',
-          );
-          if (reason != null && reason.trim().isNotEmpty) {
-            await AdminService.instance.flagNote(
-              noteOwnerId,
-              noteId,
-              reason.trim(),
+          // Check if note is already flagged
+          final noteDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(noteOwnerId)
+              .collection('notes')
+              .doc(noteId)
+              .get();
+
+          final isFlagged = noteDoc.data()?['flagged'] == true;
+
+          if (isFlagged) {
+            // Unflag the note
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: Text('Unflag Note'),
+                content: Text(
+                  'Are you sure you want to remove the flag from this note?',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: Text('Unflag'),
+                  ),
+                ],
+              ),
             );
-            displaySnackBar(context, 'Note flagged successfully');
+
+            if (confirmed == true) {
+              await AdminService.instance.unflagNote(noteOwnerId, noteId);
+              displaySnackBar(context, 'Note unflagged successfully');
+            }
+          } else {
+            // Flag the note
+            final reason = await _askActionReason(
+              context,
+              'Flag Note',
+              'Why are you flagging this note?',
+            );
+            if (reason != null && reason.trim().isNotEmpty) {
+              await AdminService.instance.flagNote(
+                noteOwnerId,
+                noteId,
+                reason.trim(),
+              );
+              displaySnackBar(context, 'Note flagged successfully');
+            }
           }
           break;
 
@@ -835,7 +901,7 @@ class _AdminPublicFeedsState extends State<AdminPublicFeeds> {
                                           if (!userSnapshot.hasData ||
                                               !userSnapshot.data!.exists) {
                                             return Text(
-                                              'Reporter: Unknown User (ID: ${reporterId.substring(0, 8)}...)',
+                                              'Reporter: Unknown User',
                                               style: TextStyle(
                                                 fontSize: 12,
                                                 color: Colors.grey[600],
@@ -856,7 +922,7 @@ class _AdminPublicFeedsState extends State<AdminPublicFeeds> {
                                               '$firstName $lastName'.trim();
 
                                           return Text(
-                                            'Reporter: ${fullName.isNotEmpty ? fullName : 'Unknown User'} (ID: ${reporterId.substring(0, 8)}...)',
+                                            'Reporter: ${fullName.isNotEmpty ? fullName : 'Unknown User'}',
                                             style: TextStyle(
                                               fontSize: 12,
                                               color: Colors.grey[600],
@@ -866,7 +932,6 @@ class _AdminPublicFeedsState extends State<AdminPublicFeeds> {
                                         },
                                       ),
                                     ),
-                                    Spacer(),
                                     if (createdAt != null)
                                       Text(
                                         _formatTimestamp(createdAt),
@@ -875,6 +940,89 @@ class _AdminPublicFeedsState extends State<AdminPublicFeeds> {
                                           color: Colors.grey[500],
                                         ),
                                       ),
+                                    SizedBox(width: 8),
+                                    // Delete button
+                                    IconButton(
+                                      onPressed: () async {
+                                        // Show confirmation dialog
+                                        final bool?
+                                        confirmDelete = await showDialog<bool>(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            title: Text('Delete Report'),
+                                            content: Text(
+                                              'Are you sure you want to delete this report? This action cannot be undone.',
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () => Navigator.of(
+                                                  context,
+                                                ).pop(false),
+                                                child: Text('Cancel'),
+                                              ),
+                                              TextButton(
+                                                onPressed: () => Navigator.of(
+                                                  context,
+                                                ).pop(true),
+                                                style: TextButton.styleFrom(
+                                                  foregroundColor: Colors.red,
+                                                ),
+                                                child: Text('Delete'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+
+                                        if (confirmDelete == true) {
+                                          try {
+                                            // Delete the report document
+                                            await noteRef
+                                                .collection('reports')
+                                                .doc(reporterId)
+                                                .delete();
+
+                                            // Show success message
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  'Report deleted successfully',
+                                                ),
+                                                backgroundColor: Color(
+                                                  0xFF27AE60,
+                                                ),
+                                              ),
+                                            );
+                                          } catch (e) {
+                                            // Show error message
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  'Error deleting report: $e',
+                                                ),
+                                                backgroundColor: Color(
+                                                  0xFFE74C3C,
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        }
+                                      },
+                                      icon: Icon(
+                                        Icons.delete_outline,
+                                        size: 18,
+                                        color: Colors.red[600],
+                                      ),
+                                      tooltip: 'Delete Report',
+                                      constraints: BoxConstraints(
+                                        minWidth: 32,
+                                        minHeight: 32,
+                                      ),
+                                      padding: EdgeInsets.all(4),
+                                    ),
                                   ],
                                 ),
                                 SizedBox(height: 8),

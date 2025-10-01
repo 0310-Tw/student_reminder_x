@@ -94,6 +94,11 @@
         </provider>
 
         
+        <!-- Google Maps API Key -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyB7oYx7JBK_9BMKHcFJ9nt495Np01yeKRo" />
+            
         <!-- Firebase notification icon configuration -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
