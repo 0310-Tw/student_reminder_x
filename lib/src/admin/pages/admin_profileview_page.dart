@@ -5,6 +5,7 @@ import 'package:students_reminder/src/services/user_service.dart';
 import 'package:students_reminder/src/services/admin_service.dart';
 import 'package:students_reminder/src/services/notification_service.dart';
 import 'package:students_reminder/src/shared/list.dart';
+import 'package:students_reminder/src/shared/routes.dart';
 import 'package:students_reminder/src/widgets/group_filter.dart';
 import 'package:students_reminder/src/widgets/user_banner_notifications.dart';
 import 'package:students_reminder/src/widgets/suspension_check.dart';
@@ -295,6 +296,20 @@ class _AdminProfileviewPageState extends State<AdminProfileviewPage> {
                                       Icons.more_vert,
                                       color: Colors.grey.shade600,
                                     ),
+                                  ),
+                                  TextButton.icon(
+                                    icon: Icon(Icons.map, color: Colors.indigo),
+                                    label: Text('Geofence'),
+                                    onPressed: () {
+                                      Navigator.pushNamed(
+                                        context,
+                                        AppRoutes.geofence,
+                                        arguments: {
+                                          'studentId': 'someStudentIdHere',
+                                          'dateId': '20251001', // or your generated date ID
+                                        },
+                                      );
+                                    },
                                   ),
                                 ],
                               ],

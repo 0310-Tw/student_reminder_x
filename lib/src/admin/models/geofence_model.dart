@@ -1,4 +1,3 @@
-// lib/src/models/geofence_profile.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class GeofenceLocation {
