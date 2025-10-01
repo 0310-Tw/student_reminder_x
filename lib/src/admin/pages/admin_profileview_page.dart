@@ -297,20 +297,6 @@ class _AdminProfileviewPageState extends State<AdminProfileviewPage> {
                                       color: Colors.grey.shade600,
                                     ),
                                   ),
-                                  TextButton.icon(
-                                    icon: Icon(Icons.map, color: Colors.indigo),
-                                    label: Text('Geofence'),
-                                    onPressed: () {
-                                      Navigator.pushNamed(
-                                        context,
-                                        AppRoutes.geofence,
-                                        arguments: {
-                                          'studentId': 'someStudentIdHere',
-                                          'dateId': '20251001', // or your generated date ID
-                                        },
-                                      );
-                                    },
-                                  ),
                                 ],
                               ],
                             ),
