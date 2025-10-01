@@ -5,6 +5,7 @@ import 'package:students_reminder/src/shared/routes.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await initFirebase();
   await initNotifications();
 
