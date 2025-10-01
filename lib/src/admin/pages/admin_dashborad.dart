@@ -495,6 +495,28 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         stats['total'] ?? 0,
                         Color(0xFFFF9800),
                       ),
+                      // Add At Risk indicator for weekly and monthly periods
+                      if (_selectedPeriod == 'This Week' ||
+                          _selectedPeriod == 'This Month') ...[
+                        SizedBox(height: 12),
+                        StreamBuilder<QuerySnapshot>(
+                          stream: _getAtRiskStudentsStream(),
+                          builder: (context, atRiskSnapshot) {
+                            final atRiskCount = atRiskSnapshot.hasData
+                                ? atRiskSnapshot.data!.docs.length
+                                : 0;
+                            return GestureDetector(
+                              onTap: () => _showAtRiskStudentsList(),
+                              child: _buildProgressIndicator(
+                                'At Risk',
+                                atRiskCount,
+                                stats['total'] ?? 0,
+                                Color(0xFF9B59B6),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ],
                   );
                 },
@@ -513,6 +535,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
     Color color,
   ) {
     final percentage = total > 0 ? (value / total) : 0.0;
+    final percentageText = total > 0
+        ? '${(percentage * 100).toStringAsFixed(1)}%'
+        : '0%';
 
     return Row(
       children: [
@@ -536,9 +561,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
         ),
         SizedBox(width: 12),
-        Text(
-          '$value',
-          style: TextStyle(fontWeight: FontWeight.bold, color: color),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              '$value',
+              style: TextStyle(fontWeight: FontWeight.bold, color: color),
+            ),
+            Text(
+              percentageText,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -806,6 +844,64 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   ),
                 ),
               ),
+              // At Risk indicator - now streaming from Firestore
+              if (_selectedPeriod == 'This Week' ||
+                  _selectedPeriod == 'This Month')
+                StreamBuilder<DocumentSnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(student.id)
+                      .collection('at-risk')
+                      .doc('current_status')
+                      .snapshots(),
+                  builder: (context, atRiskSnapshot) {
+                    final isAtRisk =
+                        atRiskSnapshot.hasData &&
+                        atRiskSnapshot.data!.exists &&
+                        (atRiskSnapshot.data!.data()
+                                as Map<String, dynamic>?)?['isAtRisk'] ==
+                            true;
+
+                    if (isAtRisk) {
+                      return Container(
+                        margin: EdgeInsets.only(right: 8),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Color(0xFF9B59B6).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: Color(0xFF9B59B6).withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.warning,
+                              size: 10,
+                              color: Color(0xFF9B59B6),
+                            ),
+                            SizedBox(width: 2),
+                            Text(
+                              'AT RISK',
+                              style: TextStyle(
+                                fontSize: 8,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF9B59B6),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                    return SizedBox.shrink();
+                  },
+                ),
+              // Platform indicator
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
@@ -911,8 +1007,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
         break;
       case 'This Week':
         final weekday = now.weekday;
-        final startOfWeek = now.subtract(Duration(days: weekday - 1));
-        final endOfWeek = startOfWeek.add(Duration(days: 6));
+        final startOfWeek = now.subtract(Duration(days: weekday - 1)); // Monday
+        final endOfWeek = startOfWeek.add(
+          Duration(days: 4),
+        ); // Friday (Mon+4=Fri)
         startDateId = _formatDateId(
           DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day),
         );
@@ -1029,7 +1127,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         late++;
       }
 
-      // Check if early departure (clock out before 5 PM)
+      // Check if early departure (clock out before 4:00 PM - school end time)
       final clockOutTime =
           data['outAt'] as Timestamp? ?? data['clockOutAt'] as Timestamp?;
       if (clockOutTime != null) {
@@ -1038,9 +1136,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
           clockOut.year,
           clockOut.month,
           clockOut.day,
-          17,
+          16,
           0,
-        ); // 5 PM
+        ); // 4:00 PM - actual school end time
         if (clockOut.isBefore(expectedEnd)) {
           early++;
         }
@@ -1085,6 +1183,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
       'late': late,
       'total': totalStudents,
     };
+  }
+
+  // New method: Stream at-risk students from Firestore
+  Stream<QuerySnapshot> _getAtRiskStudentsStream() {
+    return FirebaseFirestore.instance
+        .collectionGroup('at-risk')
+        .where('isAtRisk', isEqualTo: true)
+        .snapshots();
   }
 
   Map<String, dynamic> _getStudentAttendanceStatus(
@@ -1154,9 +1260,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
           clockOut.year,
           clockOut.month,
           clockOut.day,
-          17,
+          16,
           0,
-        );
+        ); // 4:00 PM - correct school end time
         return clockOut.isBefore(expectedEnd);
       }
       return false;
@@ -1201,63 +1307,168 @@ class _AdminDashboardState extends State<AdminDashboard> {
       return !presentStudentIds.contains(student.id);
     }).toList();
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: Column(
           children: [
-            Icon(Icons.people, color: Color(0xFF95A5A6)),
-            SizedBox(width: 8),
-            Text('Absent Students'),
+            // Handle bar
+            Container(
+              width: 40,
+              height: 4,
+              margin: EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // Header
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: Row(
+                children: [
+                  Icon(Icons.people, color: Color(0xFF95A5A6), size: 28),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Absent Students',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2C3E50),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close, color: Colors.grey[600]),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            Divider(height: 1),
+            // Content
+            Expanded(
+              child: absentStudents.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.people_outline,
+                            size: 64,
+                            color: Colors.grey[400],
+                          ),
+                          SizedBox(height: 16),
+                          Text(
+                            'No absent students found',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 8,
+                      ),
+                      itemCount: absentStudents.length,
+                      itemBuilder: (context, index) {
+                        final student = absentStudents[index];
+                        final studentData =
+                            student.data() as Map<String, dynamic>;
+                        final name =
+                            '${studentData['firstName'] ?? ''} ${studentData['lastName'] ?? ''}'
+                                .trim();
+
+                        return Container(
+                          margin: EdgeInsets.only(bottom: 8),
+                          child: InkWell(
+                            onTap: () {
+                              Navigator.pop(context); // Close the bottom sheet
+                              _showStudentDetails(student.id, name);
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Color(0xFF95A5A6).withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Color(0xFF95A5A6).withOpacity(0.2),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    backgroundColor: Color(
+                                      0xFF95A5A6,
+                                    ).withOpacity(0.2),
+                                    child: Text(
+                                      name.isNotEmpty
+                                          ? name[0].toUpperCase()
+                                          : '?',
+                                      style: TextStyle(
+                                        color: Color(0xFF95A5A6),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          name,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w500,
+                                            fontSize: 16,
+                                            color: Color(0xFF2C3E50),
+                                          ),
+                                        ),
+                                        SizedBox(height: 2),
+                                        Text(
+                                          'No attendance record',
+                                          style: TextStyle(
+                                            color: Colors.grey[600],
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(
+                                    Icons.people_outline,
+                                    color: Color(0xFF95A5A6),
+                                    size: 20,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
           ],
         ),
-        content: Container(
-          width: double.maxFinite,
-          height: 300,
-          child: absentStudents.isEmpty
-              ? Center(
-                  child: Text(
-                    'No absent students found',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                )
-              : ListView.builder(
-                  itemCount: absentStudents.length,
-                  itemBuilder: (context, index) {
-                    final student = absentStudents[index];
-                    final studentData = student.data() as Map<String, dynamic>;
-                    final name =
-                        '${studentData['firstName'] ?? ''} ${studentData['lastName'] ?? ''}'
-                            .trim();
-
-                    return ListTile(
-                      title: Text(name),
-                      subtitle: Text('No attendance record'),
-                      leading: CircleAvatar(
-                        backgroundColor: Color(0xFF95A5A6).withOpacity(0.2),
-                        child: Text(
-                          name.isNotEmpty ? name[0].toUpperCase() : '?',
-                          style: TextStyle(
-                            color: Color(0xFF95A5A6),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      trailing: Icon(
-                        Icons.chevron_right,
-                        color: Color(0xFF95A5A6),
-                      ),
-                      onTap: () => _showStudentDetails(student.id, name),
-                    );
-                  },
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Close'),
-          ),
-        ],
       ),
     );
   }
@@ -1481,5 +1692,257 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   void _showStudentDetails(String studentId, String studentName) {
     Navigator.pushNamed(context, '/admin');
+  }
+
+  void _showAtRiskStudentsList() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.9,
+        builder: (context, scrollController) {
+          return Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.orange,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'At-Risk Students',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(),
+                Expanded(
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: _getAtRiskStudentsStream(),
+                    builder: (context, atRiskSnapshot) {
+                      if (!atRiskSnapshot.hasData) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+
+                      final atRiskDocs = atRiskSnapshot.data!.docs;
+
+                      if (atRiskDocs.isEmpty) {
+                        return const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.check_circle_outline,
+                                size: 64,
+                                color: Colors.green,
+                              ),
+                              SizedBox(height: 16),
+                              Text(
+                                'No At-Risk Students',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'All students are attending regularly',
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      return ListView.builder(
+                        controller: scrollController,
+                        padding: const EdgeInsets.all(16),
+                        itemCount: atRiskDocs.length,
+                        itemBuilder: (context, index) {
+                          final atRiskDoc = atRiskDocs[index];
+                          final atRiskData =
+                              atRiskDoc.data() as Map<String, dynamic>;
+
+                          // Get student ID from document path
+                          final studentId =
+                              atRiskDoc.reference.parent.parent!.id;
+
+                          return FutureBuilder<DocumentSnapshot>(
+                            future: FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(studentId)
+                                .get(),
+                            builder: (context, studentSnapshot) {
+                              if (!studentSnapshot.hasData) {
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  child: ListTile(
+                                    leading: CircleAvatar(
+                                      backgroundColor: Colors.grey.withOpacity(
+                                        0.3,
+                                      ),
+                                      child: SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                    ),
+                                    title: Text('Loading...'),
+                                  ),
+                                );
+                              }
+
+                              final studentData =
+                                  studentSnapshot.data!.data()
+                                      as Map<String, dynamic>?;
+                              final studentName =
+                                  '${studentData?['firstName'] ?? ''} ${studentData?['lastName'] ?? ''}'
+                                      .trim();
+                              final email = studentData?['email'] ?? 'No email';
+
+                              final weeklyAbsences =
+                                  atRiskData['weeklyAbsences'] ?? 0;
+                              final monthlyAbsences =
+                                  atRiskData['monthlyAbsences'] ?? 0;
+                              final riskFactors =
+                                  atRiskData['riskFactors']
+                                      as Map<String, dynamic>? ??
+                                  {};
+
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                child: ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundColor: Colors.orange,
+                                    child: Icon(
+                                      Icons.warning_amber_rounded,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                  ),
+                                  title: Text(
+                                    studentName.isEmpty
+                                        ? 'Unknown Student'
+                                        : studentName,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  subtitle: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(email),
+                                      const SizedBox(height: 4),
+                                      Wrap(
+                                        spacing: 8,
+                                        children: [
+                                          if (riskFactors['weeklyRisk'] == true)
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 2,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.red.withOpacity(
+                                                  0.1,
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                                border: Border.all(
+                                                  color: Colors.red.withOpacity(
+                                                    0.3,
+                                                  ),
+                                                ),
+                                              ),
+                                              child: Text(
+                                                'Weekly: $weeklyAbsences absences',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: Colors.red[700],
+                                                ),
+                                              ),
+                                            ),
+                                          if (riskFactors['monthlyRisk'] ==
+                                              true)
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 2,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.orange
+                                                    .withOpacity(0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                                border: Border.all(
+                                                  color: Colors.orange
+                                                      .withOpacity(0.3),
+                                                ),
+                                              ),
+                                              child: Text(
+                                                'Monthly: $monthlyAbsences absences',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: Colors.orange[700],
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  trailing: Icon(
+                                    Icons.chevron_right,
+                                    color: Colors.grey[400],
+                                  ),
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    _showStudentDetails(studentId, studentName);
+                                  },
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 }

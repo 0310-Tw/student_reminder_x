@@ -4,6 +4,14 @@ const admin = require('firebase-admin');
 
 admin.initializeApp();
 
+// Import at-risk calculation functions
+const {
+  onAttendanceUpdate,
+  dailyAtRiskUpdate,
+  calculateAllStudentsAtRisk,
+  getStudentAtRiskStatus
+} = require('./atRiskCalculator');
+
 // Simple test function
 exports.helloWorld = onRequest((request, response) => {
   logger.info("Hello logs!", {structuredData: true});
@@ -69,3 +77,9 @@ exports.sendFCMNotification = onRequest(async (request, response) => {
     response.status(500).send({ error: error.message });
   }
 });
+
+// Export at-risk calculation functions
+exports.onAttendanceUpdate = onAttendanceUpdate;
+exports.dailyAtRiskUpdate = dailyAtRiskUpdate;
+exports.calculateAllStudentsAtRisk = calculateAllStudentsAtRisk;
+exports.getStudentAtRiskStatus = getStudentAtRiskStatus;

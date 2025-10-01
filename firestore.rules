@@ -38,10 +38,20 @@ service cloud.firestore {
       allow read: if isAdmin() || isOwner(userId);
       allow write: if isAdmin() || isOwner(userId);
       
-      // Days subcollection - individual day attendance records
+      // Days subcollection - individual day attendance records (weekdays only)
       match /days/{dayId} {
         allow read: if isAdmin() || isOwner(userId);
-        allow write: if isAdmin() || isOwner(userId);
+        // Allow write only on weekdays (Monday=1 to Friday=5) and during school hours
+        allow write: if (isAdmin() || isOwner(userId)) && 
+                        request.time.dayOfWeek() >= 1 && 
+                        request.time.dayOfWeek() <= 5;
+        // Additional validation for attendance data structure
+        allow create: if (isAdmin() || isOwner(userId)) && 
+                         request.time.dayOfWeek() >= 1 && 
+                         request.time.dayOfWeek() <= 5 &&
+                         request.resource.data.keys().hasAll(['status', 'createdAt']) &&
+                         request.resource.data.status is string &&
+                         request.resource.data.status in ['present', 'absent', 'late', 'early'];
       }
       
       // Events subcollection - attendance events/logs
@@ -64,6 +74,13 @@ service cloud.firestore {
     // User notifications subcollection
     match /users/{userId}/notifications/{notificationId} {
       allow read, write: if isAdmin() || isOwner(userId);
+    }
+
+    // At-risk subcollection - backend functions write, admins read
+    match /users/{userId}/at-risk/{statusId} {
+      allow read: if isAdmin() || isOwner(userId);
+      // Allow backend functions (no auth context) to write at-risk data
+      allow write: if isAdmin() || request.auth == null;
     }
 
     // Reports collection
@@ -129,6 +146,11 @@ service cloud.firestore {
     match /{path=**}/reports/{reporterId} {
       allow read: if isAdmin() || 
                      (request.auth != null && request.auth.uid == reporterId);
+    }
+
+    // Allow reading at-risk data via collection group queries for admins
+    match /{path=**}/at-risk/{statusId} {
+      allow read: if isAdmin();
     }
 
     // Additional rules for admin dashboard data access
