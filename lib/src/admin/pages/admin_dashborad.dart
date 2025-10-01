@@ -15,6 +15,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
   List<String> _periods = ['Today', 'This Week', 'This Month'];
   String _studentFilter = 'All'; // 'All', 'Web', 'Mobile'
 
+  PageController _pageController = PageController();
+  int _currentPage = 0;
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -475,35 +484,33 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
                   return Column(
                     children: [
-                      _buildProgressIndicator(
-                        'Present',
-                        stats['present'] ?? 0,
-                        stats['total'] ?? 0,
-                        Color(0xFF27AE60),
-                      ),
-                      SizedBox(height: 12),
-                      _buildProgressIndicator(
-                        'Absent',
-                        stats['absent'] ?? 0,
-                        stats['total'] ?? 0,
-                        Color(0xFFE74C3C),
-                      ),
-                      SizedBox(height: 12),
-                      _buildProgressIndicator(
-                        'Late',
-                        stats['late'] ?? 0,
-                        stats['total'] ?? 0,
-                        Color(0xFFFF9800),
-                      ),
-                  
-                      SizedBox(height: 20),
+                      // Horizontal scrollable content
+                      Container(
+                        height: 200,
+                        child: PageView(
+                          controller: _pageController,
+                          onPageChanged: (index) {
+                            setState(() {
+                              _currentPage = index;
+                            });
+                          },
+                          children: [
+                            // Page 1: Attendance Progress Indicators
+                            _buildAttendanceProgressPage(stats),
 
-                      // New: Weekly Trend Comparison
-                      _buildWeeklyTrendComparison(),
-                      SizedBox(height: 20),
+                            // Page 2: Weekly Trend
+                            _buildWeeklyTrendPage(),
 
-                      // New: Frequently Late Students
-                      _buildFrequentlyLateStudents(),
+                            // Page 3: Frequently Late Students
+                            _buildFrequentlyLatePage(),
+                          ],
+                        ),
+                      ),
+
+                      SizedBox(height: 16),
+
+                      // Page dots indicator
+                      _buildPageIndicator(),
                     ],
                   );
                 },
@@ -553,6 +560,71 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
+  // New page-based methods for horizontal scrolling
+  Widget _buildAttendanceProgressPage(Map<String, int> stats) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _buildProgressIndicator(
+            'Present',
+            stats['present'] ?? 0,
+            stats['total'] ?? 0,
+            Color(0xFF27AE60),
+          ),
+          SizedBox(height: 12),
+          _buildProgressIndicator(
+            'Absent',
+            stats['absent'] ?? 0,
+            stats['total'] ?? 0,
+            Color(0xFFE74C3C),
+          ),
+          SizedBox(height: 12),
+          _buildProgressIndicator(
+            'Late',
+            stats['late'] ?? 0,
+            stats['total'] ?? 0,
+            Color(0xFFFF9800),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWeeklyTrendPage() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16),
+      child: _buildWeeklyTrendComparison(),
+    );
+  }
+
+  Widget _buildFrequentlyLatePage() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16),
+      child: _buildFrequentlyLateStudents(),
+    );
+  }
+
+  Widget _buildPageIndicator() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(3, (index) {
+        return Container(
+          margin: EdgeInsets.symmetric(horizontal: 4),
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: _currentPage == index
+                ? Color(0xFF3498DB)
+                : Colors.grey.withOpacity(0.4),
+          ),
+        );
+      }),
+    );
+  }
+
   // New: Weekly Trend Comparison Widget
   Widget _buildWeeklyTrendComparison() {
     return StreamBuilder<QuerySnapshot>(
@@ -569,103 +641,113 @@ class _AdminDashboardState extends State<AdminDashboard> {
         final attendanceRecords = snapshot.data?.docs ?? [];
         final trendData = _calculateWeeklyTrend(attendanceRecords);
 
-        return Container(
-          padding: EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Color(0xFFF8F9FA),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.withOpacity(0.2)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.trending_up, color: Color(0xFF3498DB), size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'Weekly Trend',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF2C3E50),
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Container(
+            width: 350, // Give it a fixed width for horizontal scrolling
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Color(0xFFF8F9FA),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.withOpacity(0.2)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.trending_up, color: Color(0xFF3498DB), size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Weekly Trend',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2C3E50),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'This Week',
-                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        '${trendData['thisWeek']} lates',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF2C3E50),
+                  ],
+                ),
+                SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'This Week',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        'vs Last Week',
-                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                      ),
-                      SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            trendData['trendIcon'],
-                            color: trendData['trendColor'],
-                            size: 16,
+                        SizedBox(height: 4),
+                        Text(
+                          '${trendData['thisWeek']} lates',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF2C3E50),
                           ),
-                          SizedBox(width: 4),
-                          Text(
-                            trendData['trendText'],
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                        ),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          'vs Last Week',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              trendData['trendIcon'],
                               color: trendData['trendColor'],
+                              size: 16,
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              SizedBox(height: 8),
-              LinearProgressIndicator(
-                value: trendData['progressValue'],
-                backgroundColor: Colors.grey[300],
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3498DB)),
-              ),
-              SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Last Week: ${trendData['lastWeek']} lates',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                  Text(
-                    '${(trendData['progressValue'] * 100).toStringAsFixed(1)}%',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            ],
+                            SizedBox(width: 4),
+                            Text(
+                              trendData['trendText'],
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: trendData['trendColor'],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8),
+                LinearProgressIndicator(
+                  value: trendData['progressValue'],
+                  backgroundColor: Colors.grey[300],
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3498DB)),
+                ),
+                SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Last Week: ${trendData['lastWeek']} lates',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                    Text(
+                      '${(trendData['progressValue'] * 100).toStringAsFixed(1)}%',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         );
       },
