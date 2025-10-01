@@ -14,13 +14,10 @@ Future<bool> handleClockAction({
   required String actionType, // 'checkin' or 'checkout'
 }) async {
   // fetch geofence profile for the student/day
-  final profile = await GeofenceService.instance.getProfile(
+  final GeofenceProfile profile = await GeofenceService.instance.getProfile(
     studentId: studentId,
     dateId: dateId,
   );
-
-  // if no profile at all, no restriction
-  if (profile == null) return true;
 
   // get current GPS position
   final pos = await Geolocator.getCurrentPosition();
@@ -31,19 +28,29 @@ Future<bool> handleClockAction({
   }
 
   // Pick the correct target location (check-in vs check-out)
-  final GeofenceLocation target = (actionType == 'checkin')
-      ? profile.checkInLocation
-      : profile.checkOutLocation;
+  final double targetLat;
+  final double targetLng;
+  final double targetRadius;
+
+  if (actionType == 'checkin') {
+    targetLat = profile.inLat;
+    targetLng = profile.inLng;
+    targetRadius = profile.inRadius;
+  } else {
+    targetLat = profile.outLat;
+    targetLng = profile.outLng;
+    targetRadius = profile.outRadius;
+  }
 
   // Calculate distance from current position to designated point
   final distance = Geolocator.distanceBetween(
     pos.latitude,
     pos.longitude,
-    target.lat,
-    target.lng,
+    targetLat,
+    targetLng,
   );
 
-  if (distance <= target.radius) {
+  if (distance <= targetRadius) {
     // Inside zone: just allow
     return true;
   }
@@ -76,8 +83,8 @@ Future<bool> handleClockAction({
       type: actionType,
       actualLat: pos.latitude,
       actualLng: pos.longitude,
-      designatedLat: target.lat,
-      designatedLng: target.lng,
+      designatedLat: targetLat,
+      designatedLng: targetLng,
       distance: distance,
     );
 

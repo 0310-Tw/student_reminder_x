@@ -121,20 +121,14 @@ class _AdminGeofenceEditorState extends State<AdminGeofenceEditor> {
       return;
     }
 
-    final checkIn = GeofenceLocation(
-      lat: inLocation!.latitude,
-      lng: inLocation!.longitude,
-      radius: inRadius,
-    );
-    final checkOut = GeofenceLocation(
-      lat: outLocation!.latitude,
-      lng: outLocation!.longitude,
-      radius: outRadius,
-    );
-
+    // Build a GeofenceProfile with flat fields
     final profile = GeofenceProfile(
-      checkInLocation: checkIn,
-      checkOutLocation: checkOut,
+      inLat: inLocation!.latitude,
+      inLng: inLocation!.longitude,
+      inRadius: inRadius,
+      outLat: outLocation!.latitude,
+      outLng: outLocation!.longitude,
+      outRadius: outRadius,
       bandType: bandType,
       outsidePolicy: outsidePolicy,
       outsideMessage: messageController.text.isNotEmpty ? messageController.text : null,
