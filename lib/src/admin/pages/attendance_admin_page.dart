@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:students_reminder/src/shared/routes.dart';
 import '../../services/attendance_service.dart';
 import '../../shared/misc.dart';
 
@@ -696,6 +697,16 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                       case 'view_location':
                         _showLocationMap(data);
                         break;
+                         case 'geofence': // 👈 your new item
+                        Navigator.pushNamed(
+                          context,
+                          AppRoutes.geofence,
+                          arguments: {
+                            'studentId': studentUid,
+                            'dateId': dateStr,
+                          },
+                        );
+                        break;
                     }
                   },
                   itemBuilder: (BuildContext context) => [
@@ -733,6 +744,16 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                         data['outLoc'] != null ||
                         data['clockInLoc'] != null ||
                         data['clockOutLoc'] != null)
+                         PopupMenuItem<String>(
+                        value: 'geofence',
+                        child: Row(
+                          children: [
+                            Icon(Icons.maps_ugc_outlined, color: Colors.indigo, size: 18),
+                            SizedBox(width: 8),
+                            Text('Geofence'),
+                          ],
+                        ),
+                      ),
                       PopupMenuItem<String>(
                         value: 'view_location',
                         child: Row(
@@ -743,7 +764,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                           ],
                         ),
                       ),
-                  ],
+                    ],
                 ),
               ),
             ],
