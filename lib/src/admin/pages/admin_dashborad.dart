@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:students_reminder/src/services/auth_service.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -30,6 +31,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
             onPressed: () {
               Navigator.pushNamed(context, '/admin-profileview-page');
             },
+          ),
+          IconButton(
+            icon: Icon(Icons.logout, color: Colors.white),
+            onPressed: () => _showLogoutDialog(),
+            tooltip: 'Logout',
           ),
         ],
       ),
@@ -499,11 +505,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       if (_selectedPeriod == 'This Week' ||
                           _selectedPeriod == 'This Month') ...[
                         SizedBox(height: 12),
-                        StreamBuilder<QuerySnapshot>(
-                          stream: _getAtRiskStudentsStream(),
-                          builder: (context, atRiskSnapshot) {
-                            final atRiskCount = atRiskSnapshot.hasData
-                                ? atRiskSnapshot.data!.docs.length
+                        FutureBuilder<List<Map<String, dynamic>>>(
+                          future: _calculateAtRiskStudents(),
+                          builder: (context, atRiskFuture) {
+                            final atRiskCount = atRiskFuture.hasData
+                                ? atRiskFuture.data!.length
                                 : 0;
                             return GestureDetector(
                               onTap: () => _showAtRiskStudentsList(),
@@ -1185,12 +1191,248 @@ class _AdminDashboardState extends State<AdminDashboard> {
     };
   }
 
-  // New method: Stream at-risk students from Firestore
-  Stream<QuerySnapshot> _getAtRiskStudentsStream() {
-    return FirebaseFirestore.instance
-        .collectionGroup('at-risk')
-        .where('isAtRisk', isEqualTo: true)
-        .snapshots();
+  // Calculate at-risk students based on attendance patterns
+  Future<List<Map<String, dynamic>>> _calculateAtRiskStudents() async {
+    try {
+      // Get all students
+      final studentsSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('role', isEqualTo: 'student')
+          .get();
+
+      // Get all attendance records
+      final attendanceSnapshot = await FirebaseFirestore.instance
+          .collectionGroup('days')
+          .get();
+
+      final atRiskStudents = <Map<String, dynamic>>[];
+      final now = DateTime.now();
+
+      for (final studentDoc in studentsSnapshot.docs) {
+        final studentId = studentDoc.id;
+        final studentData = studentDoc.data();
+        final studentName =
+            '${studentData['firstName'] ?? ''} ${studentData['lastName'] ?? ''}'
+                .trim();
+
+        // Calculate attendance statistics for this student
+        final studentAttendance = attendanceSnapshot.docs
+            .where((doc) => doc.reference.parent.parent?.id == studentId)
+            .toList();
+
+        // Analyze attendance patterns for the last 30 days
+        final thirtyDaysAgo = now.subtract(Duration(days: 30));
+        final recentAttendance = studentAttendance.where((doc) {
+          final data = doc.data();
+          final dayId = data['dayId'] as String? ?? '';
+          if (dayId.isEmpty) return false;
+
+          try {
+            final parts = dayId.split('-');
+            if (parts.length == 3) {
+              final recordDate = DateTime(
+                int.parse(parts[0]),
+                int.parse(parts[1]),
+                int.parse(parts[2]),
+              );
+              return recordDate.isAfter(thirtyDaysAgo);
+            }
+          } catch (e) {
+            // Invalid date format
+          }
+          return false;
+        }).toList();
+
+        // Calculate at-risk criteria
+        int totalDays = recentAttendance.length;
+        int absentDays = 0;
+        int lateDays = 0;
+
+        int maxConsecutiveAbsences = 0;
+        int currentStreak = 0;
+
+        // Sort by date to check consecutive absences
+        recentAttendance.sort((a, b) {
+          final aData = a.data();
+          final bData = b.data();
+          final aDate = aData['dayId'] as String? ?? '';
+          final bDate = bData['dayId'] as String? ?? '';
+          return aDate.compareTo(bDate);
+        });
+
+        for (final record in recentAttendance) {
+          final data = record.data();
+          final status = data['status'] as String? ?? 'absent';
+
+          if (status == 'absent') {
+            absentDays++;
+            currentStreak++;
+            maxConsecutiveAbsences = maxConsecutiveAbsences > currentStreak
+                ? maxConsecutiveAbsences
+                : currentStreak;
+          } else {
+            currentStreak = 0;
+            if (status == 'late' || data['lateReason'] != null) {
+              lateDays++;
+            }
+          }
+        }
+
+        // At-Risk Criteria:
+        // 1. More than 30% absence rate in the last 30 days
+        // 2. More than 5 consecutive absences
+        // 3. More than 40% late arrivals in the last 30 days
+        // 4. More than 10 late arrivals in the last 30 days
+        bool isAtRisk = false;
+        List<String> reasons = [];
+
+        if (totalDays > 0) {
+          double absenceRate = (absentDays / totalDays) * 100;
+          double lateRate = (lateDays / totalDays) * 100;
+
+          if (absenceRate > 30) {
+            isAtRisk = true;
+            reasons.add(
+              'High absence rate: ${absenceRate.toStringAsFixed(1)}%',
+            );
+          }
+
+          if (maxConsecutiveAbsences >= 5) {
+            isAtRisk = true;
+            reasons.add('$maxConsecutiveAbsences consecutive absences');
+          }
+
+          if (lateRate > 40) {
+            isAtRisk = true;
+            reasons.add('High late rate: ${lateRate.toStringAsFixed(1)}%');
+          }
+
+          if (lateDays >= 10) {
+            isAtRisk = true;
+            reasons.add('$lateDays late arrivals');
+          }
+        }
+
+        // If student has no attendance records in 30 days, also at risk
+        if (totalDays == 0) {
+          isAtRisk = true;
+          reasons.add('No attendance records');
+        }
+
+        if (isAtRisk) {
+          atRiskStudents.add({
+            'id': studentId,
+            'name': studentName.isEmpty ? 'Unknown Student' : studentName,
+            'reasons': reasons,
+            'absentDays': absentDays,
+            'lateDays': lateDays,
+            'totalDays': totalDays,
+            'maxConsecutiveAbsences': maxConsecutiveAbsences,
+            'absenceRate': totalDays > 0
+                ? (absentDays / totalDays) * 100.0
+                : 0.0,
+            'lateRate': totalDays > 0 ? (lateDays / totalDays) * 100.0 : 0.0,
+          });
+
+          // Optionally store the at-risk status in Firestore for persistence
+          await _storeAtRiskStatus(studentId, reasons);
+        } else {
+          // Remove at-risk status if student is no longer at risk
+          await _removeAtRiskStatus(studentId);
+        }
+      }
+
+      return atRiskStudents;
+    } catch (e) {
+      print('Error calculating at-risk students: $e');
+      return [];
+    }
+  }
+
+  // Store at-risk status in Firestore
+  Future<void> _storeAtRiskStatus(
+    String studentId,
+    List<String> reasons,
+  ) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(studentId)
+          .collection('at-risk')
+          .doc('current')
+          .set({
+            'isAtRisk': true,
+            'reasons': reasons,
+            'flaggedDate': FieldValue.serverTimestamp(),
+            'lastUpdated': FieldValue.serverTimestamp(),
+          });
+    } catch (e) {
+      print('Error storing at-risk status: $e');
+    }
+  }
+
+  // Remove at-risk status from Firestore
+  Future<void> _removeAtRiskStatus(String studentId) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(studentId)
+          .collection('at-risk')
+          .doc('current')
+          .delete();
+    } catch (e) {
+      // Document might not exist, which is fine
+    }
+  }
+
+  // Helper widget for mini progress bars in at-risk student list
+  Widget _buildMiniProgressBar(String label, double percentage, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey[600],
+          ),
+        ),
+        SizedBox(height: 2),
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                height: 4,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+                child: FractionallySizedBox(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: (percentage / 100).clamp(0.0, 1.0),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(width: 4),
+            Text(
+              '${percentage.toStringAsFixed(0)}%',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 
   Map<String, dynamic> _getStudentAttendanceStatus(
@@ -1741,16 +1983,40 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ),
                 const Divider(),
                 Expanded(
-                  child: StreamBuilder<QuerySnapshot>(
-                    stream: _getAtRiskStudentsStream(),
-                    builder: (context, atRiskSnapshot) {
-                      if (!atRiskSnapshot.hasData) {
+                  child: FutureBuilder<List<Map<String, dynamic>>>(
+                    future: _calculateAtRiskStudents(),
+                    builder: (context, atRiskFuture) {
+                      if (atRiskFuture.connectionState ==
+                          ConnectionState.waiting) {
                         return const Center(child: CircularProgressIndicator());
                       }
 
-                      final atRiskDocs = atRiskSnapshot.data!.docs;
+                      if (atRiskFuture.hasError) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.error_outline,
+                                size: 64,
+                                color: Colors.red,
+                              ),
+                              SizedBox(height: 16),
+                              Text(
+                                'Error loading at-risk students',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.red,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
 
-                      if (atRiskDocs.isEmpty) {
+                      final atRiskStudents = atRiskFuture.data ?? [];
+
+                      if (atRiskStudents.isEmpty) {
                         return const Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -1781,157 +2047,155 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       return ListView.builder(
                         controller: scrollController,
                         padding: const EdgeInsets.all(16),
-                        itemCount: atRiskDocs.length,
+                        itemCount: atRiskStudents.length,
                         itemBuilder: (context, index) {
-                          final atRiskDoc = atRiskDocs[index];
-                          final atRiskData =
-                              atRiskDoc.data() as Map<String, dynamic>;
+                          final student = atRiskStudents[index];
+                          final studentName = student['name'] as String;
+                          final reasons = student['reasons'] as List<String>;
+                          final absenceRate = (student['absenceRate'] as num)
+                              .toDouble();
+                          final lateRate = (student['lateRate'] as num)
+                              .toDouble();
+                          final absentDays = student['absentDays'] as int;
+                          final lateDays = student['lateDays'] as int;
+                          final totalDays = student['totalDays'] as int;
 
-                          // Get student ID from document path
-                          final studentId =
-                              atRiskDoc.reference.parent.parent!.id;
-
-                          return FutureBuilder<DocumentSnapshot>(
-                            future: FirebaseFirestore.instance
-                                .collection('users')
-                                .doc(studentId)
-                                .get(),
-                            builder: (context, studentSnapshot) {
-                              if (!studentSnapshot.hasData) {
-                                return Card(
-                                  margin: const EdgeInsets.only(bottom: 8),
-                                  child: ListTile(
-                                    leading: CircleAvatar(
-                                      backgroundColor: Colors.grey.withOpacity(
-                                        0.3,
-                                      ),
-                                      child: SizedBox(
-                                        width: 16,
-                                        height: 16,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.grey,
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            elevation: 2,
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      CircleAvatar(
+                                        backgroundColor: Color(0xFF9B59B6),
+                                        child: Text(
+                                          studentName.isNotEmpty
+                                              ? studentName[0].toUpperCase()
+                                              : '?',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                    title: Text('Loading...'),
-                                  ),
-                                );
-                              }
-
-                              final studentData =
-                                  studentSnapshot.data!.data()
-                                      as Map<String, dynamic>?;
-                              final studentName =
-                                  '${studentData?['firstName'] ?? ''} ${studentData?['lastName'] ?? ''}'
-                                      .trim();
-                              final email = studentData?['email'] ?? 'No email';
-
-                              final weeklyAbsences =
-                                  atRiskData['weeklyAbsences'] ?? 0;
-                              final monthlyAbsences =
-                                  atRiskData['monthlyAbsences'] ?? 0;
-                              final riskFactors =
-                                  atRiskData['riskFactors']
-                                      as Map<String, dynamic>? ??
-                                  {};
-
-                              return Card(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                child: ListTile(
-                                  leading: CircleAvatar(
-                                    backgroundColor: Colors.orange,
-                                    child: Icon(
-                                      Icons.warning_amber_rounded,
-                                      color: Colors.white,
-                                      size: 20,
-                                    ),
-                                  ),
-                                  title: Text(
-                                    studentName.isEmpty
-                                        ? 'Unknown Student'
-                                        : studentName,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  subtitle: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(email),
-                                      const SizedBox(height: 4),
-                                      Wrap(
-                                        spacing: 8,
-                                        children: [
-                                          if (riskFactors['weeklyRisk'] == true)
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 2,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: Colors.red.withOpacity(
-                                                  0.1,
-                                                ),
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                                border: Border.all(
-                                                  color: Colors.red.withOpacity(
-                                                    0.3,
-                                                  ),
-                                                ),
-                                              ),
-                                              child: Text(
-                                                'Weekly: $weeklyAbsences absences',
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  color: Colors.red[700],
-                                                ),
+                                      SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              studentName,
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                                color: Color(0xFF2C3E50),
                                               ),
                                             ),
-                                          if (riskFactors['monthlyRisk'] ==
-                                              true)
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 2,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: Colors.orange
-                                                    .withOpacity(0.1),
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                                border: Border.all(
-                                                  color: Colors.orange
-                                                      .withOpacity(0.3),
-                                                ),
-                                              ),
-                                              child: Text(
-                                                'Monthly: $monthlyAbsences absences',
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  color: Colors.orange[700],
-                                                ),
+                                            SizedBox(height: 4),
+                                            Text(
+                                              '$absentDays absent, $lateDays late (${totalDays} total days)',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey[600],
                                               ),
                                             ),
-                                        ],
+                                          ],
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Color(
+                                            0xFF9B59B6,
+                                          ).withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          'AT RISK',
+                                          style: TextStyle(
+                                            color: Color(0xFF9B59B6),
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 10,
+                                          ),
+                                        ),
                                       ),
                                     ],
                                   ),
-                                  trailing: Icon(
-                                    Icons.chevron_right,
-                                    color: Colors.grey[400],
+                                  SizedBox(height: 12),
+                                  Text(
+                                    'Risk Factors:',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF2C3E50),
+                                    ),
                                   ),
-                                  onTap: () {
-                                    Navigator.pop(context);
-                                    _showStudentDetails(studentId, studentName);
-                                  },
-                                ),
-                              );
-                            },
+                                  SizedBox(height: 4),
+                                  ...reasons.map(
+                                    (reason) => Padding(
+                                      padding: EdgeInsets.only(
+                                        left: 8,
+                                        bottom: 2,
+                                      ),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '• ',
+                                            style: TextStyle(
+                                              color: Color(0xFF9B59B6),
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: Text(
+                                              reason,
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                color: Colors.grey[700],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  if (totalDays > 0) ...[
+                                    SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: _buildMiniProgressBar(
+                                            'Absence Rate',
+                                            absenceRate,
+                                            Colors.red,
+                                          ),
+                                        ),
+                                        SizedBox(width: 12),
+                                        Expanded(
+                                          child: _buildMiniProgressBar(
+                                            'Late Rate',
+                                            lateRate,
+                                            Colors.orange,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
                           );
                         },
                       );
@@ -1944,5 +2208,74 @@ class _AdminDashboardState extends State<AdminDashboard> {
         },
       ),
     );
+  }
+
+  void _showLogoutDialog() async {
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.logout, color: Colors.red),
+              SizedBox(width: 8),
+              Text('Logout'),
+            ],
+          ),
+          content: Text('Are you sure you want to log out from your admin account?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: Text('Logout'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed == true && mounted) {
+        // Show loading dialog
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            content: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 16),
+                Text('Logging out...'),
+              ],
+            ),
+          ),
+        );
+
+        // Perform logout
+        await AuthService.instance.logout();
+
+        // Navigation will be handled automatically by the auth stream
+      }
+    } catch (e) {
+      // Pop loading dialog if it exists
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error logging out: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }
