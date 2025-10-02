@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/user_service.dart';
+import 'package:students_reminder/src/widgets/atrisk_banner_notifications.dart';
 import 'package:students_reminder/src/widgets/suspension_check.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:students_reminder/src/shared/routes.dart';
@@ -21,6 +22,10 @@ class _HomePageState extends State<HomePage> {
   String? _selectedAttendanceStatus;
   Stream<QuerySnapshot<Map<String, dynamic>>>? _studentStream;
   final uid = AuthService.instance.currentUser?.uid;
+
+  // Stream subscriptions for proper cleanup
+  final List<StreamSubscription> _subscriptions = [];
+  Timer? _dailyCacheTimer;
 
   // Cache for student attendance status to avoid repeated queries
   final Map<String, String> _studentAttendanceCache = {};
@@ -51,12 +56,25 @@ class _HomePageState extends State<HomePage> {
 
   void _setupDailyCacheClear() {
     // Clear attendance cache at midnight to ensure fresh data each day
-    Timer.periodic(const Duration(hours: 1), (timer) {
+    _dailyCacheTimer = Timer.periodic(const Duration(hours: 1), (timer) {
       final now = DateTime.now();
       if (now.hour == 0 && now.minute == 0) {
         _studentAttendanceCache.clear();
       }
     });
+  }
+
+  @override
+  void dispose() {
+    // Cancel all stream subscriptions
+    for (final subscription in _subscriptions) {
+      subscription.cancel();
+    }
+
+    // Cancel the daily cache timer
+    _dailyCacheTimer?.cancel();
+
+    super.dispose();
   }
 
   void _setupLiveCounts() {
@@ -469,6 +487,7 @@ class _HomePageState extends State<HomePage> {
         body: SuspensionCheck(
           child: Column(
             children: [
+              AtRiskBannerNotifications(),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Row(

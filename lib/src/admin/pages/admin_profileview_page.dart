@@ -6,7 +6,7 @@ import 'package:students_reminder/src/services/admin_service.dart';
 import 'package:students_reminder/src/services/notification_service.dart';
 import 'package:students_reminder/src/shared/list.dart';
 import 'package:students_reminder/src/widgets/group_filter.dart';
-import 'package:students_reminder/src/widgets/user_banner_notifications.dart';
+import 'package:students_reminder/src/widgets/atrisk_banner_notifications.dart';
 import 'package:students_reminder/src/widgets/suspension_check.dart';
 import 'package:students_reminder/src/shared/misc.dart';
 
@@ -51,7 +51,6 @@ class _AdminProfileviewPageState extends State<AdminProfileviewPage> {
       body: SuspensionCheck(
         child: Column(
           children: [
-            UserBannerNotifications(),
             GroupFilter(
               value: _group,
               onChanged: (val) => setState(() => _group = val),

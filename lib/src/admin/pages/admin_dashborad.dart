@@ -32,11 +32,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               Navigator.pushNamed(context, '/admin-profileview-page');
             },
           ),
-          IconButton(
-            icon: Icon(Icons.logout, color: Colors.white),
-            onPressed: () => _showLogoutDialog(),
-            tooltip: 'Logout',
-          ),
+         
         ],
       ),
       body: Column(

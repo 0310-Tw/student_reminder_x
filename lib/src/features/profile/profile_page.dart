@@ -6,14 +6,47 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:crop_your_image/crop_your_image.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:students_reminder/src/features/auth/login_page.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/user_service.dart';
 import 'package:students_reminder/src/shared/misc.dart';
 import 'package:students_reminder/src/shared/widgets/live_char_counter_text_field.dart';
-import 'package:students_reminder/src/widgets/user_banner_notifications.dart';
+import 'package:students_reminder/src/widgets/atrisk_banner_notifications.dart';
 import 'package:students_reminder/src/widgets/suspension_check.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+
+// SAFE STREAMBUILDER PATTERN FOR FIRESTORE:
+//
+// StreamBuilder<User?>(
+//   stream: FirebaseAuth.instance.authStateChanges(),
+//   builder: (context, authSnapshot) {
+//     if (!authSnapshot.hasData || authSnapshot.data == null) {
+//       return LoginPage(); // Redirect to login if no user
+//     }
+//
+//     final user = authSnapshot.data!;
+//     return StreamBuilder<DocumentSnapshot>(
+//       stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
+//       builder: (context, dataSnapshot) {
+//         if (dataSnapshot.connectionState == ConnectionState.waiting) {
+//           return CircularProgressIndicator();
+//         }
+//
+//         if (dataSnapshot.hasError) {
+//           return Text('Error: ${dataSnapshot.error}');
+//         }
+//
+//         if (!dataSnapshot.hasData || !dataSnapshot.data!.exists) {
+//           return Text('No data found');
+//         }
+//
+//         final data = dataSnapshot.data!.data() as Map<String, dynamic>?;
+//         return YourWidget(data: data);
+//       },
+//     );
+//   },
+// )
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -25,46 +58,64 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   Future<void> _onLogout(BuildContext context) async {
     try {
-      //Confirm first
-      final safeToLogout = await showDialog(
+      // Confirm logout first
+      final safeToLogout = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: Text('Logout'),
+          title: Row(
+            children: [
+              Icon(Icons.logout, color: Colors.red),
+              SizedBox(width: 8),
+              Text('Logout'),
+            ],
+          ),
           content: Text('Are you sure you want to log out?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
               child: Text('Cancel'),
             ),
-            FilledButton(
+            ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: Text('Yes'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: Text('Logout'),
             ),
           ],
         ),
       );
 
-      // Check if widget is still mounted after dialog
+      // Check if widget is still mounted and user confirmed
       if (!mounted || safeToLogout != true) return;
+
+      // Cancel all subscriptions immediately to prevent permission errors
+      _userDataSubscription?.cancel();
+      _userDataSubscription = null;
 
       // Show loading indicator
       if (mounted) {
         showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (context) => const AlertDialog(
-            content: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(width: 16),
-                Text('Logging out...'),
-              ],
+          builder: (context) => WillPopScope(
+            onWillPop: () async => false, // Prevent back button during logout
+            child: AlertDialog(
+              content: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(width: 16),
+                  Text('Logging out...'),
+                ],
+              ),
             ),
           ),
         );
       }
 
+      // Perform logout
       await AuthService.instance.logout();
 
       // Pop loading dialog if still mounted
@@ -72,15 +123,28 @@ class _ProfilePageState extends State<ProfilePage> {
         Navigator.pop(context);
       }
 
-      // Navigation will be handled automatically by SplashGate
+      // Navigate to login page immediately
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginPage()),
+          (route) => false, // Remove all previous routes
+        );
+      }
     } catch (e) {
       // Pop loading dialog if it exists and widget is still mounted
       if (mounted && Navigator.canPop(context)) {
         Navigator.pop(context);
       }
 
+      // Show error only if widget is still mounted
       if (mounted) {
-        displaySnackBar(context, 'Error logging out: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error logging out: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
       }
     }
   }
@@ -367,8 +431,14 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
-    final user = AuthService.instance.currentUser;
-    if (user != null) {
+    _setupUserDataListener();
+  }
+
+  void _setupUserDataListener() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null && mounted) {
+      _userDataSubscription?.cancel(); // Cancel any existing subscription
+
       _userDataSubscription = UserService.instance
           .getUser(user.uid)
           .listen(
@@ -381,16 +451,24 @@ class _ProfilePageState extends State<ProfilePage> {
                 _phone.text = (data['phone'] ?? '') as String;
                 setState(() {
                   _photoUrl = data['photoUrl'] as String?;
-                  _coverUrl =
-                      data['coverUrl'] as String?; // Listen for cover URL
+                  _coverUrl = data['coverUrl'] as String?;
                 });
               }
             },
             onError: (error) {
-              // Handle permission errors during logout gracefully
-              if (error.toString().contains('permission-denied')) {
-                // User logged out, stop listening
-                return;
+              // Handle permission errors gracefully
+              if (mounted) {
+                print('Error loading user data: $error');
+                setState(() {
+                  _busy = false;
+                  _coverBusy = false;
+                });
+
+                // If it's a permission error, the user might have been logged out
+                if (error.toString().contains('permission-denied')) {
+                  _userDataSubscription?.cancel();
+                  _userDataSubscription = null;
+                }
               }
             },
           );
@@ -405,292 +483,313 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    final user = AuthService.instance.currentUser;
-
-    // If user is null, redirect to login
-    if (user == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.of(
-          context,
-        ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginPage()));
-      });
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
-    return Scaffold(
-      body: SuspensionCheck(
-        restrictWriteAccess: true,
-        child: CustomScrollView(
-          slivers: [
-            // Collapsible cover image with SliverAppBar
-            SliverAppBar(
-              backgroundColor: Color(0xFF2C3E50),
-              foregroundColor: Colors.white,
-              expandedHeight: 250.0,
-              floating: false,
-              pinned: true,
-              actions: [
-                IconButton(
-                  onPressed: () async {
-                    try {
-                      await _onLogout(context);
-                    } catch (e) {
-                      // Handle any errors silently for the app bar button
-                    }
-                  },
-                  icon: Icon(Icons.logout),
-                ),
-              ],
-              flexibleSpace: FlexibleSpaceBar(
-                title: Text('My Profile'),
-                background: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // Cover image or placeholder
-                    _coverUrl != null
-                        ? Image.network(
-                            _coverUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return _buildCoverPlaceholder();
-                            },
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) return child;
-                              return Container(
-                                color: Colors.grey.shade200,
-                                child: Center(
-                                  child: CircularProgressIndicator(
-                                    value:
-                                        loadingProgress.expectedTotalBytes !=
-                                            null
-                                        ? loadingProgress
-                                                  .cumulativeBytesLoaded /
-                                              loadingProgress
-                                                  .expectedTotalBytes!
-                                        : null,
-                                  ),
-                                ),
-                              );
-                            },
-                          )
-                        : _buildCoverPlaceholder(),
-                    // Gradient overlay for better text readability
-                    Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Color(0xFF2C3E50).withOpacity(0.3),
-                            Colors.black.withOpacity(0.5),
-                          ],
-                        ),
-                      ),
-                    ),
-                    // Change cover button for current user
-                    Positioned(
-                      bottom: 16,
-                      right: 16,
-                      child: FloatingActionButton(
-                        heroTag: "profile_cover_fab",
-                        mini: true,
-                        backgroundColor: Color(0xFF3498DB),
-                        foregroundColor: Colors.white,
-                        onPressed: _coverBusy ? null : _onPickCoverImage,
-                        child: _coverBusy
-                            ? SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Icon(Icons.camera_alt, size: 20),
-                      ),
-                    ),
-                  ],
-                ),
+    // Use StreamBuilder to listen to auth state changes
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, authSnapshot) {
+        // If user is null or logged out, redirect to login
+        if (!authSnapshot.hasData || authSnapshot.data == null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginPage()),
+                (route) => false, // Remove all previous routes
+              );
+            }
+          });
+          return const Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Signing out...'),
+                ],
               ),
             ),
-            // Profile content
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // User notifications for flags/suspensions
-                    const UserBannerNotifications(),
-                    const SizedBox(height: 16),
-                    // Profile image section
-                    Center(
-                      child: SizedBox(
-                        width: 160,
-                        height: 160,
-                        child: AspectRatio(
-                          aspectRatio: 1.0,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Theme.of(context).primaryColor,
-                                width: 2,
-                              ),
-                            ),
-                            child: ClipOval(
-                              child: _busy
-                                  ? Container(
-                                      color: Colors.grey.shade200,
-                                      child: const Center(
-                                        child: CircularProgressIndicator(),
-                                      ),
-                                    )
-                                  : _photoUrl != null
-                                  ? Image.network(
-                                      _photoUrl!,
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                            return Container(
-                                              color: Colors.grey.shade200,
-                                              child: const Icon(
-                                                Icons.person,
-                                                size: 60,
-                                                color: Colors.grey,
-                                              ),
-                                            );
-                                          },
-                                      loadingBuilder: (context, child, loadingProgress) {
-                                        if (loadingProgress == null)
-                                          return child;
-                                        return Container(
-                                          color: Colors.grey.shade200,
-                                          child: Center(
-                                            child: CircularProgressIndicator(
-                                              value:
-                                                  loadingProgress
-                                                          .expectedTotalBytes !=
-                                                      null
-                                                  ? loadingProgress
-                                                            .cumulativeBytesLoaded /
-                                                        loadingProgress
-                                                            .expectedTotalBytes!
-                                                  : null,
-                                            ),
+          );
+        }
+
+        final user = authSnapshot.data!;
+
+        return Scaffold(
+          body: SuspensionCheck(
+            restrictWriteAccess: true,
+            child: CustomScrollView(
+              slivers: [
+                // Collapsible cover image with SliverAppBar
+                SliverAppBar(
+                  backgroundColor: Color(0xFF2C3E50),
+                  foregroundColor: Colors.white,
+                  expandedHeight: 250.0,
+                  floating: false,
+                  pinned: true,
+                  actions: [
+                    IconButton(
+                      onPressed: () async {
+                        try {
+                          await _onLogout(context);
+                        } catch (e) {
+                          // Handle any errors silently for the app bar button
+                        }
+                      },
+                      icon: Icon(Icons.logout),
+                    ),
+                  ],
+                  flexibleSpace: FlexibleSpaceBar(
+                    title: Text('My Profile'),
+                    background: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        // Cover image or placeholder
+                        _coverUrl != null
+                            ? Image.network(
+                                _coverUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return _buildCoverPlaceholder();
+                                },
+                                loadingBuilder:
+                                    (context, child, loadingProgress) {
+                                      if (loadingProgress == null) return child;
+                                      return Container(
+                                        color: Colors.grey.shade200,
+                                        child: Center(
+                                          child: CircularProgressIndicator(
+                                            value:
+                                                loadingProgress
+                                                        .expectedTotalBytes !=
+                                                    null
+                                                ? loadingProgress
+                                                          .cumulativeBytesLoaded /
+                                                      loadingProgress
+                                                          .expectedTotalBytes!
+                                                : null,
                                           ),
-                                        );
-                                      },
-                                    )
-                                  : Container(
-                                      color: Colors.grey.shade200,
-                                      child: const Icon(
-                                        Icons.person,
-                                        size: 60,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
+                                        ),
+                                      );
+                                    },
+                              )
+                            : _buildCoverPlaceholder(),
+                        // Gradient overlay for better text readability
+                        Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Color(0xFF2C3E50).withOpacity(0.3),
+                                Colors.black.withOpacity(0.5),
+                              ],
                             ),
                           ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Center(
-                      child: TextButton.icon(
-                        icon: const Icon(Icons.camera_alt),
-                        onPressed: _busy ? null : _onPickPhoto,
-                        label: Text(
-                          _busy ? 'Uploading...' : 'Change Profile Image',
+                        // Change cover button for current user
+                        Positioned(
+                          bottom: 16,
+                          right: 16,
+                          child: FloatingActionButton(
+                            heroTag: "profile_cover_fab",
+                            mini: true,
+                            backgroundColor: Color(0xFF3498DB),
+                            foregroundColor: Colors.white,
+                            onPressed: _coverBusy ? null : _onPickCoverImage,
+                            child: _coverBusy
+                                ? SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Icon(Icons.camera_alt, size: 20),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                    const SizedBox(height: 24),
-                    // User info section
-                    Text('Name: ${_firstName.text} ${_lastName.text}'),
-                    const SizedBox(height: 8),
-                    Text('Email: ${user.email}'),
-                    const SizedBox(height: 24),
-                    // Editable fields
-                    TextField(
-                      controller: _firstName,
-                      decoration: const InputDecoration(
-                        labelText: 'First Name',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _lastName,
-                      decoration: const InputDecoration(
-                        labelText: 'Last Name',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _phone,
-                      decoration: const InputDecoration(
-                        labelText: 'Phone #',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    LiveCharCounterTextField(
-                      controller: _bio,
-                      maxLength: 100,
-                      labelText: 'Bio',
-                      hintText: 'Tell us about yourself...',
-                      maxLines: 3,
-                      keyboardType: TextInputType.multiline,
-                    ),
-                    const SizedBox(height: 24),
-                    // Action buttons
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _busy ? null : _updateProfile,
-                        child: _busy
-                            ? const CircularProgressIndicator()
-                            : const Text('Save Profile'),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: () async {
-                          await AuthService.instance.sendPasswordReset(
-                            user.email!,
-                          );
-                          if (mounted) {
-                            displaySnackBar(
-                              context,
-                              'Password reset email sent!',
-                            );
-                          }
-                        },
-                        child: const Text('Send Password Reset Email'),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    SizedBox(
-                      width: double.infinity,
-                      child: TextButton(
-                        onPressed: () => _onLogout(context),
-                        child: const Text('Logout'),
-                      ),
-                    ),
-
-                    const SizedBox(height: 24), // Extra bottom padding
-                  ],
+                  ),
                 ),
-              ),
+                // Profile content
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // User notifications for flags/suspensions
+                        const SizedBox(height: 16),
+                        // Profile image section
+                        Center(
+                          child: SizedBox(
+                            width: 160,
+                            height: 160,
+                            child: AspectRatio(
+                              aspectRatio: 1.0,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Theme.of(context).primaryColor,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: ClipOval(
+                                  child: _busy
+                                      ? Container(
+                                          color: Colors.grey.shade200,
+                                          child: const Center(
+                                            child: CircularProgressIndicator(),
+                                          ),
+                                        )
+                                      : _photoUrl != null
+                                      ? Image.network(
+                                          _photoUrl!,
+                                          fit: BoxFit.cover,
+                                          errorBuilder:
+                                              (context, error, stackTrace) {
+                                                return Container(
+                                                  color: Colors.grey.shade200,
+                                                  child: const Icon(
+                                                    Icons.person,
+                                                    size: 60,
+                                                    color: Colors.grey,
+                                                  ),
+                                                );
+                                              },
+                                          loadingBuilder: (context, child, loadingProgress) {
+                                            if (loadingProgress == null)
+                                              return child;
+                                            return Container(
+                                              color: Colors.grey.shade200,
+                                              child: Center(
+                                                child: CircularProgressIndicator(
+                                                  value:
+                                                      loadingProgress
+                                                              .expectedTotalBytes !=
+                                                          null
+                                                      ? loadingProgress
+                                                                .cumulativeBytesLoaded /
+                                                            loadingProgress
+                                                                .expectedTotalBytes!
+                                                      : null,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        )
+                                      : Container(
+                                          color: Colors.grey.shade200,
+                                          child: const Icon(
+                                            Icons.person,
+                                            size: 60,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Center(
+                          child: TextButton.icon(
+                            icon: const Icon(Icons.camera_alt),
+                            onPressed: _busy ? null : _onPickPhoto,
+                            label: Text(
+                              _busy ? 'Uploading...' : 'Change Profile Image',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        // User info section
+                        Text('Name: ${_firstName.text} ${_lastName.text}'),
+                        const SizedBox(height: 8),
+                        Text('Email: ${user.email}'),
+                        const SizedBox(height: 24),
+                        // Editable fields
+                        TextField(
+                          controller: _firstName,
+                          decoration: const InputDecoration(
+                            labelText: 'First Name',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _lastName,
+                          decoration: const InputDecoration(
+                            labelText: 'Last Name',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _phone,
+                          decoration: const InputDecoration(
+                            labelText: 'Phone #',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        LiveCharCounterTextField(
+                          controller: _bio,
+                          maxLength: 100,
+                          labelText: 'Bio',
+                          hintText: 'Tell us about yourself...',
+                          maxLines: 3,
+                          keyboardType: TextInputType.multiline,
+                        ),
+                        const SizedBox(height: 24),
+                        // Action buttons
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _busy ? null : _updateProfile,
+                            child: _busy
+                                ? const CircularProgressIndicator()
+                                : const Text('Save Profile'),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            onPressed: () async {
+                              await AuthService.instance.sendPasswordReset(
+                                user.email!,
+                              );
+                              if (mounted) {
+                                displaySnackBar(
+                                  context,
+                                  'Password reset email sent!',
+                                );
+                              }
+                            },
+                            child: const Text('Send Password Reset Email'),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        SizedBox(
+                          width: double.infinity,
+                          child: TextButton(
+                            onPressed: () => _onLogout(context),
+                            child: const Text('Logout'),
+                          ),
+                        ),
+
+                        const SizedBox(height: 24), // Extra bottom padding
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
-    );
+          ),
+        );
+      }, // End of StreamBuilder builder
+    ); // End of StreamBuilder
   }
 
   Widget _buildCoverPlaceholder() {

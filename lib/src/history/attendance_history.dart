@@ -1174,6 +1174,7 @@ import 'package:students_reminder/src/history/shift_timeline.dart';
 import 'package:students_reminder/src/services/attendance_service.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/shared/misc.dart';
+import 'package:students_reminder/src/widgets/atrisk_banner_notifications.dart';
 import 'package:students_reminder/src/widgets/suspension_check.dart';
 
 class AttendanceHistory14d extends StatefulWidget {
@@ -1262,6 +1263,7 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
       body: SuspensionCheck(
         child: Column(
           children: [
+            AtRiskBannerNotifications(),
             // Single dynamic Clock In / Clock Out button
             Padding(
               padding: const EdgeInsets.all(8),
@@ -1873,25 +1875,17 @@ class _HistoryList extends StatelessWidget {
   final String uid;
   final List<_DayItem> days;
 
-  // ✅ Status color helper
-  Color _statusColor(String status) {
-    switch (status) {
-      case 'present':
-        return Colors.green;
-      case 'late':
-        return Colors.orange;
-      case 'absent':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
+  @override
+  Widget build(BuildContext context) {
+    return _AttendanceListView(days: days, uid: uid);
   }
 }
 
 class _AttendanceListView extends StatelessWidget {
-  final List<AttendanceDay> days;
+  final List<_DayItem> days;
+  final String uid;
 
-  const _AttendanceListView({required this.days});
+  const _AttendanceListView({required this.days, required this.uid});
 
   @override
   Widget build(BuildContext context) {
