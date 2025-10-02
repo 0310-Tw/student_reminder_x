@@ -800,7 +800,7 @@ class _MyNotesPageState extends State<MyNotesPage> {
       if (mounted && Navigator.canPop(context)) {
         Navigator.pop(context);
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

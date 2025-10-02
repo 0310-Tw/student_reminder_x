@@ -1712,7 +1712,7 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
       if (mounted && Navigator.canPop(context)) {
         Navigator.pop(context);
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1886,7 +1886,6 @@ class _HistoryList extends StatelessWidget {
         return Colors.grey;
     }
   }
-
 }
 
 class _AttendanceListView extends StatelessWidget {

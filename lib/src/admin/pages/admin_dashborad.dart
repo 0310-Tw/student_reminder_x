@@ -2222,7 +2222,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
               Text('Logout'),
             ],
           ),
-          content: Text('Are you sure you want to log out from your admin account?'),
+          content: Text(
+            'Are you sure you want to log out from your admin account?',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -2267,7 +2269,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       if (mounted && Navigator.canPop(context)) {
         Navigator.pop(context);
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
