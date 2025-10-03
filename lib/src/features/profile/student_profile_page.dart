@@ -55,7 +55,20 @@ class StudentProfilePage extends StatelessWidget {
                     child: Text(bio),
                   ),
 
-                // TODO: Add Notes section
+                // ✅ New button to open Student Timetable Page
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.schedule),
+                    label: const Text('View Timetable'),
+                    onPressed: () {
+                      // push to student timetable route
+                      Navigator.pushNamed(context, '/student-timetable');
+                    },
+                  ),
+                ),
+
+                // Notes section header
                 Padding(
                   padding: EdgeInsets.all(16),
                   child: Text(
