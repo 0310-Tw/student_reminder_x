@@ -39,9 +39,7 @@ class SuspensionCheck extends StatelessWidget {
 class AttendanceService {
   static final _firestore = FirebaseFirestore.instance;
 
-  static Stream<QuerySnapshot<Map<String, dynamic>>> streamLast14Days(
-    String uid,
-  ) {
+  static Stream<QuerySnapshot<Map<String, dynamic>>> streamLast14Days(String uid) {
     final now = DateTime.now();
     final start = now.subtract(const Duration(days: 14));
 
@@ -54,27 +52,8 @@ class AttendanceService {
         .snapshots();
   }
 
-  static Future<void> clockIn(
-    String uid,
-    Position pos,
-    String placeName,
-  ) async {
+  static Future<void> clockIn(String uid, Position pos, String placeName) async {
     final now = DateTime.now();
-
-    // Check if it's a weekday (Monday-Friday)
-    if (!_isWeekday(now)) {
-      throw Exception(
-        "Attendance can only be recorded on weekdays (Monday-Friday)",
-      );
-    }
-
-    // Check if user can record attendance (after enrollment date)
-    if (!(await _isAfterEnrollmentDate(uid, now))) {
-      throw Exception(
-        "Attendance recording is not available before your enrollment date",
-      );
-    }
-
     final dayId = _dateId(now);
 
     final data = {
@@ -92,34 +71,11 @@ class AttendanceService {
         .set(data, SetOptions(merge: true));
   }
 
-  static Future<void> clockOut(
-    String uid,
-    Position pos,
-    String placeName,
-  ) async {
+  static Future<void> clockOut(String uid, Position pos, String placeName) async {
     final now = DateTime.now();
-
-    // Check if it's a weekday (Monday-Friday)
-    if (!_isWeekday(now)) {
-      throw Exception(
-        "Attendance can only be recorded on weekdays (Monday-Friday)",
-      );
-    }
-
-    // Check if user can record attendance (after enrollment date)
-    if (!(await _isAfterEnrollmentDate(uid, now))) {
-      throw Exception(
-        "Attendance recording is not available before your enrollment date",
-      );
-    }
-
     final dayId = _dateId(now);
 
-    final docRef = _firestore
-        .collection('attendance')
-        .doc(uid)
-        .collection('days')
-        .doc(dayId);
+    final docRef = _firestore.collection('attendance').doc(uid).collection('days').doc(dayId);
     final snapshot = await docRef.get();
 
     if (!snapshot.exists || snapshot.data()?['inAt'] == null) {
@@ -133,25 +89,16 @@ class AttendanceService {
     }, SetOptions(merge: true));
   }
 
-  static Future<void> updateLiveLocation(
-    String uid,
-    Position pos,
-    String placeName,
-  ) async {
+  static Future<void> updateLiveLocation(String uid, Position pos, String placeName) async {
     final now = DateTime.now();
     final dayId = _dateId(now);
 
-    await _firestore
-        .collection('attendance')
-        .doc(uid)
-        .collection('days')
-        .doc(dayId)
-        .set({
-          'liveLat': pos.latitude,
-          'liveLng': pos.longitude,
-          'livePlace': placeName,
-          'liveUpdated': Timestamp.now(),
-        }, SetOptions(merge: true));
+    await _firestore.collection('attendance').doc(uid).collection('days').doc(dayId).set({
+      'liveLat': pos.latitude,
+      'liveLng': pos.longitude,
+      'livePlace': placeName,
+      'liveUpdated': Timestamp.now(),
+    }, SetOptions(merge: true));
   }
 
   static String _dateId(DateTime dt) {
@@ -159,52 +106,6 @@ class AttendanceService {
     final m = dt.month.toString().padLeft(2, '0');
     final d = dt.day.toString().padLeft(2, '0');
     return "$y$m$d";
-  }
-
-  /// Check if the given date is a weekday (Monday = 1, Sunday = 7)
-  static bool _isWeekday(DateTime date) {
-    return date.weekday >= 1 && date.weekday <= 5; // Monday(1) to Friday(5)
-  }
-
-  /// Check if the given date is after the user's enrollment/creation date
-  static Future<bool> _isAfterEnrollmentDate(
-    String uid,
-    DateTime checkDate,
-  ) async {
-    try {
-      final userDoc = await _firestore.collection('users').doc(uid).get();
-
-      if (!userDoc.exists) {
-        return false; // User doesn't exist, don't allow attendance
-      }
-
-      final userData = userDoc.data() ?? {};
-      final createdAt = userData['createdAt'] as Timestamp?;
-
-      if (createdAt == null) {
-        return true; // If no creation date, allow attendance
-      }
-
-      final enrollmentDate = createdAt.toDate();
-
-      // Compare dates only (ignore time)
-      final checkDateOnly = DateTime(
-        checkDate.year,
-        checkDate.month,
-        checkDate.day,
-      );
-      final enrollmentDateOnly = DateTime(
-        enrollmentDate.year,
-        enrollmentDate.month,
-        enrollmentDate.day,
-      );
-
-      return checkDateOnly.isAtSameMomentAs(enrollmentDateOnly) ||
-          checkDateOnly.isAfter(enrollmentDateOnly);
-    } catch (e) {
-      print('Error checking enrollment date: $e');
-      return false; // On error, don't allow attendance
-    }
   }
 }
 
@@ -256,10 +157,7 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
 
   Future<String> _getPlaceName(Position pos) async {
     try {
-      final placemarks = await placemarkFromCoordinates(
-        pos.latitude,
-        pos.longitude,
-      );
+      final placemarks = await placemarkFromCoordinates(pos.latitude, pos.longitude);
       if (placemarks.isNotEmpty) {
         final p = placemarks.first;
         return "${p.name ?? ''}, ${p.locality ?? ''}".trim();
@@ -298,16 +196,15 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
   /// ---------------- Live Tracking ----------------
   Future<void> _startLiveTracking(String uid) async {
     _locationSub?.cancel();
-    _locationSub =
-        Geolocator.getPositionStream(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-            distanceFilter: 10,
-          ),
-        ).listen((pos) async {
-          final placeName = await _getPlaceName(pos);
-          await AttendanceService.updateLiveLocation(uid, pos, placeName);
-        });
+    _locationSub = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10,
+      ),
+    ).listen((pos) async {
+      final placeName = await _getPlaceName(pos);
+      await AttendanceService.updateLiveLocation(uid, pos, placeName);
+    });
   }
 
   Future<void> _stopLiveTracking() async {
@@ -388,20 +285,15 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
               child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                 stream: AttendanceService.streamLast14Days(uid),
                 builder: (context, snap) {
-                  if (!snap.hasData)
-                    return const Center(child: CircularProgressIndicator());
+                  if (!snap.hasData) return const Center(child: CircularProgressIndicator());
                   final docs = snap.data!.docs;
-                  final byDate = {
-                    for (var d in docs) d.data()['dayId'] as String: d.data(),
-                  };
+                  final byDate = {for (var d in docs) d.data()['dayId'] as String: d.data()};
                   final end = DateTime.now();
                   final items = <_DayItem>[];
                   for (int i = 13; i >= 0; i--) {
                     final day = end.subtract(Duration(days: i));
                     final id = JmTime.dateId(day);
-                    items.add(
-                      _DayItem(date: day, dateId: id, data: byDate[id]),
-                    );
+                    items.add(_DayItem(date: day, dateId: id, data: byDate[id]));
                   }
                   return _showCalendar
                       ? _CalendarGrid(uid: uid, days: items)
@@ -435,12 +327,8 @@ class _HistoryList extends StatelessWidget {
     return ListView(
       children: days.map((d) {
         final data = d.data;
-        final clockIn = data?['inAt'] != null
-            ? (data!['inAt'] as Timestamp).toDate()
-            : null;
-        final clockOut = data?['outAt'] != null
-            ? (data!['outAt'] as Timestamp).toDate()
-            : null;
+        final clockIn = data?['inAt'] != null ? (data!['inAt'] as Timestamp).toDate() : null;
+        final clockOut = data?['outAt'] != null ? (data!['outAt'] as Timestamp).toDate() : null;
 
         return ListTile(
           title: Text(JmTime.formatDate(d.date)),
@@ -458,10 +346,7 @@ class _HistoryList extends StatelessWidget {
                     if (data?['placeIn'] != null)
                       Text(
                         data!['placeIn'],
-                        style: TextStyle(
-                          color: Colors.grey.shade600,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                         overflow: TextOverflow.ellipsis,
                       ),
                   ],
@@ -477,10 +362,7 @@ class _HistoryList extends StatelessWidget {
                     if (data?['placeOut'] != null)
                       Text(
                         data!['placeOut'],
-                        style: TextStyle(
-                          color: Colors.grey.shade600,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                         overflow: TextOverflow.ellipsis,
                       ),
                   ],
@@ -536,8 +418,7 @@ class DayMapModal extends StatelessWidget {
           .doc(dayId)
           .snapshots(),
       builder: (context, snap) {
-        if (!snap.hasData)
-          return const Center(child: CircularProgressIndicator());
+        if (!snap.hasData) return const Center(child: CircularProgressIndicator());
         final data = snap.data!.data() ?? {};
 
         final inAt = (data['inAt'] as Timestamp?)?.toDate();
@@ -554,47 +435,31 @@ class DayMapModal extends StatelessWidget {
 
         final markers = <Marker>{};
         if (inLoc != null) {
-          markers.add(
-            Marker(
+          markers.add(Marker(
               markerId: const MarkerId("in"),
               position: inLoc,
               infoWindow: InfoWindow(
-                title: "Clock In",
-                snippet: "${_fmtJM(inAt)} • ${data['placeIn'] ?? ''}",
-              ),
-            ),
-          );
+                  title: "Clock In",
+                  snippet: "${_fmtJM(inAt)} • ${data['placeIn'] ?? ''}")));
         }
         if (outLoc != null) {
-          markers.add(
-            Marker(
+          markers.add(Marker(
               markerId: const MarkerId("out"),
               position: outLoc,
               infoWindow: InfoWindow(
-                title: "Clock Out",
-                snippet: "${_fmtJM(outAt)} • ${data['placeOut'] ?? ''}",
-              ),
-            ),
-          );
+                  title: "Clock Out",
+                  snippet: "${_fmtJM(outAt)} • ${data['placeOut'] ?? ''}")));
         }
         if (liveLoc != null) {
-          markers.add(
-            Marker(
-              markerId: const MarkerId("live"),
-              position: liveLoc,
-              icon: BitmapDescriptor.defaultMarkerWithHue(
-                BitmapDescriptor.hueAzure,
-              ),
-              infoWindow: InfoWindow(
-                title: "Live Location",
-                snippet: data['livePlace'] ?? '',
-              ),
-            ),
-          );
+          markers.add(Marker(
+            markerId: const MarkerId("live"),
+            position: liveLoc,
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+            infoWindow: InfoWindow(title: "Live Location", snippet: data['livePlace'] ?? ''),
+          ));
         }
 
-        final center =
-            liveLoc ?? outLoc ?? inLoc ?? const LatLng(18.005, -76.7936);
+        final center = liveLoc ?? outLoc ?? inLoc ?? const LatLng(18.005, -76.7936);
 
         return DraggableScrollableSheet(
           expand: false,
@@ -608,25 +473,16 @@ class DayMapModal extends StatelessWidget {
                   width: 40,
                   margin: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade400,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+                      color: Colors.grey.shade400, borderRadius: BorderRadius.circular(10)),
                 ),
                 Text("Day: $dayId"),
-                if (inAt != null)
-                  Text("Clock In: ${_fmtJM(inAt)} • ${data['placeIn'] ?? ''}"),
-                if (outAt != null)
-                  Text(
-                    "Clock Out: ${_fmtJM(outAt)} • ${data['placeOut'] ?? ''}",
-                  ),
+                if (inAt != null) Text("Clock In: ${_fmtJM(inAt)} • ${data['placeIn'] ?? ''}"),
+                if (outAt != null) Text("Clock Out: ${_fmtJM(outAt)} • ${data['placeOut'] ?? ''}"),
                 if (liveLoc != null) Text("Live: ${data['livePlace'] ?? ''}"),
                 const SizedBox(height: 8),
                 Expanded(
                   child: GoogleMap(
-                    initialCameraPosition: CameraPosition(
-                      target: center,
-                      zoom: 15,
-                    ),
+                    initialCameraPosition: CameraPosition(target: center, zoom: 15),
                     markers: markers,
                   ),
                 ),
