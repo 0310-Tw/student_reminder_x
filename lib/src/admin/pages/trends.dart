@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:students_reminder/src/admin/pages/admin_geofence_editor.dart';
+import 'package:students_reminder/src/admin/pages/admin_incident_detail_page.dart';
+import 'package:students_reminder/src/admin/pages/admin_incident_list.dart';
+import 'package:students_reminder/src/admin/pages/geofence_profile_list.dart';
 
 class TrendsPage extends StatefulWidget {
   const TrendsPage({super.key});
@@ -9,29 +13,225 @@ class TrendsPage extends StatefulWidget {
 }
 
 class _TrendsPageState extends State<TrendsPage> {
+  bool _disposed = false;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Color(0xFFF7F9FC),
-      appBar: AppBar(
-        backgroundColor: Color(0xFF2C3E50),
-        foregroundColor: Colors.white,
-        title: Text('Attendance Trends'),
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    // Safety check: if widget is disposed, return empty container
+    if (_disposed || !mounted) {
+      return Scaffold(
+        backgroundColor: Color(0xFFF7F9FC),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        backgroundColor: Color(0xFFF7F9FC),
+        appBar: AppBar(
+          backgroundColor: Color(0xFF2C3E50),
+          foregroundColor: Colors.white,
+          title: Text('Admin Dashboard'),
+          elevation: 0,
+          bottom: TabBar(
+            indicatorColor: Colors.white,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white.withOpacity(0.7),
+            tabs: [
+              Tab(icon: Icon(Icons.trending_up), text: 'Trends'),
+              Tab(icon: Icon(Icons.location_on), text: 'Geofence'),
+              Tab(icon: Icon(Icons.report_problem), text: 'Incidents'),
+            ],
+          ),
+        ),
+        body: TabBarView(
           children: [
-            // Weekly Trend Comparison
-            _buildWeeklyTrendComparison(),
-            SizedBox(height: 20),
+            // Trends Tab
+            _buildTrendsTab(),
 
-            // Frequently Late Students
-            _buildFrequentlyLateStudents(),
+            // Geofence Editor Tab
+            _buildGeofenceTab(),
+
+            // Incident Details Tab
+            _buildIncidentsTab(),
           ],
         ),
+      ),
+    );
+  }
+
+  // Trends Tab Content
+  Widget _buildTrendsTab() {
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Weekly Trend Comparison
+          _buildWeeklyTrendComparison(),
+          SizedBox(height: 20),
+
+          // Frequently Late Students
+          _buildFrequentlyLateStudents(),
+        ],
+      ),
+    );
+  }
+
+  // Geofence Tab Content
+  Widget _buildGeofenceTab() {
+    return Padding(
+      padding: EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Text(
+            'Geofence Management',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF2C3E50),
+            ),
+          ),
+          SizedBox(height: 20),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFF3498DB),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+            ),
+            icon: Icon(Icons.location_on, color: Colors.white),
+            label: Text(
+              'Open Geofence Editor',
+              style: TextStyle(color: Colors.white, fontSize: 16),
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AdminGeofenceEditor(
+                    studentId:
+                        'default_student', // You can modify this as needed
+                    dateId: DateTime.now().toString().substring(0, 10),
+                  ),
+                ),
+              );
+            },
+          ),
+          SizedBox(height: 16),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFF27AE60),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+            ),
+            icon: Icon(Icons.list_alt, color: Colors.white),
+            label: Text(
+              'View Geofence Profiles',
+              style: TextStyle(color: Colors.white, fontSize: 16),
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => GeofenceProfilesList(
+                    studentId:
+                        'default_student', // You can modify this as needed
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Incidents Tab Content
+  Widget _buildIncidentsTab() {
+    return Padding(
+      padding: EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Text(
+            'Incident Management',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF2C3E50),
+            ),
+          ),
+          SizedBox(height: 20),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFFE74C3C),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+            ),
+            icon: Icon(Icons.report_problem, color: Colors.white),
+            label: Text(
+              'View Sample Incident',
+              style: TextStyle(color: Colors.white, fontSize: 16),
+            ),
+            onPressed: () {
+              // Sample incident data - you can modify this with real data
+              final sampleIncident = {
+                'actualLat': 18.0179,
+                'actualLng': -76.8099,
+                'designatedLat': 18.0200,
+                'designatedLng': -76.8120,
+                'distance': 150.5,
+                'type': 'Outside Geofence',
+                'dateId': DateTime.now().toString().substring(0, 10),
+              };
+
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      AdminIncidentDetailPage(data: sampleIncident),
+                ),
+              );
+            },
+          ),
+          SizedBox(height: 16),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFFE67E22),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+            ),
+            icon: Icon(Icons.list, color: Colors.white),
+            label: Text(
+              'View All Incidents',
+              style: TextStyle(color: Colors.white, fontSize: 16),
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AdminIncidentsList(
+                    studentId:
+                        'default_student', // You can modify this as needed
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -41,11 +241,17 @@ class _TrendsPageState extends State<TrendsPage> {
     return StreamBuilder<QuerySnapshot>(
       stream: _getAllAttendanceStream(),
       builder: (context, snapshot) {
+        // Check if widget is disposed to prevent rebuilds during disposal
+        if (_disposed || !mounted) {
+          return SizedBox.shrink();
+        }
+
         if (snapshot.connectionState == ConnectionState.waiting) {
           return _buildTrendLoading();
         }
 
         if (snapshot.hasError) {
+          print('StreamBuilder error in trends: ${snapshot.error}');
           return _buildTrendError('Error loading trend data');
         }
 
@@ -161,11 +367,17 @@ class _TrendsPageState extends State<TrendsPage> {
     return StreamBuilder<QuerySnapshot>(
       stream: _getAllAttendanceStream(),
       builder: (context, snapshot) {
+        // Check if widget is disposed to prevent rebuilds during disposal
+        if (_disposed || !mounted) {
+          return SizedBox.shrink();
+        }
+
         if (snapshot.connectionState == ConnectionState.waiting) {
           return _buildFrequentlyLateLoading();
         }
 
         if (snapshot.hasError) {
+          print('StreamBuilder error in late students: ${snapshot.error}');
           return _buildFrequentlyLateError('Error loading late students');
         }
 
@@ -174,11 +386,19 @@ class _TrendsPageState extends State<TrendsPage> {
         return FutureBuilder<List<Map<String, dynamic>>>(
           future: _getFrequentlyLateStudents(attendanceRecords),
           builder: (context, futureSnapshot) {
+            // Check if widget is disposed to prevent rebuilds during disposal
+            if (_disposed || !mounted) {
+              return SizedBox.shrink();
+            }
+
             if (futureSnapshot.connectionState == ConnectionState.waiting) {
               return _buildFrequentlyLateLoading();
             }
 
             if (futureSnapshot.hasError) {
+              print(
+                'FutureBuilder error in student names: ${futureSnapshot.error}',
+              );
               return _buildFrequentlyLateError('Error loading student names');
             }
 

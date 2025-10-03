@@ -80,7 +80,6 @@ class _MyNotesPageState extends State<MyNotesPage> {
         restrictWriteAccess: true,
         child: Column(
           children: [
-           
             Container(
               padding: const EdgeInsets.all(16),
               child: Column(

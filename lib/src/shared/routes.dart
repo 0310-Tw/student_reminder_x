@@ -33,7 +33,7 @@ class AppRoutes {
   static const studentAttendance = '/student-attendance';
   static const geofence = '/geofence';
   static const profile = '/profile'; // ✅ Added profile route
-  static const trends = '/trends'; 
+  static const trends = '/trends';
 
   static Route<dynamic> onGenerateRoute(RouteSettings setting) {
     final url = Uri.parse(setting.name ?? '');
@@ -62,17 +62,19 @@ class AppRoutes {
       case adminFeeds:
         return MaterialPageRoute(builder: (_) => const AdminPublicFeeds());
       case time:
-        return MaterialPageRoute(builder: (_) => const TimetableGeneratorScreen());
+        return MaterialPageRoute(
+          builder: (_) => const TimetableGeneratorScreen(),
+        );
       case trends:
         return MaterialPageRoute(builder: (_) => const TrendsPage());
       case geofence:
-  final args = setting.arguments as Map<String, dynamic>?;
-  return MaterialPageRoute(
-    builder: (_) => AdminGeofenceEditor(
-      studentId: args?['studentId'] ?? '',
-      dateId: args?['dateId'] ?? '',
-    ),
-  );
+        final args = setting.arguments as Map<String, dynamic>?;
+        return MaterialPageRoute(
+          builder: (_) => AdminGeofenceEditor(
+            studentId: args?['studentId'] ?? '',
+            dateId: args?['dateId'] ?? '',
+          ),
+        );
       case splash:
         return MaterialPageRoute(builder: (_) => const SplashGate());
       case profile: // ✅ Added profile page
