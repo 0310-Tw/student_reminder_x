@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/user_service.dart';
+import 'package:students_reminder/src/widgets/atrisk_banner_notifications.dart';
 import 'package:students_reminder/src/widgets/suspension_check.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:students_reminder/src/shared/routes.dart';
@@ -464,6 +465,7 @@ class _HomePageState extends State<HomePage> {
         body: SuspensionCheck(
           child: Column(
             children: [
+              AtRiskBannerNotifications(),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Row(

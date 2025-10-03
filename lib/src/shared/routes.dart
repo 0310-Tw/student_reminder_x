@@ -4,6 +4,7 @@ import 'package:students_reminder/src/admin/models/geofence_profile.dart';
 import 'package:students_reminder/src/admin/pages/admin_dashborad.dart';
 import 'package:students_reminder/src/admin/pages/admin_geofence_editor.dart';
 import 'package:students_reminder/src/admin/pages/admin_profileview_page.dart';
+import 'package:students_reminder/src/admin/pages/trends.dart';
 import 'package:students_reminder/src/features/auth/login_page.dart';
 import 'package:students_reminder/src/features/auth/register_page.dart';
 import 'package:students_reminder/src/features/auth/forgot_password_page.dart';
@@ -32,6 +33,7 @@ class AppRoutes {
   static const studentAttendance = '/student-attendance';
   static const geofence = '/geofence';
   static const profile = '/profile'; // ✅ Added profile route
+  static const trends = '/trends'; 
 
   static Route<dynamic> onGenerateRoute(RouteSettings setting) {
     final url = Uri.parse(setting.name ?? '');
@@ -61,6 +63,8 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const AdminPublicFeeds());
       case time:
         return MaterialPageRoute(builder: (_) => const TimetableGeneratorScreen());
+      case trends:
+        return MaterialPageRoute(builder: (_) => const TrendsPage());
       case geofence:
   final args = setting.arguments as Map<String, dynamic>?;
   return MaterialPageRoute(

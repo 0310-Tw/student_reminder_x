@@ -11,7 +11,7 @@ import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/user_service.dart';
 import 'package:students_reminder/src/shared/misc.dart';
 import 'package:students_reminder/src/shared/widgets/live_char_counter_text_field.dart';
-import 'package:students_reminder/src/widgets/user_banner_notifications.dart';
+
 import 'package:students_reminder/src/widgets/suspension_check.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
@@ -520,7 +520,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // User notifications for flags/suspensions
-                    const UserBannerNotifications(),
+                  
                     const SizedBox(height: 16),
                     // Profile image section
                     Center(

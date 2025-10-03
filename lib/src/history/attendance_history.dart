@@ -1174,6 +1174,7 @@ import 'package:students_reminder/src/history/shift_timeline.dart';
 import 'package:students_reminder/src/services/attendance_service.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/shared/misc.dart';
+import 'package:students_reminder/src/widgets/atrisk_banner_notifications.dart';
 import 'package:students_reminder/src/widgets/suspension_check.dart';
 
 class AttendanceHistory14d extends StatefulWidget {
@@ -1257,6 +1258,7 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
       body: SuspensionCheck(
         child: Column(
           children: [
+            AtRiskBannerNotifications(),
             // Single dynamic Clock In / Clock Out button
             Padding(
               padding: const EdgeInsets.all(8),

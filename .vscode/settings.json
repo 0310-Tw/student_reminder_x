@@ -1,3 +1,4 @@
 {
-    "cmake.sourceDirectory": "C:/schoolprojects/flutter/student_reminder_x/linux"
+    "cmake.sourceDirectory": "C:/schoolprojects/flutter/student_reminder_x/linux",
+    "cmake.ignoreCMakeListsMissing": true
 }
