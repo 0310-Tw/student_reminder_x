@@ -384,219 +384,223 @@ class _AdminDashboardState extends State<AdminDashboard> {
           );
         }
       },
-      child: Container(
-        margin: EdgeInsets.symmetric(vertical: 4),
-        padding: EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Colors.white, Color(0xFFF8FAFB)],
+      child: GestureDetector(
+        onDoubleTap: () => Navigator.push(context, MaterialPageRoute(
+          builder: (context) => TrendsPage())),
+        child: Container(
+          margin: EdgeInsets.symmetric(vertical: 4),
+          padding: EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Colors.white, Color(0xFFF8FAFB)],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: Color(0xFF3498DB).withOpacity(0.1),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Color(0xFF3498DB).withOpacity(0.25),
+                blurRadius: 25,
+                offset: Offset(0, 10),
+                spreadRadius: 0,
+              ),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.12),
+                blurRadius: 15,
+                offset: Offset(0, 5),
+                spreadRadius: -2,
+              ),
+              BoxShadow(
+                color: Colors.white,
+                blurRadius: 8,
+                offset: Offset(0, -2),
+                spreadRadius: 0,
+              ),
+            ],
           ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: Color(0xFF3498DB).withOpacity(0.1),
-            width: 1.5,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Color(0xFF3498DB).withOpacity(0.25),
-              blurRadius: 25,
-              offset: Offset(0, 10),
-              spreadRadius: 0,
-            ),
-            BoxShadow(
-              color: Colors.black.withOpacity(0.12),
-              blurRadius: 15,
-              offset: Offset(0, 5),
-              spreadRadius: -2,
-            ),
-            BoxShadow(
-              color: Colors.white,
-              blurRadius: 8,
-              offset: Offset(0, -2),
-              spreadRadius: 0,
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '$_selectedPeriod Attendance Summary',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF2C3E50),
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 20),
-            StreamBuilder<QuerySnapshot>(
-              stream: _getAttendanceStream(),
-              builder: (context, attendanceSnapshot) {
-                if (attendanceSnapshot.connectionState ==
-                    ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator());
-                }
-
-                if (attendanceSnapshot.hasError) {
-                  print(
-                    'Attendance overview error: ${attendanceSnapshot.error}',
-                  );
-                  print(
-                    'Error details: ${attendanceSnapshot.error.runtimeType}',
-                  );
-                  return Center(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  SizedBox(width: 12),
+                  Expanded(
                     child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Error loading attendance data',
+                          '$_selectedPeriod Attendance Summary',
                           style: TextStyle(
-                            color: Colors.red,
-                            fontWeight: FontWeight.bold,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF2C3E50),
+                            letterSpacing: -0.5,
                           ),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          '${attendanceSnapshot.error}',
-                          style: TextStyle(color: Colors.red, fontSize: 12),
-                          textAlign: TextAlign.center,
                         ),
                       ],
                     ),
-                  );
-                }
-
-                return StreamBuilder<QuerySnapshot>(
-                  stream: _getStudentsStream(),
-                  builder: (context, studentsSnapshot) {
-                    if (studentsSnapshot.connectionState ==
-                        ConnectionState.waiting) {
-                      return Center(child: CircularProgressIndicator());
-                    }
-
-                    if (studentsSnapshot.hasError) {
-                      print(
-                        'Students overview error: ${studentsSnapshot.error}',
-                      );
-                      return Center(
-                        child: Text(
-                          'Error loading student data',
-                          style: TextStyle(color: Colors.red),
-                        ),
-                      );
-                    }
-
-                    if (!studentsSnapshot.hasData ||
-                        studentsSnapshot.data!.docs.isEmpty) {
-                      return Center(
-                        child: Text(
-                          'No students found',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      );
-                    }
-
-                    final totalStudents = studentsSnapshot.data!.docs.length;
-                    final attendanceRecords =
-                        attendanceSnapshot.data?.docs ?? [];
-                    final stats = _calculateAttendanceStats(
-                      attendanceRecords,
-                      totalStudents,
-                    );
-
+                  ),
+                ],
+              ),
+              SizedBox(height: 20),
+              StreamBuilder<QuerySnapshot>(
+                stream: _getAttendanceStream(),
+                builder: (context, attendanceSnapshot) {
+                  if (attendanceSnapshot.connectionState ==
+                      ConnectionState.waiting) {
+                    return Center(child: CircularProgressIndicator());
+                  }
+        
+                  if (attendanceSnapshot.hasError) {
                     print(
-                      'Overview - Total students: $totalStudents, Records: ${attendanceRecords.length}',
+                      'Attendance overview error: ${attendanceSnapshot.error}',
                     );
-
-                    return Column(
-                      children: [
-                        _buildProgressIndicator(
-                          'Present',
-                          stats['present'] ?? 0,
-                          stats['total'] ?? 0,
-                          Color(0xFF27AE60),
-                        ),
-                        SizedBox(height: 12),
-                        _buildProgressIndicator(
-                          'Absent',
-                          stats['absent'] ?? 0,
-                          stats['total'] ?? 0,
-                          Color(0xFFE74C3C),
-                        ),
-                        SizedBox(height: 12),
-                        _buildProgressIndicator(
-                          'Late',
-                          stats['late'] ?? 0,
-                          stats['total'] ?? 0,
-                          Color(0xFFFF9800),
-                        ),
-                        SizedBox(height: 12),
-                        // Only show At Risk section for weekly and monthly views
-                        if (_selectedPeriod == 'This Week' ||
-                            _selectedPeriod == 'This Month')
-                          _buildAtRiskProgressIndicator(attendanceRecords),
-                        if (_selectedPeriod == 'This Week' ||
-                            _selectedPeriod == 'This Month')
+                    print(
+                      'Error details: ${attendanceSnapshot.error.runtimeType}',
+                    );
+                    return Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Error loading attendance data',
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            '${attendanceSnapshot.error}',
+                            style: TextStyle(color: Colors.red, fontSize: 12),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+        
+                  return StreamBuilder<QuerySnapshot>(
+                    stream: _getStudentsStream(),
+                    builder: (context, studentsSnapshot) {
+                      if (studentsSnapshot.connectionState ==
+                          ConnectionState.waiting) {
+                        return Center(child: CircularProgressIndicator());
+                      }
+        
+                      if (studentsSnapshot.hasError) {
+                        print(
+                          'Students overview error: ${studentsSnapshot.error}',
+                        );
+                        return Center(
+                          child: Text(
+                            'Error loading student data',
+                            style: TextStyle(color: Colors.red),
+                          ),
+                        );
+                      }
+        
+                      if (!studentsSnapshot.hasData ||
+                          studentsSnapshot.data!.docs.isEmpty) {
+                        return Center(
+                          child: Text(
+                            'No students found',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        );
+                      }
+        
+                      final totalStudents = studentsSnapshot.data!.docs.length;
+                      final attendanceRecords =
+                          attendanceSnapshot.data?.docs ?? [];
+                      final stats = _calculateAttendanceStats(
+                        attendanceRecords,
+                        totalStudents,
+                      );
+        
+                      print(
+                        'Overview - Total students: $totalStudents, Records: ${attendanceRecords.length}',
+                      );
+        
+                      return Column(
+                        children: [
+                          _buildProgressIndicator(
+                            'Present',
+                            stats['present'] ?? 0,
+                            stats['total'] ?? 0,
+                            Color(0xFF27AE60),
+                          ),
                           SizedBox(height: 12),
-                        SizedBox(height: 20),
-                        // Enhanced swipe indicator
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: 10,
-                              height: 10,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Color(0xFF3498DB),
-                                    Color(0xFF2980B9),
+                          _buildProgressIndicator(
+                            'Absent',
+                            stats['absent'] ?? 0,
+                            stats['total'] ?? 0,
+                            Color(0xFFE74C3C),
+                          ),
+                          SizedBox(height: 12),
+                          _buildProgressIndicator(
+                            'Late',
+                            stats['late'] ?? 0,
+                            stats['total'] ?? 0,
+                            Color(0xFFFF9800),
+                          ),
+                          SizedBox(height: 12),
+                          // Only show At Risk section for weekly and monthly views
+                          if (_selectedPeriod == 'This Week' ||
+                              _selectedPeriod == 'This Month')
+                            _buildAtRiskProgressIndicator(attendanceRecords),
+                          if (_selectedPeriod == 'This Week' ||
+                              _selectedPeriod == 'This Month')
+                            SizedBox(height: 12),
+                          SizedBox(height: 20),
+                          // Enhanced swipe indicator
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Color(0xFF3498DB),
+                                      Color(0xFF2980B9),
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(5),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Color(0xFF3498DB).withOpacity(0.3),
+                                      blurRadius: 4,
+                                      offset: Offset(0, 2),
+                                    ),
                                   ],
                                 ),
-                                borderRadius: BorderRadius.circular(5),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Color(0xFF3498DB).withOpacity(0.3),
-                                    blurRadius: 4,
-                                    offset: Offset(0, 2),
-                                  ),
-                                ],
                               ),
-                            ),
-                            SizedBox(width: 12),
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: Color(0xFF3498DB).withOpacity(0.4),
-                                borderRadius: BorderRadius.circular(4),
+                              SizedBox(width: 12),
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: Color(0xFF3498DB).withOpacity(0.4),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    );
-                  },
-                );
-              },
-            ),
-          ],
+                            ],
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
