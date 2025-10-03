@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -42,28 +43,37 @@ class AuthService {
 
   //Login CODE
   Future<UserCredential> login(String email, String password) async {
+    debugPrint('*** AuthService: Attempting login for $email');
     final cred = await _auth.signInWithEmailAndPassword(
       email: email,
       password: password,
     );
+    debugPrint(
+      '*** AuthService: Firebase login successful for ${cred.user?.email}',
+    );
     await SessionManager.onLoginSuccess();
+    debugPrint('*** AuthService: Session recorded successfully');
     return cred;
   }
 
   //Logout CODE
   Future<void> logout() async {
+    debugPrint('*** AuthService: LOGOUT CALLED! Stack trace:');
+    debugPrint(StackTrace.current.toString());
     try {
       // Clear session first to prevent race conditions
       await SessionManager.clear();
+      debugPrint('*** AuthService: Session cleared');
       // Then sign out from Firebase
       await _auth.signOut();
+      debugPrint('*** AuthService: Firebase signOut completed');
     } catch (e) {
-      print('Error during logout: $e');
+      debugPrint('*** AuthService: Error during logout: $e');
       // Ensure we still sign out even if session clearing fails
       try {
         await _auth.signOut();
       } catch (signOutError) {
-        print('Error signing out: $signOutError');
+        debugPrint('*** AuthService: Error signing out: $signOutError');
         rethrow;
       }
     }

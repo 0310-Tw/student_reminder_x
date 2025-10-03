@@ -1253,11 +1253,7 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
             onPressed: () => setState(() => _showCalendar = !_showCalendar),
             icon: Icon(_showCalendar ? Icons.view_list : Icons.calendar_month),
           ),
-          IconButton(
-            onPressed: () => _showLogoutDialog(),
-            icon: const Icon(Icons.logout),
-            tooltip: 'Logout',
-          ),
+         
         ],
       ),
       body: SuspensionCheck(
@@ -1655,75 +1651,6 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
       }
     } catch (_) {}
     return "Unknown location";
-  }
-
-  void _showLogoutDialog() async {
-    try {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.logout, color: Colors.red),
-              SizedBox(width: 8),
-              Text('Logout'),
-            ],
-          ),
-          content: Text('Are you sure you want to log out?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-              ),
-              child: Text('Logout'),
-            ),
-          ],
-        ),
-      );
-
-      if (confirmed == true && mounted) {
-        // Show loading dialog
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            content: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(width: 16),
-                Text('Logging out...'),
-              ],
-            ),
-          ),
-        );
-
-        // Perform logout
-        await AuthService.instance.logout();
-
-        // Navigation will be handled automatically by the auth stream
-      }
-    } catch (e) {
-      // Pop loading dialog if it exists
-      if (mounted && Navigator.canPop(context)) {
-        Navigator.pop(context);
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error logging out: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
   }
 }
 
