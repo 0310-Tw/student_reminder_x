@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
 ThemeData buildTheme() {
-  final primaryScheme = ColorScheme.fromSeed(seedColor: Color(0xFF9e35e0));
+  final primaryScheme = ColorScheme.fromSeed(seedColor: Color(0xFF5BC0DE));
   final base = ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
-    colorSchemeSeed: Color(0xFF9e35e0),
+    colorSchemeSeed: Color(0xFF5BC0DE),
   );
 
   return base.copyWith(

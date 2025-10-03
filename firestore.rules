@@ -1,0 +1,161 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Helper function to check if user is student
+    function isStudent() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student';
+    }
+    
+    // Helper function to check if user owns the resource
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Users collection - basic user data
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isOwner(userId);
+      // Allow list/query operations for authenticated users (needed for dashboard)
+      allow list: if isAuthenticated();
+    }
+
+    // Attendance collection - main attendance documents
+    match /attendance/{userId} {
+      allow read: if isAdmin() || isOwner(userId);
+      allow write: if isAdmin() || isOwner(userId);
+      
+      // Days subcollection - individual day attendance records (weekdays only)
+      match /days/{dayId} {
+        allow read: if isAdmin() || isOwner(userId);
+        // Allow write only on weekdays (Monday=1 to Friday=5) and during school hours
+        allow write: if (isAdmin() || isOwner(userId)) && 
+                        request.time.dayOfWeek() >= 1 && 
+                        request.time.dayOfWeek() <= 5;
+        // Additional validation for attendance data structure
+        allow create: if (isAdmin() || isOwner(userId)) && 
+                         request.time.dayOfWeek() >= 1 && 
+                         request.time.dayOfWeek() <= 5 &&
+                         request.resource.data.keys().hasAll(['status', 'createdAt']) &&
+                         request.resource.data.status is string &&
+                         request.resource.data.status in ['present', 'absent', 'late', 'early'];
+      }
+      
+      // Events subcollection - attendance events/logs
+      match /events/{eventId} {
+        allow read: if isAdmin() || isOwner(userId);
+        allow write: if isAdmin() || isOwner(userId);
+      }
+    }
+
+    // Admin actions collection
+    match /adminActions/{actionId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Notifications collection
+    match /notifications/{notificationId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // User notifications subcollection
+    match /users/{userId}/notifications/{notificationId} {
+      allow read, write: if isAdmin() || isOwner(userId);
+    }
+
+    // At-risk subcollection - backend functions write, admins read
+    match /users/{userId}/at-risk/{statusId} {
+      allow read: if isAdmin() || isOwner(userId);
+      // Allow backend functions (no auth context) to write at-risk data
+      allow write: if isAdmin() || request.auth == null;
+    }
+
+    // Reports collection
+    match /reports/{reportId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Public notes collection
+    match /notes/{noteId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Documents collection
+    match /documents/{documentId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // User notes subcollection
+    match /users/{userId}/notes/{noteId} {
+      allow read: if isAdmin() || isOwner(userId) || resource.data.visibility == 'public';
+      allow write: if isAdmin() || isOwner(userId);
+      // Allow list operations for users on their own notes
+      allow list: if isAdmin() || isOwner(userId);
+      // Allow authenticated users to like/unlike public notes
+      allow update: if isAuthenticated() && 
+                   resource.data.visibility == 'public' &&
+                   // Only allow updates to like-related fields
+                   request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount', 'likedBy']) &&
+                   // Ensure title, body, and other core fields aren't changed
+                   request.resource.data.title == resource.data.title &&
+                   request.resource.data.body == resource.data.body &&
+                   request.resource.data.visibility == resource.data.visibility;
+      
+      // Reports subcollection - allow users to read/write their own reports
+      match /reports/{reporterId} {
+        allow read, write: if isAdmin() || isOwner(reporterId);
+      }
+    }
+
+    // Global rules for collection group queries (needed for admin dashboard)
+    match /{path=**}/days/{dayId} {
+      allow read: if isAdmin();
+    }
+
+    match /{path=**}/events/{eventId} {
+      allow read: if isAdmin();
+    }
+
+    match /{path=**}/notifications/{notificationId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Allow reading public notes via collection group queries
+    match /{path=**}/notes/{noteId} {
+      allow read: if isAuthenticated() && 
+                     (resource.data.visibility == 'public' || 
+                      resource.data.authorId == request.auth.uid);
+    }
+    
+    // Allow reading reports via collection group queries for admins and report owners
+    match /{path=**}/reports/{reporterId} {
+      allow read: if isAdmin() || 
+                     (request.auth != null && request.auth.uid == reporterId);
+    }
+
+    // Allow reading at-risk data via collection group queries for admins
+    match /{path=**}/at-risk/{statusId} {
+      allow read: if isAdmin();
+    }
+
+    // Additional rules for admin dashboard data access
+    match /{document=**} {
+      allow read: if isAdmin();
+    }
+  }
+}
