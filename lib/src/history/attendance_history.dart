@@ -1253,7 +1253,6 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
             onPressed: () => setState(() => _showCalendar = !_showCalendar),
             icon: Icon(_showCalendar ? Icons.view_list : Icons.calendar_month),
           ),
-         
         ],
       ),
       body: SuspensionCheck(
@@ -1802,17 +1801,19 @@ class _HistoryList extends StatelessWidget {
   final String uid;
   final List<_DayItem> days;
 
-  @override
-  Widget build(BuildContext context) {
-    return _AttendanceListView(days: days, uid: uid);
+  // ✅ Status color helper
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'present':
+        return Colors.green;
+      case 'late':
+        return Colors.orange;
+      case 'absent':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
   }
-}
-
-class _AttendanceListView extends StatelessWidget {
-  final List<_DayItem> days;
-  final String uid;
-
-  const _AttendanceListView({required this.days, required this.uid});
 
   @override
   Widget build(BuildContext context) {

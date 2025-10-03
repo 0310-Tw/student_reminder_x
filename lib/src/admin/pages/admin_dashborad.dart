@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-import 'package:students_reminder/src/services/auth_service.dart';
+import 'package:students_reminder/src/admin/pages/trends.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -32,7 +32,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
               Navigator.pushNamed(context, '/admin-profileview-page');
             },
           ),
-         
         ],
       ),
       body: Column(
@@ -221,10 +220,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         stats['absent'].toString(),
                         Icons.cancel,
                         Color(0xFF95A5A6),
-                        () => _showAbsentStudentsList(
-                          attendanceRecords,
-                          studentsSnapshot.data!.docs,
-                        ),
+                        () => _showAbsentStudentsBottomSheet(),
                       ),
                     ),
                   ],
@@ -378,154 +374,230 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Widget _buildAttendanceOverview() {
-    return Container(
-      padding: EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: Offset(0, 2),
+    return GestureDetector(
+      onHorizontalDragEnd: (details) {
+        // If swipe is to the left, navigate to trends page
+        if (details.velocity.pixelsPerSecond.dx < -500) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => TrendsPage()),
+          );
+        }
+      },
+      child: Container(
+        margin: EdgeInsets.symmetric(vertical: 4),
+        padding: EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Colors.white, Color(0xFFF8FAFB)],
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$_selectedPeriod Attendance Summary',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF2C3E50),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Color(0xFF3498DB).withOpacity(0.1),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Color(0xFF3498DB).withOpacity(0.25),
+              blurRadius: 25,
+              offset: Offset(0, 10),
+              spreadRadius: 0,
             ),
-          ),
-          SizedBox(height: 16),
-          StreamBuilder<QuerySnapshot>(
-            stream: _getAttendanceStream(),
-            builder: (context, attendanceSnapshot) {
-              if (attendanceSnapshot.connectionState ==
-                  ConnectionState.waiting) {
-                return Center(child: CircularProgressIndicator());
-              }
-
-              if (attendanceSnapshot.hasError) {
-                print('Attendance overview error: ${attendanceSnapshot.error}');
-                print('Error details: ${attendanceSnapshot.error.runtimeType}');
-                return Center(
+            BoxShadow(
+              color: Colors.black.withOpacity(0.12),
+              blurRadius: 15,
+              offset: Offset(0, 5),
+              spreadRadius: -2,
+            ),
+            BoxShadow(
+              color: Colors.white,
+              blurRadius: 8,
+              offset: Offset(0, -2),
+              spreadRadius: 0,
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                SizedBox(width: 12),
+                Expanded(
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Error loading attendance data',
+                        '$_selectedPeriod Attendance Summary',
                         style: TextStyle(
-                          color: Colors.red,
-                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF2C3E50),
+                          letterSpacing: -0.5,
                         ),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        '${attendanceSnapshot.error}',
-                        style: TextStyle(color: Colors.red, fontSize: 12),
-                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
-                );
-              }
+                ),
+              ],
+            ),
+            SizedBox(height: 20),
+            StreamBuilder<QuerySnapshot>(
+              stream: _getAttendanceStream(),
+              builder: (context, attendanceSnapshot) {
+                if (attendanceSnapshot.connectionState ==
+                    ConnectionState.waiting) {
+                  return Center(child: CircularProgressIndicator());
+                }
 
-              return StreamBuilder<QuerySnapshot>(
-                stream: _getStudentsStream(),
-                builder: (context, studentsSnapshot) {
-                  if (studentsSnapshot.connectionState ==
-                      ConnectionState.waiting) {
-                    return Center(child: CircularProgressIndicator());
-                  }
-
-                  if (studentsSnapshot.hasError) {
-                    print('Students overview error: ${studentsSnapshot.error}');
-                    return Center(
-                      child: Text(
-                        'Error loading student data',
-                        style: TextStyle(color: Colors.red),
-                      ),
-                    );
-                  }
-
-                  if (!studentsSnapshot.hasData ||
-                      studentsSnapshot.data!.docs.isEmpty) {
-                    return Center(
-                      child: Text(
-                        'No students found',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    );
-                  }
-
-                  final totalStudents = studentsSnapshot.data!.docs.length;
-                  final attendanceRecords = attendanceSnapshot.data?.docs ?? [];
-                  final stats = _calculateAttendanceStats(
-                    attendanceRecords,
-                    totalStudents,
-                  );
-
+                if (attendanceSnapshot.hasError) {
                   print(
-                    'Overview - Total students: $totalStudents, Records: ${attendanceRecords.length}',
+                    'Attendance overview error: ${attendanceSnapshot.error}',
                   );
-
-                  return Column(
-                    children: [
-                      _buildProgressIndicator(
-                        'Present',
-                        stats['present'] ?? 0,
-                        stats['total'] ?? 0,
-                        Color(0xFF27AE60),
-                      ),
-                      SizedBox(height: 12),
-                      _buildProgressIndicator(
-                        'Absent',
-                        stats['absent'] ?? 0,
-                        stats['total'] ?? 0,
-                        Color(0xFFE74C3C),
-                      ),
-                      SizedBox(height: 12),
-                      _buildProgressIndicator(
-                        'Late',
-                        stats['late'] ?? 0,
-                        stats['total'] ?? 0,
-                        Color(0xFFFF9800),
-                      ),
-                      // Add At Risk indicator for weekly and monthly periods
-                      if (_selectedPeriod == 'This Week' ||
-                          _selectedPeriod == 'This Month') ...[
-                        SizedBox(height: 12),
-                        FutureBuilder<List<Map<String, dynamic>>>(
-                          future: _calculateAtRiskStudents(),
-                          builder: (context, atRiskFuture) {
-                            final atRiskCount = atRiskFuture.hasData
-                                ? atRiskFuture.data!.length
-                                : 0;
-                            return GestureDetector(
-                              onTap: () => _showAtRiskStudentsList(),
-                              child: _buildProgressIndicator(
-                                'At Risk',
-                                atRiskCount,
-                                stats['total'] ?? 0,
-                                Color(0xFF9B59B6),
-                              ),
-                            );
-                          },
+                  print(
+                    'Error details: ${attendanceSnapshot.error.runtimeType}',
+                  );
+                  return Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Error loading attendance data',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          '${attendanceSnapshot.error}',
+                          style: TextStyle(color: Colors.red, fontSize: 12),
+                          textAlign: TextAlign.center,
                         ),
                       ],
-                    ],
+                    ),
                   );
-                },
-              );
-            },
-          ),
-        ],
+                }
+
+                return StreamBuilder<QuerySnapshot>(
+                  stream: _getStudentsStream(),
+                  builder: (context, studentsSnapshot) {
+                    if (studentsSnapshot.connectionState ==
+                        ConnectionState.waiting) {
+                      return Center(child: CircularProgressIndicator());
+                    }
+
+                    if (studentsSnapshot.hasError) {
+                      print(
+                        'Students overview error: ${studentsSnapshot.error}',
+                      );
+                      return Center(
+                        child: Text(
+                          'Error loading student data',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                      );
+                    }
+
+                    if (!studentsSnapshot.hasData ||
+                        studentsSnapshot.data!.docs.isEmpty) {
+                      return Center(
+                        child: Text(
+                          'No students found',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      );
+                    }
+
+                    final totalStudents = studentsSnapshot.data!.docs.length;
+                    final attendanceRecords =
+                        attendanceSnapshot.data?.docs ?? [];
+                    final stats = _calculateAttendanceStats(
+                      attendanceRecords,
+                      totalStudents,
+                    );
+
+                    print(
+                      'Overview - Total students: $totalStudents, Records: ${attendanceRecords.length}',
+                    );
+
+                    return Column(
+                      children: [
+                        _buildProgressIndicator(
+                          'Present',
+                          stats['present'] ?? 0,
+                          stats['total'] ?? 0,
+                          Color(0xFF27AE60),
+                        ),
+                        SizedBox(height: 12),
+                        _buildProgressIndicator(
+                          'Absent',
+                          stats['absent'] ?? 0,
+                          stats['total'] ?? 0,
+                          Color(0xFFE74C3C),
+                        ),
+                        SizedBox(height: 12),
+                        _buildProgressIndicator(
+                          'Late',
+                          stats['late'] ?? 0,
+                          stats['total'] ?? 0,
+                          Color(0xFFFF9800),
+                        ),
+                        SizedBox(height: 12),
+                        // Only show At Risk section for weekly and monthly views
+                        if (_selectedPeriod == 'This Week' ||
+                            _selectedPeriod == 'This Month')
+                          _buildAtRiskProgressIndicator(attendanceRecords),
+                        if (_selectedPeriod == 'This Week' ||
+                            _selectedPeriod == 'This Month')
+                          SizedBox(height: 12),
+                        SizedBox(height: 20),
+                        // Enhanced swipe indicator
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Color(0xFF3498DB),
+                                    Color(0xFF2980B9),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(5),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Color(0xFF3498DB).withOpacity(0.3),
+                                    blurRadius: 4,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            SizedBox(width: 12),
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: Color(0xFF3498DB).withOpacity(0.4),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -534,53 +606,316 @@ class _AdminDashboardState extends State<AdminDashboard> {
     String label,
     int value,
     int total,
-    Color color,
-  ) {
+    Color color, {
+    VoidCallback? onTap,
+  }) {
     final percentage = total > 0 ? (value / total) : 0.0;
-    final percentageText = total > 0
-        ? '${(percentage * 100).toStringAsFixed(1)}%'
-        : '0%';
 
-    return Row(
-      children: [
-        Expanded(
-          flex: 2,
-          child: Text(
-            label,
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF2C3E50),
+    Widget container = Container(
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.2), width: 1),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [color, color.withOpacity(0.8)]),
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: Offset(0, 3),
+                ),
+              ],
             ),
-          ),
-        ),
-        Expanded(
-          flex: 5,
-          child: LinearProgressIndicator(
-            value: percentage,
-            backgroundColor: color.withOpacity(0.2),
-            valueColor: AlwaysStoppedAnimation<Color>(color),
-            minHeight: 8,
-          ),
-        ),
-        SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              '$value',
-              style: TextStyle(fontWeight: FontWeight.bold, color: color),
-            ),
-            Text(
-              percentageText,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
+            child: Center(
+              child: Text(
+                '$value',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  fontSize: 16,
+                ),
               ),
             ),
-          ],
-        ),
-      ],
+          ),
+          SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF2C3E50),
+                        fontSize: 16,
+                      ),
+                    ),
+                    Text(
+                      '${(percentage * 100).toStringAsFixed(0)}%',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: color,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8),
+                Container(
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: percentage.clamp(0.0, 1.0), // Cap at 100%
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [color, color.withOpacity(0.8)],
+                        ),
+                        borderRadius: BorderRadius.circular(3),
+                        boxShadow: [
+                          BoxShadow(
+                            color: color.withOpacity(0.4),
+                            blurRadius: 4,
+                            offset: Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return onTap != null
+        ? GestureDetector(onTap: onTap, child: container)
+        : container;
+  }
+
+  Widget _buildAtRiskProgressIndicator(
+    List<QueryDocumentSnapshot> attendanceRecords,
+  ) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collectionGroup('at-risk').snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          );
+        }
+
+        if (snapshot.hasError) {
+          print('At Risk StreamBuilder error: ${snapshot.error}');
+          return Container(); // Return empty on error
+        }
+
+        if (!snapshot.hasData) {
+          return Container(); // Return empty container while loading
+        }
+
+        final atRiskDocs = snapshot.data!.docs;
+        final Map<String, Map<String, dynamic>> uniqueAtRiskStudents = {};
+
+        // Process at-risk documents and ensure unique students
+        for (final doc in atRiskDocs) {
+          final data = doc.data() as Map<String, dynamic>;
+          final studentId = doc.reference.parent.parent?.id;
+
+          // Get absence counts and risk flags
+          final weeklyAbsences = data['weeklyAbsences'] ?? 0;
+          final monthlyAbsences = data['monthlyAbsences'] ?? 0;
+          final weeklyRisk = data['riskFactors']?['weeklyRisk'] ?? false;
+          final monthlyRisk = data['riskFactors']?['monthlyRisk'] ?? false;
+
+          // Apply At Risk criteria - student must meet at least one condition:
+          // 1. Weekly Risk: 2+ absences in a week OR weeklyRisk flag is true
+          // 2. Monthly Risk: 8+ absences in a month OR monthlyRisk flag is true
+          final meetsWeeklyRisk = weeklyAbsences >= 2 || weeklyRisk;
+          final meetsMonthlyRisk = monthlyAbsences >= 8 || monthlyRisk;
+          final isActuallyAtRisk = meetsWeeklyRisk || meetsMonthlyRisk;
+
+          if (isActuallyAtRisk && studentId != null) {
+            // Only add if not already present, or if this document is more recent
+            final lastUpdated = data['lastUpdated'] as Timestamp?;
+
+            if (!uniqueAtRiskStudents.containsKey(studentId)) {
+              uniqueAtRiskStudents[studentId] = {
+                'id': studentId,
+                'data': data,
+                'weeklyAbsences': weeklyAbsences,
+                'monthlyAbsences': monthlyAbsences,
+                'weeklyRisk': weeklyRisk,
+                'monthlyRisk': monthlyRisk,
+                'meetsWeeklyRisk': meetsWeeklyRisk,
+                'meetsMonthlyRisk': meetsMonthlyRisk,
+                'lastUpdated': data['lastUpdated'],
+              };
+            } else {
+              // If student already exists, keep the more recent record
+              final existingLastUpdated =
+                  uniqueAtRiskStudents[studentId]!['lastUpdated'] as Timestamp?;
+              if (lastUpdated != null &&
+                  (existingLastUpdated == null ||
+                      lastUpdated.compareTo(existingLastUpdated) > 0)) {
+                uniqueAtRiskStudents[studentId] = {
+                  'id': studentId,
+                  'data': data,
+                  'weeklyAbsences': weeklyAbsences,
+                  'monthlyAbsences': monthlyAbsences,
+                  'weeklyRisk': weeklyRisk,
+                  'monthlyRisk': monthlyRisk,
+                  'meetsWeeklyRisk': meetsWeeklyRisk,
+                  'meetsMonthlyRisk': meetsMonthlyRisk,
+                  'lastUpdated': data['lastUpdated'],
+                };
+              }
+            }
+          }
+        }
+
+        final atRiskStudents = uniqueAtRiskStudents.values.toList();
+
+        // Get total student count from a separate stream
+        return StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('users')
+              .where('role', isEqualTo: 'student')
+              .snapshots(),
+          builder: (context, studentSnapshot) {
+            if (!studentSnapshot.hasData) {
+              return Container();
+            }
+
+            final totalStudents = studentSnapshot.data!.docs.length;
+            final atRiskCount = atRiskStudents.length;
+            final percentage = totalStudents > 0
+                ? (atRiskCount / totalStudents)
+                : 0.0;
+            final color = Color(0xFF9B59B6); // Purple color for At Risk
+
+            return GestureDetector(
+              onTap: () => _showAtRiskStudentsBottomSheet(atRiskStudents),
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: color.withOpacity(0.2), width: 1),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [color, color.withOpacity(0.8)],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [
+                          BoxShadow(
+                            color: color.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Text(
+                          '$atRiskCount',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'At Risk',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF2C3E50),
+                                  fontSize: 16,
+                                ),
+                              ),
+                              Text(
+                                '${(percentage * 100).toStringAsFixed(0)}%',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: color,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 8),
+                          Container(
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: color.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                            child: FractionallySizedBox(
+                              alignment: Alignment.centerLeft,
+                              widthFactor: percentage.clamp(
+                                0.0,
+                                1.0,
+                              ), // Cap at 100%
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [color, color.withOpacity(0.8)],
+                                  ),
+                                  borderRadius: BorderRadius.circular(3),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: color.withOpacity(0.4),
+                                      blurRadius: 4,
+                                      offset: Offset(0, 1),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -846,36 +1181,91 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   ),
                 ),
               ),
-              // At Risk indicator - now streaming from Firestore
-              if (_selectedPeriod == 'This Week' ||
-                  _selectedPeriod == 'This Month')
-                StreamBuilder<DocumentSnapshot>(
-                  stream: FirebaseFirestore.instance
-                      .collection('users')
-                      .doc(student.id)
-                      .collection('at-risk')
-                      .doc('current_status')
-                      .snapshots(),
-                  builder: (context, atRiskSnapshot) {
-                    final isAtRisk =
-                        atRiskSnapshot.hasData &&
-                        atRiskSnapshot.data!.exists &&
-                        (atRiskSnapshot.data!.data()
-                                as Map<String, dynamic>?)?['isAtRisk'] ==
-                            true;
+              // At Risk Indicator - only show for at-risk students
+              StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('attendance')
+                    .doc(student.id)
+                    .collection('at-risk')
+                    .limit(1)
+                    .snapshots(),
+                builder: (context, atRiskSnapshot) {
+                  bool isAtRisk = false;
 
-                    if (isAtRisk) {
-                      return Container(
-                        margin: EdgeInsets.only(right: 8),
+                  if (atRiskSnapshot.hasData &&
+                      atRiskSnapshot.data!.docs.isNotEmpty) {
+                    final doc = atRiskSnapshot.data!.docs.first;
+                    final data = doc.data() as Map<String, dynamic>;
+
+                    // Apply the same At Risk criteria as in the progress indicator
+                    final weeklyAbsences = data['weeklyAbsences'] ?? 0;
+                    final monthlyAbsences = data['monthlyAbsences'] ?? 0;
+                    final weeklyRisk =
+                        data['riskFactors']?['weeklyRisk'] ?? false;
+                    final monthlyRisk =
+                        data['riskFactors']?['monthlyRisk'] ?? false;
+
+                    final meetsWeeklyRisk = weeklyAbsences >= 2 || weeklyRisk;
+                    final meetsMonthlyRisk =
+                        monthlyAbsences >= 8 || monthlyRisk;
+                    isAtRisk = meetsWeeklyRisk || meetsMonthlyRisk;
+                  }
+
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Show At Risk indicator only if student is at risk
+                      if (isAtRisk) ...[
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          margin: EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            color: Color(0xFF9B59B6).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: Color(0xFF9B59B6).withOpacity(0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.warning,
+                                size: 10,
+                                color: Color(0xFF9B59B6),
+                              ),
+                              SizedBox(width: 3),
+                              Text(
+                                'AT RISK',
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF9B59B6),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      // Platform indicator (always shown)
+                      Container(
                         padding: EdgeInsets.symmetric(
-                          horizontal: 6,
+                          horizontal: 8,
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: Color(0xFF9B59B6).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(10),
+                          color: platform.contains('web')
+                              ? Color(0xFF3498DB).withOpacity(0.1)
+                              : Color(0xFF27AE60).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: Color(0xFF9B59B6).withOpacity(0.3),
+                            color: platform.contains('web')
+                                ? Color(0xFF3498DB).withOpacity(0.3)
+                                : Color(0xFF27AE60).withOpacity(0.3),
                             width: 1,
                           ),
                         ),
@@ -883,64 +1273,29 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.warning,
-                              size: 10,
-                              color: Color(0xFF9B59B6),
+                              platformIcon,
+                              size: 12,
+                              color: platform.contains('web')
+                                  ? Color(0xFF3498DB)
+                                  : Color(0xFF27AE60),
                             ),
-                            SizedBox(width: 2),
+                            SizedBox(width: 4),
                             Text(
-                              'AT RISK',
+                              platformText,
                               style: TextStyle(
-                                fontSize: 8,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF9B59B6),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                color: platform.contains('web')
+                                    ? Color(0xFF3498DB)
+                                    : Color(0xFF27AE60),
                               ),
                             ),
                           ],
                         ),
-                      );
-                    }
-                    return SizedBox.shrink();
-                  },
-                ),
-              // Platform indicator
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: platform.contains('web')
-                      ? Color(0xFF3498DB).withOpacity(0.1)
-                      : Color(0xFF27AE60).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: platform.contains('web')
-                        ? Color(0xFF3498DB).withOpacity(0.3)
-                        : Color(0xFF27AE60).withOpacity(0.3),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      platformIcon,
-                      size: 12,
-                      color: platform.contains('web')
-                          ? Color(0xFF3498DB)
-                          : Color(0xFF27AE60),
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      platformText,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                        color: platform.contains('web')
-                            ? Color(0xFF3498DB)
-                            : Color(0xFF27AE60),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  );
+                },
               ),
             ],
           ),
@@ -1004,27 +1359,43 @@ class _AdminDashboardState extends State<AdminDashboard> {
     switch (_selectedPeriod) {
       case 'Today':
         final today = DateTime(now.year, now.month, now.day);
-        startDateId = _formatDateId(today);
-        endDateId = startDateId;
+        // Only show today's data if it's a weekday (school operates Monday-Friday only)
+        if (_isWeekday(today)) {
+          startDateId = _formatDateId(today);
+          endDateId = startDateId;
+        } else {
+          // If it's weekend, show the most recent weekday (Friday)
+          final lastWeekday = _getLastWeekday(today);
+          startDateId = _formatDateId(lastWeekday);
+          endDateId = startDateId;
+        }
         break;
       case 'This Week':
-        final weekday = now.weekday;
-        final startOfWeek = now.subtract(Duration(days: weekday - 1)); // Monday
-        final endOfWeek = startOfWeek.add(
-          Duration(days: 4),
-        ); // Friday (Mon+4=Fri)
-        startDateId = _formatDateId(
-          DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day),
+        final weekdayDates = _getWeekdaysInRange(
+          _getWeekStartDate(now),
+          _getWeekEndDate(now),
         );
-        endDateId = _formatDateId(
-          DateTime(endOfWeek.year, endOfWeek.month, endOfWeek.day),
-        );
+        if (weekdayDates.isNotEmpty) {
+          startDateId = _formatDateId(weekdayDates.first);
+          endDateId = _formatDateId(weekdayDates.last);
+        } else {
+          // Fallback to today if no weekdays found
+          final today = DateTime(now.year, now.month, now.day);
+          startDateId = _formatDateId(today);
+          endDateId = startDateId;
+        }
         break;
       case 'This Month':
         final startOfMonth = DateTime(now.year, now.month, 1);
         final endOfMonth = DateTime(now.year, now.month + 1, 0);
-        startDateId = _formatDateId(startOfMonth);
-        endDateId = _formatDateId(endOfMonth);
+        final weekdayDates = _getWeekdaysInRange(startOfMonth, endOfMonth);
+        if (weekdayDates.isNotEmpty) {
+          startDateId = _formatDateId(weekdayDates.first);
+          endDateId = _formatDateId(weekdayDates.last);
+        } else {
+          startDateId = _formatDateId(startOfMonth);
+          endDateId = _formatDateId(endOfMonth);
+        }
         break;
       default:
         final today = DateTime(now.year, now.month, now.day);
@@ -1102,17 +1473,114 @@ class _AdminDashboardState extends State<AdminDashboard> {
     return '$year-$month-$day';
   }
 
+  // Weekday Helper Methods
+  bool _isWeekday(DateTime date) {
+    // Monday = 1, Tuesday = 2, ..., Friday = 5, Saturday = 6, Sunday = 7
+    return date.weekday >= 1 && date.weekday <= 5;
+  }
+
+  DateTime _getLastWeekday(DateTime date) {
+    DateTime current = date;
+    while (!_isWeekday(current)) {
+      current = current.subtract(Duration(days: 1));
+    }
+    return current;
+  }
+
+  DateTime _getWeekStartDate(DateTime date) {
+    // Get Monday of the week
+    final daysSinceMonday = date.weekday - 1;
+    return date.subtract(Duration(days: daysSinceMonday));
+  }
+
+  DateTime _getWeekEndDate(DateTime date) {
+    // Get Sunday of the week
+    final daysUntilSunday = 7 - date.weekday;
+    return date.add(Duration(days: daysUntilSunday));
+  }
+
+  List<DateTime> _getWeekdaysInRange(DateTime start, DateTime end) {
+    List<DateTime> weekdays = [];
+    DateTime current = start;
+
+    while (current.isBefore(end) || current.isAtSameMomentAs(end)) {
+      if (_isWeekday(current)) {
+        weekdays.add(current);
+      }
+      current = current.add(Duration(days: 1));
+    }
+
+    return weekdays;
+  }
+
+  // Student Creation Date Helper
+  Future<DateTime?> _getStudentCreationDate(String studentId) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(studentId)
+          .get();
+
+      if (doc.exists) {
+        final data = doc.data()!;
+        final createdAt = data['createdAt'] as Timestamp?;
+        return createdAt?.toDate();
+      }
+    } catch (e) {
+      print('Error getting student creation date: $e');
+    }
+    return null;
+  }
+
+  // Filter attendance records to only include weekday records (Monday-Friday)
+  // This ensures attendance tracking only occurs during school operating days
+  List<DocumentSnapshot> _filterWeekdayRecords(List<DocumentSnapshot> records) {
+    return records.where((record) {
+      final data = record.data() as Map<String, dynamic>;
+      final dayId = data['dayId'] as String?;
+      if (dayId != null) {
+        final recordDate = DateTime.tryParse(dayId);
+        return recordDate != null && _isWeekday(recordDate);
+      }
+      return false;
+    }).toList();
+  }
+
+  // Filter attendance records to only include records after student creation date
+  // This ensures new students' attendance tracking starts from their enrollment date
+  Future<List<DocumentSnapshot>> _filterRecordsByStudentCreation(
+    List<DocumentSnapshot> records,
+    String studentId,
+  ) async {
+    final creationDate = await _getStudentCreationDate(studentId);
+    if (creationDate == null) return records;
+
+    return records.where((record) {
+      final data = record.data() as Map<String, dynamic>;
+      final dayId = data['dayId'] as String?;
+      if (dayId != null) {
+        final recordDate = DateTime.tryParse(dayId);
+        return recordDate != null &&
+            (recordDate.isAfter(creationDate) ||
+                recordDate.isAtSameMomentAs(creationDate));
+      }
+      return false;
+    }).toList();
+  }
+
   // Calculation Methods
   Map<String, int> _calculateTodayStats(
     List<DocumentSnapshot> attendanceRecords,
     int totalStudents,
   ) {
-    int late = 0;
-    int early = 0;
-    int present = 0;
-    Set<String> presentUserIds = {};
+    // Filter to only include weekday records
+    final weekdayRecords = _filterWeekdayRecords(attendanceRecords);
 
-    for (final record in attendanceRecords) {
+    Set<String> presentUserIds = {};
+    Set<String> lateUserIds = {};
+    Set<String> earlyUserIds = {};
+
+    for (final record in weekdayRecords) {
       final data = record.data() as Map<String, dynamic>;
       final status = data['status'] as String? ?? 'absent';
       final userId =
@@ -1124,31 +1592,35 @@ class _AdminDashboardState extends State<AdminDashboard> {
         presentUserIds.add(userId);
       }
 
-      // Check if late (based on status or lateReason)
-      if (status == 'late' || data['lateReason'] != null) {
-        late++;
+      // Count unique users who were late (not individual late records)
+      if (userId != null && (status == 'late' || data['lateReason'] != null)) {
+        lateUserIds.add(userId);
       }
 
-      // Check if early departure (clock out before 4:00 PM - school end time)
-      final clockOutTime =
-          data['outAt'] as Timestamp? ?? data['clockOutAt'] as Timestamp?;
-      if (clockOutTime != null) {
-        final clockOut = clockOutTime.toDate();
-        final expectedEnd = DateTime(
-          clockOut.year,
-          clockOut.month,
-          clockOut.day,
-          16,
-          0,
-        ); // 4:00 PM - actual school end time
-        if (clockOut.isBefore(expectedEnd)) {
-          early++;
+      // Count unique users who left early (clock out before 5 PM)
+      if (userId != null) {
+        final clockOutTime =
+            data['outAt'] as Timestamp? ?? data['clockOutAt'] as Timestamp?;
+        if (clockOutTime != null) {
+          final clockOut = clockOutTime.toDate();
+          final expectedEnd = DateTime(
+            clockOut.year,
+            clockOut.month,
+            clockOut.day,
+            17,
+            0,
+          ); // 5 PM
+          if (clockOut.isBefore(expectedEnd)) {
+            earlyUserIds.add(userId);
+          }
         }
       }
     }
 
-    present = presentUserIds.length;
+    final present = presentUserIds.length;
     final absent = totalStudents - present;
+    final late = lateUserIds.length;
+    final early = earlyUserIds.length;
 
     return {'late': late, 'early': early, 'present': present, 'absent': absent};
   }
@@ -1157,10 +1629,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
     List<DocumentSnapshot> attendanceRecords,
     int totalStudents,
   ) {
-    int late = 0;
-    Set<String> uniqueStudents = {};
+    // Filter to only include weekday records
+    final weekdayRecords = _filterWeekdayRecords(attendanceRecords);
 
-    for (final record in attendanceRecords) {
+    Set<String> uniqueStudents = {};
+    Set<String> lateStudents = {};
+
+    for (final record in weekdayRecords) {
       final data = record.data() as Map<String, dynamic>;
       final userId =
           record.reference.parent.parent?.id; // Get userId from document path
@@ -1171,13 +1646,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
         uniqueStudents.add(userId);
       }
 
-      if (status == 'late' || data['lateReason'] != null) {
-        late++;
+      // Count unique students who were late (not individual late records)
+      if (userId != null && (status == 'late' || data['lateReason'] != null)) {
+        lateStudents.add(userId);
       }
     }
 
     final present = uniqueStudents.length;
     final absent = totalStudents - present;
+    final late = lateStudents.length;
 
     return {
       'present': present,
@@ -1185,250 +1662,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
       'late': late,
       'total': totalStudents,
     };
-  }
-
-  // Calculate at-risk students based on attendance patterns
-  Future<List<Map<String, dynamic>>> _calculateAtRiskStudents() async {
-    try {
-      // Get all students
-      final studentsSnapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .where('role', isEqualTo: 'student')
-          .get();
-
-      // Get all attendance records
-      final attendanceSnapshot = await FirebaseFirestore.instance
-          .collectionGroup('days')
-          .get();
-
-      final atRiskStudents = <Map<String, dynamic>>[];
-      final now = DateTime.now();
-
-      for (final studentDoc in studentsSnapshot.docs) {
-        final studentId = studentDoc.id;
-        final studentData = studentDoc.data();
-        final studentName =
-            '${studentData['firstName'] ?? ''} ${studentData['lastName'] ?? ''}'
-                .trim();
-
-        // Calculate attendance statistics for this student
-        final studentAttendance = attendanceSnapshot.docs
-            .where((doc) => doc.reference.parent.parent?.id == studentId)
-            .toList();
-
-        // Analyze attendance patterns for the last 30 days
-        final thirtyDaysAgo = now.subtract(Duration(days: 30));
-        final recentAttendance = studentAttendance.where((doc) {
-          final data = doc.data();
-          final dayId = data['dayId'] as String? ?? '';
-          if (dayId.isEmpty) return false;
-
-          try {
-            final parts = dayId.split('-');
-            if (parts.length == 3) {
-              final recordDate = DateTime(
-                int.parse(parts[0]),
-                int.parse(parts[1]),
-                int.parse(parts[2]),
-              );
-              return recordDate.isAfter(thirtyDaysAgo);
-            }
-          } catch (e) {
-            // Invalid date format
-          }
-          return false;
-        }).toList();
-
-        // Calculate at-risk criteria
-        int totalDays = recentAttendance.length;
-        int absentDays = 0;
-        int lateDays = 0;
-
-        int maxConsecutiveAbsences = 0;
-        int currentStreak = 0;
-
-        // Sort by date to check consecutive absences
-        recentAttendance.sort((a, b) {
-          final aData = a.data();
-          final bData = b.data();
-          final aDate = aData['dayId'] as String? ?? '';
-          final bDate = bData['dayId'] as String? ?? '';
-          return aDate.compareTo(bDate);
-        });
-
-        for (final record in recentAttendance) {
-          final data = record.data();
-          final status = data['status'] as String? ?? 'absent';
-
-          if (status == 'absent') {
-            absentDays++;
-            currentStreak++;
-            maxConsecutiveAbsences = maxConsecutiveAbsences > currentStreak
-                ? maxConsecutiveAbsences
-                : currentStreak;
-          } else {
-            currentStreak = 0;
-            if (status == 'late' || data['lateReason'] != null) {
-              lateDays++;
-            }
-          }
-        }
-
-        // At-Risk Criteria:
-        // 1. More than 30% absence rate in the last 30 days
-        // 2. More than 5 consecutive absences
-        // 3. More than 40% late arrivals in the last 30 days
-        // 4. More than 10 late arrivals in the last 30 days
-        bool isAtRisk = false;
-        List<String> reasons = [];
-
-        if (totalDays > 0) {
-          double absenceRate = (absentDays / totalDays) * 100;
-          double lateRate = (lateDays / totalDays) * 100;
-
-          if (absenceRate > 30) {
-            isAtRisk = true;
-            reasons.add(
-              'High absence rate: ${absenceRate.toStringAsFixed(1)}%',
-            );
-          }
-
-          if (maxConsecutiveAbsences >= 5) {
-            isAtRisk = true;
-            reasons.add('$maxConsecutiveAbsences consecutive absences');
-          }
-
-          if (lateRate > 40) {
-            isAtRisk = true;
-            reasons.add('High late rate: ${lateRate.toStringAsFixed(1)}%');
-          }
-
-          if (lateDays >= 10) {
-            isAtRisk = true;
-            reasons.add('$lateDays late arrivals');
-          }
-        }
-
-        // If student has no attendance records in 30 days, also at risk
-        if (totalDays == 0) {
-          isAtRisk = true;
-          reasons.add('No attendance records');
-        }
-
-        if (isAtRisk) {
-          atRiskStudents.add({
-            'id': studentId,
-            'name': studentName.isEmpty ? 'Unknown Student' : studentName,
-            'reasons': reasons,
-            'absentDays': absentDays,
-            'lateDays': lateDays,
-            'totalDays': totalDays,
-            'maxConsecutiveAbsences': maxConsecutiveAbsences,
-            'absenceRate': totalDays > 0
-                ? (absentDays / totalDays) * 100.0
-                : 0.0,
-            'lateRate': totalDays > 0 ? (lateDays / totalDays) * 100.0 : 0.0,
-          });
-
-          // Optionally store the at-risk status in Firestore for persistence
-          await _storeAtRiskStatus(studentId, reasons);
-        } else {
-          // Remove at-risk status if student is no longer at risk
-          await _removeAtRiskStatus(studentId);
-        }
-      }
-
-      return atRiskStudents;
-    } catch (e) {
-      print('Error calculating at-risk students: $e');
-      return [];
-    }
-  }
-
-  // Store at-risk status in Firestore
-  Future<void> _storeAtRiskStatus(
-    String studentId,
-    List<String> reasons,
-  ) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(studentId)
-          .collection('at-risk')
-          .doc('current')
-          .set({
-            'isAtRisk': true,
-            'reasons': reasons,
-            'flaggedDate': FieldValue.serverTimestamp(),
-            'lastUpdated': FieldValue.serverTimestamp(),
-          });
-    } catch (e) {
-      print('Error storing at-risk status: $e');
-    }
-  }
-
-  // Remove at-risk status from Firestore
-  Future<void> _removeAtRiskStatus(String studentId) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(studentId)
-          .collection('at-risk')
-          .doc('current')
-          .delete();
-    } catch (e) {
-      // Document might not exist, which is fine
-    }
-  }
-
-  // Helper widget for mini progress bars in at-risk student list
-  Widget _buildMiniProgressBar(String label, double percentage, Color color) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w500,
-            color: Colors.grey[600],
-          ),
-        ),
-        SizedBox(height: 2),
-        Row(
-          children: [
-            Expanded(
-              child: Container(
-                height: 4,
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-                child: FractionallySizedBox(
-                  alignment: Alignment.centerLeft,
-                  widthFactor: (percentage / 100).clamp(0.0, 1.0),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: color,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            SizedBox(width: 4),
-            Text(
-              '${percentage.toStringAsFixed(0)}%',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w500,
-                color: color,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
   }
 
   Map<String, dynamic> _getStudentAttendanceStatus(
@@ -1498,9 +1731,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
           clockOut.year,
           clockOut.month,
           clockOut.day,
-          16,
+          17,
           0,
-        ); // 4:00 PM - correct school end time
+        );
         return clockOut.isBefore(expectedEnd);
       }
       return false;
@@ -1524,190 +1757,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
       'Present Students',
       presentStudents,
       Color(0xFF27AE60),
-    );
-  }
-
-  void _showAbsentStudentsList(
-    List<DocumentSnapshot> attendanceRecords,
-    List<DocumentSnapshot> allStudents,
-  ) {
-    // Get list of present student IDs
-    Set<String> presentStudentIds = {};
-    for (final record in attendanceRecords) {
-      final userId = record.reference.parent.parent?.id;
-      if (userId != null) {
-        presentStudentIds.add(userId);
-      }
-    }
-
-    // Find absent students
-    final absentStudents = allStudents.where((student) {
-      return !presentStudentIds.contains(student.id);
-    }).toList();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.7,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-          ),
-        ),
-        child: Column(
-          children: [
-            // Handle bar
-            Container(
-              width: 40,
-              height: 4,
-              margin: EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            // Header
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: Row(
-                children: [
-                  Icon(Icons.people, color: Color(0xFF95A5A6), size: 28),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Absent Students',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF2C3E50),
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.close, color: Colors.grey[600]),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-            Divider(height: 1),
-            // Content
-            Expanded(
-              child: absentStudents.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.people_outline,
-                            size: 64,
-                            color: Colors.grey[400],
-                          ),
-                          SizedBox(height: 16),
-                          Text(
-                            'No absent students found',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 8,
-                      ),
-                      itemCount: absentStudents.length,
-                      itemBuilder: (context, index) {
-                        final student = absentStudents[index];
-                        final studentData =
-                            student.data() as Map<String, dynamic>;
-                        final name =
-                            '${studentData['firstName'] ?? ''} ${studentData['lastName'] ?? ''}'
-                                .trim();
-
-                        return Container(
-                          margin: EdgeInsets.only(bottom: 8),
-                          child: InkWell(
-                            onTap: () {
-                              Navigator.pop(context); // Close the bottom sheet
-                              _showStudentDetails(student.id, name);
-                            },
-                            borderRadius: BorderRadius.circular(12),
-                            child: Container(
-                              padding: EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Color(0xFF95A5A6).withOpacity(0.05),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: Color(0xFF95A5A6).withOpacity(0.2),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  CircleAvatar(
-                                    backgroundColor: Color(
-                                      0xFF95A5A6,
-                                    ).withOpacity(0.2),
-                                    child: Text(
-                                      name.isNotEmpty
-                                          ? name[0].toUpperCase()
-                                          : '?',
-                                      style: TextStyle(
-                                        color: Color(0xFF95A5A6),
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          name,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w500,
-                                            fontSize: 16,
-                                            color: Color(0xFF2C3E50),
-                                          ),
-                                        ),
-                                        SizedBox(height: 2),
-                                        Text(
-                                          'No attendance record',
-                                          style: TextStyle(
-                                            color: Colors.grey[600],
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Icon(
-                                    Icons.people_outline,
-                                    color: Color(0xFF95A5A6),
-                                    size: 20,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -1932,348 +1981,372 @@ class _AdminDashboardState extends State<AdminDashboard> {
     Navigator.pushNamed(context, '/admin');
   }
 
-  void _showAtRiskStudentsList() {
+  void _showAbsentStudentsBottomSheet() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.9,
-        builder: (context, scrollController) {
-          return Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(20),
-                topRight: Radius.circular(20),
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: Column(
+          children: [
+            // Handle bar
+            Container(
+              width: 40,
+              height: 4,
+              margin: EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.warning_amber_rounded,
-                        color: Colors.orange,
-                        size: 24,
+            // Header
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: Row(
+                children: [
+                  Icon(Icons.person_off, color: Color(0xFFE74C3C), size: 28),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Absent Students',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2C3E50),
                       ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'At-Risk Students',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-                const Divider(),
-                Expanded(
-                  child: FutureBuilder<List<Map<String, dynamic>>>(
-                    future: _calculateAtRiskStudents(),
-                    builder: (context, atRiskFuture) {
-                      if (atRiskFuture.connectionState ==
+                ],
+              ),
+            ),
+            Divider(thickness: 1),
+            // Content
+            Expanded(
+              child: StreamBuilder<QuerySnapshot>(
+                stream: _getAttendanceStream(),
+                builder: (context, attendanceSnapshot) {
+                  if (attendanceSnapshot.connectionState ==
+                      ConnectionState.waiting) {
+                    return Center(child: CircularProgressIndicator());
+                  }
+
+                  return StreamBuilder<QuerySnapshot>(
+                    stream: _getStudentsStream(),
+                    builder: (context, studentsSnapshot) {
+                      if (studentsSnapshot.connectionState ==
                           ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
+                        return Center(child: CircularProgressIndicator());
                       }
 
-                      if (atRiskFuture.hasError) {
+                      if (!attendanceSnapshot.hasData ||
+                          !studentsSnapshot.hasData) {
+                        return Center(child: Text('No data available'));
+                      }
+
+                      final attendanceRecords = attendanceSnapshot.data!.docs;
+                      final allStudents = studentsSnapshot.data!.docs;
+
+                      // Get present student IDs from attendance records
+                      Set<String> presentStudentIds = {};
+                      for (final record in attendanceRecords) {
+                        final userId = record.reference.parent.parent?.id;
+                        if (userId != null) {
+                          presentStudentIds.add(userId);
+                        }
+                      }
+
+                      // Find absent students (those not in attendance records)
+                      final absentStudents = allStudents.where((student) {
+                        return !presentStudentIds.contains(student.id);
+                      }).toList();
+
+                      if (absentStudents.isEmpty) {
                         return Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(
-                                Icons.error_outline,
+                                Icons.check_circle,
                                 size: 64,
-                                color: Colors.red,
+                                color: Color(0xFF27AE60),
                               ),
                               SizedBox(height: 16),
                               Text(
-                                'Error loading at-risk students',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.red,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-
-                      final atRiskStudents = atRiskFuture.data ?? [];
-
-                      if (atRiskStudents.isEmpty) {
-                        return const Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.check_circle_outline,
-                                size: 64,
-                                color: Colors.green,
-                              ),
-                              SizedBox(height: 16),
-                              Text(
-                                'No At-Risk Students',
+                                'No absent students!',
                                 style: TextStyle(
                                   fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF27AE60),
                                 ),
-                              ),
-                              SizedBox(height: 8),
-                              Text(
-                                'All students are attending regularly',
-                                style: TextStyle(color: Colors.grey),
                               ),
                             ],
                           ),
                         );
                       }
 
-                      return ListView.builder(
-                        controller: scrollController,
-                        padding: const EdgeInsets.all(16),
-                        itemCount: atRiskStudents.length,
+                      return ListView.separated(
+                        padding: EdgeInsets.all(16),
+                        itemCount: absentStudents.length,
+                        separatorBuilder: (context, index) =>
+                            SizedBox(height: 12),
                         itemBuilder: (context, index) {
-                          final student = atRiskStudents[index];
-                          final studentName = student['name'] as String;
-                          final reasons = student['reasons'] as List<String>;
-                          final absenceRate = (student['absenceRate'] as num)
-                              .toDouble();
-                          final lateRate = (student['lateRate'] as num)
-                              .toDouble();
-                          final absentDays = student['absentDays'] as int;
-                          final lateDays = student['lateDays'] as int;
-                          final totalDays = student['totalDays'] as int;
+                          final student = absentStudents[index];
+                          final studentData =
+                              student.data() as Map<String, dynamic>;
+                          final firstName = studentData['firstName'] ?? '';
+                          final lastName = studentData['lastName'] ?? '';
+                          final name = '$firstName $lastName'.trim();
 
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            elevation: 2,
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
+                          return Container(
+                            padding: EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Color(0xFFF8F9FA),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Color(0xFFE9ECEF),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 20,
+                                  backgroundColor: Color(
+                                    0xFFE74C3C,
+                                  ).withOpacity(0.2),
+                                  child: Text(
+                                    name.isNotEmpty
+                                        ? name[0].toUpperCase()
+                                        : '?',
+                                    style: TextStyle(
+                                      color: Color(0xFFE74C3C),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      CircleAvatar(
-                                        backgroundColor: Color(0xFF9B59B6),
-                                        child: Text(
-                                          studentName.isNotEmpty
-                                              ? studentName[0].toUpperCase()
-                                              : '?',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                      Text(
+                                        name.isNotEmpty
+                                            ? name
+                                            : 'Unknown Student',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 16,
+                                          color: Color(0xFF2C3E50),
                                         ),
                                       ),
-                                      SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              studentName,
-                                              style: TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.bold,
-                                                color: Color(0xFF2C3E50),
-                                              ),
-                                            ),
-                                            SizedBox(height: 4),
-                                            Text(
-                                              '$absentDays absent, $lateDays late (${totalDays} total days)',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.grey[600],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      Container(
-                                        padding: EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Color(
-                                            0xFF9B59B6,
-                                          ).withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          'AT RISK',
-                                          style: TextStyle(
-                                            color: Color(0xFF9B59B6),
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 10,
-                                          ),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        'No attendance record',
+                                        style: TextStyle(
+                                          color: Color(0xFF6C757D),
+                                          fontSize: 14,
                                         ),
                                       ),
                                     ],
                                   ),
-                                  SizedBox(height: 12),
-                                  Text(
-                                    'Risk Factors:',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFF2C3E50),
-                                    ),
-                                  ),
-                                  SizedBox(height: 4),
-                                  ...reasons.map(
-                                    (reason) => Padding(
-                                      padding: EdgeInsets.only(
-                                        left: 8,
-                                        bottom: 2,
-                                      ),
-                                      child: Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            '• ',
-                                            style: TextStyle(
-                                              color: Color(0xFF9B59B6),
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          Expanded(
-                                            child: Text(
-                                              reason,
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                color: Colors.grey[700],
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  if (totalDays > 0) ...[
-                                    SizedBox(height: 8),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: _buildMiniProgressBar(
-                                            'Absence Rate',
-                                            absenceRate,
-                                            Colors.red,
-                                          ),
-                                        ),
-                                        SizedBox(width: 12),
-                                        Expanded(
-                                          child: _buildMiniProgressBar(
-                                            'Late Rate',
-                                            lateRate,
-                                            Colors.orange,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ],
-                              ),
+                                ),
+                                Icon(
+                                  Icons.schedule,
+                                  color: Color(0xFFE74C3C),
+                                  size: 20,
+                                ),
+                              ],
                             ),
                           );
                         },
                       );
                     },
-                  ),
-                ),
-              ],
+                  );
+                },
+              ),
             ),
-          );
-        },
+          ],
+        ),
       ),
     );
   }
 
-  void _showLogoutDialog() async {
-    try {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.logout, color: Colors.red),
-              SizedBox(width: 8),
-              Text('Logout'),
-            ],
+  void _showAtRiskStudentsBottomSheet(
+    List<Map<String, dynamic>> atRiskStudents,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
           ),
-          content: Text(
-            'Are you sure you want to log out from your admin account?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
+        ),
+        child: Column(
+          children: [
+            // Handle bar
+            Container(
+              width: 40,
+              height: 4,
+              margin: EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
               ),
-              child: Text('Logout'),
+            ),
+            // Header
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: Row(
+                children: [
+                  Icon(Icons.warning, color: Color(0xFF9B59B6), size: 28),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'At Risk Students',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2C3E50),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Divider(thickness: 1),
+            // Content
+            Expanded(
+              child: atRiskStudents.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.check_circle,
+                            size: 64,
+                            color: Color(0xFF27AE60),
+                          ),
+                          SizedBox(height: 16),
+                          Text(
+                            'No students at risk!',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF27AE60),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: EdgeInsets.all(16),
+                      itemCount: atRiskStudents.length,
+                      separatorBuilder: (context, index) =>
+                          SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final student = atRiskStudents[index];
+                        final studentId = student['id'] as String;
+                        final weeklyAbsences = student['weeklyAbsences'] as int;
+                        final monthlyAbsences =
+                            student['monthlyAbsences'] as int;
+
+                        return FutureBuilder<DocumentSnapshot>(
+                          future: FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(studentId)
+                              .get(),
+                          builder: (context, snapshot) {
+                            final studentData =
+                                snapshot.data?.data() as Map<String, dynamic>?;
+                            final firstName = studentData?['firstName'] ?? '';
+                            final lastName = studentData?['lastName'] ?? '';
+                            final name = '$firstName $lastName'.trim();
+
+                            return Container(
+                              padding: EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Color(0xFFF8F9FA),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Color(0xFFE9ECEF),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 20,
+                                    backgroundColor: Color(
+                                      0xFF9B59B6,
+                                    ).withOpacity(0.2),
+                                    child: Text(
+                                      name.isNotEmpty
+                                          ? name[0].toUpperCase()
+                                          : '?',
+                                      style: TextStyle(
+                                        color: Color(0xFF9B59B6),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          name.isNotEmpty ? name : 'Loading...',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 16,
+                                            color: Color(0xFF2C3E50),
+                                          ),
+                                        ),
+                                        SizedBox(height: 4),
+                                        Text(
+                                          'Absences: Weekly $weeklyAbsences • Monthly $monthlyAbsences',
+                                          style: TextStyle(
+                                            color: Color(0xFF6C757D),
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(
+                                    Icons.warning,
+                                    color: Color(0xFF9B59B6),
+                                    size: 20,
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
             ),
           ],
         ),
-      );
-
-      if (confirmed == true && mounted) {
-        // Show loading dialog
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            content: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(width: 16),
-                Text('Logging out...'),
-              ],
-            ),
-          ),
-        );
-
-        // Perform logout
-        await AuthService.instance.logout();
-
-        // Navigation will be handled automatically by the auth stream
-      }
-    } catch (e) {
-      // Pop loading dialog if it exists
-      if (mounted && Navigator.canPop(context)) {
-        Navigator.pop(context);
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error logging out: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+      ),
+    );
   }
 }

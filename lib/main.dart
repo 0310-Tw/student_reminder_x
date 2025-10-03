@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:students_reminder/src/core/app_theme.dart';
 import 'package:students_reminder/src/core/bootstrap.dart';
@@ -6,6 +5,7 @@ import 'package:students_reminder/src/shared/routes.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await initFirebase();
   await initNotifications();
 
