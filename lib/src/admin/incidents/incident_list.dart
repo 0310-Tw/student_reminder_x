@@ -10,9 +10,7 @@ class IncidentsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Geofence Incidents'),
-      ),
+      appBar: AppBar(title: const Text('Geofence Incidents')),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
             .collection('geofenceIncidents')
@@ -58,9 +56,7 @@ class IncidentsPage extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => IncidentDetailPage(
-                        data: data,
-                      ),
+                      builder: (_) => IncidentDetailPage(data: data),
                     ),
                   );
                 },

@@ -697,7 +697,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                       case 'view_location':
                         _showLocationMap(data);
                         break;
-                         case 'geofence': // 👈 your new item
+                      case 'geofence': // 👈 your new item
                         Navigator.pushNamed(
                           context,
                           AppRoutes.geofence,
@@ -744,27 +744,31 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                         data['outLoc'] != null ||
                         data['clockInLoc'] != null ||
                         data['clockOutLoc'] != null)
-                         PopupMenuItem<String>(
+                      PopupMenuItem<String>(
                         value: 'geofence',
                         child: Row(
                           children: [
-                            Icon(Icons.maps_ugc_outlined, color: Colors.indigo, size: 18),
+                            Icon(
+                              Icons.maps_ugc_outlined,
+                              color: Colors.indigo,
+                              size: 18,
+                            ),
                             SizedBox(width: 8),
                             Text('Geofence'),
                           ],
                         ),
                       ),
-                      PopupMenuItem<String>(
-                        value: 'view_location',
-                        child: Row(
-                          children: [
-                            Icon(Icons.map, color: Colors.purple, size: 18),
-                            SizedBox(width: 8),
-                            Text('View Location'),
-                          ],
-                        ),
+                    PopupMenuItem<String>(
+                      value: 'view_location',
+                      child: Row(
+                        children: [
+                          Icon(Icons.map, color: Colors.purple, size: 18),
+                          SizedBox(width: 8),
+                          Text('View Location'),
+                        ],
                       ),
-                    ],
+                    ),
+                  ],
                 ),
               ),
             ],

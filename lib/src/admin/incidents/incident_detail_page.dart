@@ -29,9 +29,7 @@ class IncidentDetailPage extends StatelessWidget {
     };
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Incident Detail'),
-      ),
+      appBar: AppBar(title: const Text('Incident Detail')),
       body: Column(
         children: [
           Expanded(
@@ -50,7 +48,9 @@ class IncidentDetailPage extends StatelessWidget {
               children: [
                 Text('Type: ${data['type']}'),
                 Text('Date ID: ${data['dateId']}'),
-                Text('Distance outside: ${(data['distance'] as num?)?.toStringAsFixed(1)} m'),
+                Text(
+                  'Distance outside: ${(data['distance'] as num?)?.toStringAsFixed(1)} m',
+                ),
               ],
             ),
           ),

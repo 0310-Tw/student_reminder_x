@@ -12,11 +12,10 @@ import 'package:students_reminder/src/history/attendance_history.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/admin_service.dart';
 import 'package:students_reminder/src/services/notification_service.dart';
-import 'package:students_reminder/src/admin/pages/admin_profileview_page.dart';
 import 'package:students_reminder/src/admin/pages/admin_public_feeds.dart';
 import 'package:students_reminder/src/admin/pages/attendance_admin_page.dart';
 import 'package:students_reminder/src/timetable/timetable.dart';
-import 'package:students_reminder/src/timetable/timetable_display.dart';
+import 'package:students_reminder/src/features/geofence/student_geofence_dashboard.dart';
 
 class MainLayoutPage extends StatefulWidget {
   const MainLayoutPage({super.key});
@@ -129,12 +128,13 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
         TimetableGeneratorScreen(),
         PublicFeeds(),
         AttendanceHistory14d(),
+        const StudentGeofenceDashboard(),
       ];
 
-    // Reset index if switching between admin/student mode or if current index is out of bounds
-    if (previousPageCount != _pages.length || _index >= _pages.length) {
-      _index = 0;
-     }
+      // Reset index if switching between admin/student mode or if current index is out of bounds
+      if (previousPageCount != _pages.length || _index >= _pages.length) {
+        _index = 0;
+      }
     }
   }
 
@@ -153,6 +153,7 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
         Icon(Icons.calendar_month, size: 30, color: Colors.white), // timetable
         Icon(Icons.public, size: 30, color: Colors.white),
         Icon(Icons.history, size: 30, color: Colors.white),
+        Icon(Icons.location_on, size: 30, color: Colors.white), // geofence
       ];
     }
   }

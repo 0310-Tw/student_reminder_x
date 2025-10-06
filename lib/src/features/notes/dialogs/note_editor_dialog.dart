@@ -4,7 +4,6 @@ import 'package:students_reminder/src/services/note_service.dart';
 import 'package:students_reminder/src/shared/misc.dart';
 import 'package:students_reminder/src/shared/validators_%20and_widgets.dart';
 import 'package:students_reminder/src/shared/widgets/live_char_counter_text_field.dart';
-import 'package:students_reminder/src/widgets/suspension_check.dart';
 
 class NoteEditorDialog extends StatefulWidget {
   final String uid;

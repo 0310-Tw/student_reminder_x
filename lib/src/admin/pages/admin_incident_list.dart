@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:students_reminder/src/admin/pages/admin_incident_detail_page.dart';
 
-
 class AdminIncidentsList extends StatefulWidget {
   final String studentId;
 
@@ -100,8 +99,14 @@ class _AdminIncidentsListState extends State<AdminIncidentsList> {
 
     if (_startDate != null && _endDate != null) {
       query = query
-          .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(_startDate!))
-          .where('createdAt', isLessThanOrEqualTo: Timestamp.fromDate(_endDate!));
+          .where(
+            'createdAt',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(_startDate!),
+          )
+          .where(
+            'createdAt',
+            isLessThanOrEqualTo: Timestamp.fromDate(_endDate!),
+          );
     }
 
     return query.orderBy('createdAt', descending: true).snapshots();
@@ -121,7 +126,9 @@ class _AdminIncidentsListState extends State<AdminIncidentsList> {
       setState(() {
         _startDate = picked.start;
         // include the end date by adding a day at midnight
-        _endDate = picked.end.add(const Duration(hours: 23, minutes: 59, seconds: 59));
+        _endDate = picked.end.add(
+          const Duration(hours: 23, minutes: 59, seconds: 59),
+        );
       });
     }
   }

@@ -9,7 +9,6 @@ ThemeData buildTheme() {
   );
 
   return base.copyWith(
-        
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: primaryScheme.surfaceContainerHighest.withOpacity(0.5),
@@ -22,7 +21,7 @@ ThemeData buildTheme() {
         fontWeight: FontWeight.w600,
       ),
       border: OutlineInputBorder(),
-      ),
+    ),
     navigationBarTheme: NavigationBarThemeData(
       labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
     ),

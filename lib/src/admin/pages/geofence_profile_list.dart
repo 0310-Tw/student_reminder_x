@@ -10,9 +10,7 @@ class GeofenceProfilesList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Geofence Profiles'),
-      ),
+      appBar: AppBar(title: const Text('Geofence Profiles')),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
             .collection('geofences')
@@ -98,7 +96,8 @@ class GeofenceProfilesList extends StatelessWidget {
         content: TextField(
           controller: controller,
           decoration: const InputDecoration(
-              hintText: 'Enter dateId (YYYYMMDD), e.g. 20251001'),
+            hintText: 'Enter dateId (YYYYMMDD), e.g. 20251001',
+          ),
         ),
         actions: [
           TextButton(

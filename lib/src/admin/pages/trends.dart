@@ -424,7 +424,7 @@ class _TrendsPageState extends State<TrendsPage> {
                       ),
                       SizedBox(width: 8),
                       Text(
-                        'Frequently Late (≥2 times)',
+                        'Frequently Late (2 or more times)',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,

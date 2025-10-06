@@ -20,7 +20,7 @@ class StudentProfile {
       4: "thursday",
       5: "friday",
       6: "saturday",
-      7: "sunday"
+      7: "sunday",
     };
 
     final todayKey = dayMap[weekday]!;

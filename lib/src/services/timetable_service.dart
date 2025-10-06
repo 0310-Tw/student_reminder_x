@@ -14,7 +14,10 @@ class TimetableService {
   /// -------------------------------
   Future<Map<String, List<String>>> loadStructure() async {
     // Try Firestore first
-    final doc = await _firestore.collection('timetable_structure').doc(userId).get();
+    final doc = await _firestore
+        .collection('timetable_structure')
+        .doc(userId)
+        .get();
     if (doc.exists) {
       final data = doc.data()!;
       final days = List<String>.from(data['days'] ?? []);
@@ -67,21 +70,23 @@ class TimetableService {
         .collection('schedule')
         .snapshots()
         .map((snapshot) {
-      Map<String, Map<String, String>> timetable = {};
-      for (var doc in snapshot.docs) {
-        final day = doc['day'] as String;
-        final time = doc['time'] as String;
-        final subject = doc['subject'] as String;
-        timetable[day] ??= {};
-        timetable[day]![time] = subject;
-      }
-      return timetable;
-    });
+          Map<String, Map<String, String>> timetable = {};
+          for (var doc in snapshot.docs) {
+            final day = doc['day'] as String;
+            final time = doc['time'] as String;
+            final subject = doc['subject'] as String;
+            timetable[day] ??= {};
+            timetable[day]![time] = subject;
+          }
+          return timetable;
+        });
   }
 
   Future<void> updateSubject(String day, String time, String subject) async {
-    final scheduleRef =
-        _firestore.collection('timetable').doc(userId).collection('schedule');
+    final scheduleRef = _firestore
+        .collection('timetable')
+        .doc(userId)
+        .collection('schedule');
 
     // Check if entry exists
     final snapshot = await scheduleRef
@@ -90,7 +95,9 @@ class TimetableService {
         .get();
 
     if (snapshot.docs.isNotEmpty) {
-      await scheduleRef.doc(snapshot.docs.first.id).update({'subject': subject});
+      await scheduleRef.doc(snapshot.docs.first.id).update({
+        'subject': subject,
+      });
     } else {
       await scheduleRef.add({'day': day, 'time': time, 'subject': subject});
     }

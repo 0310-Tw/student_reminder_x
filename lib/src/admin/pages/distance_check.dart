@@ -2,7 +2,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:students_reminder/src/admin/pages/campus_location.dart';
 import 'package:students_reminder/src/admin/models/student_geofence.dart';
 
-
 Future<bool> isInsideGeofence(
   double userLat,
   double userLng,
@@ -18,14 +17,14 @@ Future<bool> isInsideGeofence(
   return distance <= expectedCampus.radiusMeters;
 }
 
-
 Future<void> checkStudentLocation(StudentProfile student) async {
   final campusId = student.getCampusForToday();
   final expectedCampus = campusLocations[campusId]!;
 
   // Get current position
   Position position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high);
+    desiredAccuracy: LocationAccuracy.high,
+  );
 
   final isInside = await isInsideGeofence(
     position.latitude,

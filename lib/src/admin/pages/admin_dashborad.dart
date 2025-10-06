@@ -456,7 +456,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       ConnectionState.waiting) {
                     return Center(child: CircularProgressIndicator());
                   }
-        
+
                   if (attendanceSnapshot.hasError) {
                     print(
                       'Attendance overview error: ${attendanceSnapshot.error}',
@@ -485,7 +485,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       ),
                     );
                   }
-        
+
                   return StreamBuilder<QuerySnapshot>(
                     stream: _getStudentsStream(),
                     builder: (context, studentsSnapshot) {
@@ -493,7 +493,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           ConnectionState.waiting) {
                         return Center(child: CircularProgressIndicator());
                       }
-        
+
                       if (studentsSnapshot.hasError) {
                         print(
                           'Students overview error: ${studentsSnapshot.error}',
@@ -505,7 +505,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           ),
                         );
                       }
-        
+
                       if (!studentsSnapshot.hasData ||
                           studentsSnapshot.data!.docs.isEmpty) {
                         return Center(
@@ -515,7 +515,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           ),
                         );
                       }
-        
+
                       final totalStudents = studentsSnapshot.data!.docs.length;
                       final attendanceRecords =
                           attendanceSnapshot.data?.docs ?? [];
@@ -523,11 +523,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         attendanceRecords,
                         totalStudents,
                       );
-        
+
                       print(
                         'Overview - Total students: $totalStudents, Records: ${attendanceRecords.length}',
                       );
-        
+
                       return Column(
                         children: [
                           _buildProgressIndicator(
@@ -1519,25 +1519,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     return weekdays;
   }
 
-  // Student Creation Date Helper
-  Future<DateTime?> _getStudentCreationDate(String studentId) async {
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(studentId)
-          .get();
-
-      if (doc.exists) {
-        final data = doc.data()!;
-        final createdAt = data['createdAt'] as Timestamp?;
-        return createdAt?.toDate();
-      }
-    } catch (e) {
-      print('Error getting student creation date: $e');
-    }
-    return null;
-  }
-
   // Filter attendance records to only include weekday records (Monday-Friday)
   // This ensures attendance tracking only occurs during school operating days
   List<DocumentSnapshot> _filterWeekdayRecords(List<DocumentSnapshot> records) {
@@ -1547,28 +1528,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
       if (dayId != null) {
         final recordDate = DateTime.tryParse(dayId);
         return recordDate != null && _isWeekday(recordDate);
-      }
-      return false;
-    }).toList();
-  }
-
-  // Filter attendance records to only include records after student creation date
-  // This ensures new students' attendance tracking starts from their enrollment date
-  Future<List<DocumentSnapshot>> _filterRecordsByStudentCreation(
-    List<DocumentSnapshot> records,
-    String studentId,
-  ) async {
-    final creationDate = await _getStudentCreationDate(studentId);
-    if (creationDate == null) return records;
-
-    return records.where((record) {
-      final data = record.data() as Map<String, dynamic>;
-      final dayId = data['dayId'] as String?;
-      if (dayId != null) {
-        final recordDate = DateTime.tryParse(dayId);
-        return recordDate != null &&
-            (recordDate.isAfter(creationDate) ||
-                recordDate.isAtSameMomentAs(creationDate));
       }
       return false;
     }).toList();

@@ -1,7 +1,7 @@
 // lib/src/services/geofence_helper.dart
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:students_reminder/src/services/geofence_service.dart';
+import '../geofence/services/geofence_service.dart';
 import 'package:students_reminder/src/admin/models/geofence_model.dart';
 
 /// Checks if the current GPS position is inside the geofence and
@@ -69,7 +69,7 @@ Future<bool> handleClockAction({
             TextButton(
               onPressed: () => Navigator.pop(ctx),
               child: const Text('OK'),
-            )
+            ),
           ],
         ),
       );
@@ -91,9 +91,9 @@ Future<bool> handleClockAction({
     // Optionally still show message
     if (profile.outsideMessage != null && profile.outsideMessage!.isNotEmpty) {
       // ignore: use_build_context_synchronously
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(profile.outsideMessage!)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(profile.outsideMessage!)));
     }
 
     return true; // Allow

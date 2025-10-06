@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:students_reminder/src/admin/models/geofence_model.dart';
-import 'package:students_reminder/src/admin/models/geofence_profile.dart';
 import 'package:students_reminder/src/admin/pages/admin_dashborad.dart';
 import 'package:students_reminder/src/admin/pages/admin_geofence_editor.dart';
 import 'package:students_reminder/src/admin/pages/admin_profileview_page.dart';
@@ -16,6 +14,9 @@ import 'package:students_reminder/src/admin/pages/attendance_admin_page.dart';
 import 'package:students_reminder/src/admin/pages/admin_public_feeds.dart';
 import 'package:students_reminder/src/features/splash/splash_gate.dart';
 import 'package:students_reminder/src/timetable/timetable.dart';
+import 'package:students_reminder/src/features/geofence/student_geofence_dashboard.dart';
+import 'package:students_reminder/src/features/geofence/geofence_incident_history.dart';
+import 'package:students_reminder/src/features/geofence/student_location_selection_page.dart';
 
 class AppRoutes {
   static const login = '/login';
@@ -32,6 +33,9 @@ class AppRoutes {
   static const splash = '/splash';
   static const studentAttendance = '/student-attendance';
   static const geofence = '/geofence';
+  static const geofenceDashboard = '/geofence-dashboard';
+  static const geofenceIncidents = '/geofence-incidents';
+  static const locationSelection = '/location-selection';
   static const profile = '/profile'; // ✅ Added profile route
   static const trends = '/trends';
 
@@ -74,6 +78,18 @@ class AppRoutes {
             studentId: args?['studentId'] ?? '',
             dateId: args?['dateId'] ?? '',
           ),
+        );
+      case geofenceDashboard:
+        return MaterialPageRoute(
+          builder: (_) => const StudentGeofenceDashboard(),
+        );
+      case geofenceIncidents:
+        return MaterialPageRoute(
+          builder: (_) => const GeofenceIncidentHistory(),
+        );
+      case locationSelection:
+        return MaterialPageRoute(
+          builder: (_) => const StudentLocationSelectionPage(),
         );
       case splash:
         return MaterialPageRoute(builder: (_) => const SplashGate());

@@ -45,16 +45,8 @@ class GeofenceProfile {
   /// Convert to Firestore map
   Map<String, dynamic> toMap() {
     return {
-      'checkInLocation': {
-        'lat': inLat,
-        'lng': inLng,
-        'radius': inRadius,
-      },
-      'checkOutLocation': {
-        'lat': outLat,
-        'lng': outLng,
-        'radius': outRadius,
-      },
+      'checkInLocation': {'lat': inLat, 'lng': inLng, 'radius': inRadius},
+      'checkOutLocation': {'lat': outLat, 'lng': outLng, 'radius': outRadius},
       'bandType': bandType,
       'outsidePolicy': outsidePolicy,
       'outsideMessage': outsideMessage,

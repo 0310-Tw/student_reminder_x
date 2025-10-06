@@ -32,9 +32,7 @@ class AdminIncidentDetailPage extends StatelessWidget {
     };
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Incident Detail'),
-      ),
+      appBar: AppBar(title: const Text('Incident Detail')),
       body: Column(
         children: [
           Expanded(

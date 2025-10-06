@@ -3,5 +3,9 @@ class TimetableEntry {
   final String time;
   final String subject;
 
-  TimetableEntry({required this.day, required this.time, required this.subject});
+  TimetableEntry({
+    required this.day,
+    required this.time,
+    required this.subject,
+  });
 }

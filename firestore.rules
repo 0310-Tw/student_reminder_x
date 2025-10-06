@@ -153,6 +153,45 @@ service cloud.firestore {
       allow read: if isAdmin();
     }
 
+    // Geofencing collections - student location schedules
+    match /student_schedules/{userId} {
+      allow read, write: if isAdmin() || isOwner(userId);
+      allow list: if isAdmin();
+    }
+
+    // Geofencing collections - geofence profiles
+    match /users/{userId}/geofences/{geofenceId} {
+      allow read, write: if isAdmin() || isOwner(userId);
+      allow list: if isAdmin() || isOwner(userId);
+    }
+
+    // Geofencing collections - geofence incidents
+    match /geofence_incidents/{incidentId} {
+      allow read, write: if isAdmin();
+      // Students can read their own incidents
+      allow read: if isStudent() && resource.data.studentId == request.auth.uid;
+      allow list: if isAdmin();
+    }
+
+    // Alternative geofence incidents collection structure
+    match /users/{userId}/geofenceIncidents/{incidentId} {
+      allow read, write: if isAdmin() || isOwner(userId);
+      allow list: if isAdmin() || isOwner(userId);
+    }
+
+    // Global geofence collection group queries
+    match /{path=**}/geofences/{geofenceId} {
+      allow read: if isAdmin() || 
+                     (isAuthenticated() && 
+                      resource.data.studentId == request.auth.uid);
+    }
+
+    match /{path=**}/geofenceIncidents/{incidentId} {
+      allow read: if isAdmin() || 
+                     (isAuthenticated() && 
+                      resource.data.studentId == request.auth.uid);
+    }
+
     // Additional rules for admin dashboard data access
     match /{document=**} {
       allow read: if isAdmin();

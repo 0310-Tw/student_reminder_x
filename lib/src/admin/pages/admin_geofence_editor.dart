@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:students_reminder/src/admin/models/geofence_model.dart';
-import '../../services/geofence_service.dart';
+import '../../geofence/services/geofence_service.dart';
 
 class AdminGeofenceEditor extends StatefulWidget {
   final String studentId;
@@ -42,14 +42,18 @@ class _AdminGeofenceEditorState extends State<AdminGeofenceEditor> {
                     markerId: const MarkerId('in'),
                     position: inLocation!,
                     infoWindow: const InfoWindow(title: 'Check-In'),
-                    icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+                    icon: BitmapDescriptor.defaultMarkerWithHue(
+                      BitmapDescriptor.hueGreen,
+                    ),
                   ),
                 if (outLocation != null)
                   Marker(
                     markerId: const MarkerId('out'),
                     position: outLocation!,
                     infoWindow: const InfoWindow(title: 'Check-Out'),
-                    icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                    icon: BitmapDescriptor.defaultMarkerWithHue(
+                      BitmapDescriptor.hueRed,
+                    ),
                   ),
               },
               onTap: (pos) {
@@ -75,10 +79,18 @@ class _AdminGeofenceEditorState extends State<AdminGeofenceEditor> {
                     Expanded(
                       child: DropdownButtonFormField<String>(
                         value: bandType,
-                        decoration: const InputDecoration(labelText: 'Band Type'),
+                        decoration: const InputDecoration(
+                          labelText: 'Band Type',
+                        ),
                         items: const [
-                          DropdownMenuItem(value: 'fixed', child: Text('Fixed')),
-                          DropdownMenuItem(value: 'floating', child: Text('Floating')),
+                          DropdownMenuItem(
+                            value: 'fixed',
+                            child: Text('Fixed'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'floating',
+                            child: Text('Floating'),
+                          ),
                         ],
                         onChanged: (v) => setState(() => bandType = v!),
                       ),
@@ -87,10 +99,18 @@ class _AdminGeofenceEditorState extends State<AdminGeofenceEditor> {
                     Expanded(
                       child: DropdownButtonFormField<String>(
                         value: outsidePolicy,
-                        decoration: const InputDecoration(labelText: 'Outside Policy'),
+                        decoration: const InputDecoration(
+                          labelText: 'Outside Policy',
+                        ),
                         items: const [
-                          DropdownMenuItem(value: 'block', child: Text('Block')),
-                          DropdownMenuItem(value: 'allow_flag', child: Text('Allow & Flag')),
+                          DropdownMenuItem(
+                            value: 'block',
+                            child: Text('Block'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'allow_flag',
+                            child: Text('Allow & Flag'),
+                          ),
                         ],
                         onChanged: (v) => setState(() => outsidePolicy = v!),
                       ),
@@ -99,7 +119,9 @@ class _AdminGeofenceEditorState extends State<AdminGeofenceEditor> {
                 ),
                 TextField(
                   controller: messageController,
-                  decoration: const InputDecoration(labelText: 'Outside Message'),
+                  decoration: const InputDecoration(
+                    labelText: 'Outside Message',
+                  ),
                 ),
                 const SizedBox(height: 12),
                 ElevatedButton(
@@ -116,8 +138,9 @@ class _AdminGeofenceEditorState extends State<AdminGeofenceEditor> {
 
   Future<void> _saveProfile() async {
     if (inLocation == null || outLocation == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Tap map to pick both locations')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tap map to pick both locations')),
+      );
       return;
     }
 
@@ -131,7 +154,9 @@ class _AdminGeofenceEditorState extends State<AdminGeofenceEditor> {
       outRadius: outRadius,
       bandType: bandType,
       outsidePolicy: outsidePolicy,
-      outsideMessage: messageController.text.isNotEmpty ? messageController.text : null,
+      outsideMessage: messageController.text.isNotEmpty
+          ? messageController.text
+          : null,
     );
 
     await GeofenceService.instance.setProfile(
