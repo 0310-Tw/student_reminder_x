@@ -16,7 +16,8 @@ class AdminGeofenceProfileEditor extends StatefulWidget {
   });
 
   @override
-  State<AdminGeofenceProfileEditor> createState() => _AdminGeofenceProfileEditorState();
+  State<AdminGeofenceProfileEditor> createState() =>
+      _AdminGeofenceProfileEditorState();
 }
 
 class _AdminGeofenceProfileEditorState extends State<AdminGeofenceProfileEditor>
@@ -44,7 +45,7 @@ class _AdminGeofenceProfileEditorState extends State<AdminGeofenceProfileEditor>
     // Initialize each day with defaults from org config
     for (int day = 0; day <= 6; day++) {
       final defaultCampusId = OrgConfigService.getDefaultCampusForDay(day);
-      
+
       _dayProfiles[day] = DayProfileData(
         dayOfWeek: day,
         hasCustomProfile: false,
@@ -61,19 +62,19 @@ class _AdminGeofenceProfileEditorState extends State<AdminGeofenceProfileEditor>
 
   Future<void> _loadExistingProfiles() async {
     setState(() => _isLoading = true);
-    
+
     try {
       for (int day = 0; day <= 6; day++) {
         final profile = await GeofenceProfileService.loadGeofenceProfile(
-          widget.studentId, 
-          day
+          widget.studentId,
+          day,
         );
-        
+
         if (profile != null && mounted) {
           setState(() {
             _dayProfiles[day] = DayProfileData.fromGeofenceProfile(
-              profile, 
-              _dayProfiles[day]!.defaultCampusId
+              profile,
+              _dayProfiles[day]!.defaultCampusId,
             );
           });
         }
@@ -111,7 +112,10 @@ class _AdminGeofenceProfileEditorState extends State<AdminGeofenceProfileEditor>
               const Text('Geofence Profile'),
               Text(
                 widget.studentName,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.normal,
+                ),
               ),
             ],
           ),
@@ -121,7 +125,7 @@ class _AdminGeofenceProfileEditorState extends State<AdminGeofenceProfileEditor>
             tabs: List.generate(7, (index) {
               final dayName = OrgConfigService.getDayName(index);
               final hasCustom = _dayProfiles[index]?.hasCustomProfile ?? false;
-              
+
               return Tab(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -180,7 +184,6 @@ class _AdminGeofenceProfileEditorState extends State<AdminGeofenceProfileEditor>
 
     final dayName = OrgConfigService.getDayName(dayOfWeek);
 
-
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -214,7 +217,10 @@ class _AdminGeofenceProfileEditorState extends State<AdminGeofenceProfileEditor>
                   children: [
                     const Text(
                       'Band Type',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     SegmentedButton<BandType>(
@@ -243,10 +249,7 @@ class _AdminGeofenceProfileEditorState extends State<AdminGeofenceProfileEditor>
                       profile.bandType == BandType.fixed
                           ? 'Student must be within designated geofence areas'
                           : 'Student may check in/out from anywhere',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
                   ],
                 ),
@@ -265,12 +268,17 @@ class _AdminGeofenceProfileEditorState extends State<AdminGeofenceProfileEditor>
                     children: [
                       const Text(
                         'Outside Policy',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       RadioListTile<OutsidePolicy>(
                         title: const Text('Block'),
-                        subtitle: const Text('Prevent attendance from outside geofence'),
+                        subtitle: const Text(
+                          'Prevent attendance from outside geofence',
+                        ),
                         value: OutsidePolicy.block,
                         groupValue: profile.outsidePolicy,
                         onChanged: (value) {
@@ -282,7 +290,9 @@ class _AdminGeofenceProfileEditorState extends State<AdminGeofenceProfileEditor>
                       ),
                       RadioListTile<OutsidePolicy>(
                         title: const Text('Allow & Flag'),
-                        subtitle: const Text('Allow but create incident report'),
+                        subtitle: const Text(
+                          'Allow but create incident report',
+                        ),
                         value: OutsidePolicy.allowAndFlag,
                         groupValue: profile.outsidePolicy,
                         onChanged: (value) {
@@ -316,7 +326,7 @@ class _AdminGeofenceProfileEditorState extends State<AdminGeofenceProfileEditor>
 
             const SizedBox(height: 16),
 
-            // Check-Out Location  
+            // Check-Out Location
             _buildLocationSection(
               'Check-Out Location',
               profile.checkOutLocation,
@@ -333,7 +343,7 @@ class _AdminGeofenceProfileEditorState extends State<AdminGeofenceProfileEditor>
             const SizedBox(height: 16),
 
             // Outside Message (if Allow & Flag is selected)
-            if (profile.bandType == BandType.fixed && 
+            if (profile.bandType == BandType.fixed &&
                 profile.outsidePolicy == OutsidePolicy.allowAndFlag) ...[
               Card(
                 child: Padding(
@@ -343,7 +353,10 @@ class _AdminGeofenceProfileEditorState extends State<AdminGeofenceProfileEditor>
                     children: [
                       const Text(
                         'Outside Message',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       TextField(
@@ -356,7 +369,9 @@ class _AdminGeofenceProfileEditorState extends State<AdminGeofenceProfileEditor>
                           profile.outsideMessage = value;
                           _hasUnsavedChanges = true;
                         },
-                        controller: TextEditingController(text: profile.outsideMessage),
+                        controller: TextEditingController(
+                          text: profile.outsideMessage,
+                        ),
                       ),
                     ],
                   ),
@@ -367,7 +382,7 @@ class _AdminGeofenceProfileEditorState extends State<AdminGeofenceProfileEditor>
             ],
           ] else ...[
             const SizedBox(height: 16),
-            
+
             // Default Configuration Display
             Card(
               child: Padding(
@@ -377,13 +392,21 @@ class _AdminGeofenceProfileEditorState extends State<AdminGeofenceProfileEditor>
                   children: [
                     Text(
                       'Default Configuration for $dayName',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     ListTile(
-                      leading: const Icon(Icons.location_on, color: Colors.blue),
+                      leading: const Icon(
+                        Icons.location_on,
+                        color: Colors.blue,
+                      ),
                       title: Text('Default Campus: ${profile.defaultCampusId}'),
-                      subtitle: const Text('Using organization default settings'),
+                      subtitle: const Text(
+                        'Using organization default settings',
+                      ),
                     ),
                     const Divider(),
                     const ListTile(
@@ -422,7 +445,10 @@ class _AdminGeofenceProfileEditorState extends State<AdminGeofenceProfileEditor>
                 const SizedBox(width: 8),
                 Text(
                   title,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -451,19 +477,23 @@ class _AdminGeofenceProfileEditorState extends State<AdminGeofenceProfileEditor>
               ],
               onChanged: (campusId) {
                 if (campusId == 'stony_hill') {
-                  onChanged(LocationData(
-                    lat: 18.0179,
-                    lng: -76.7491,
-                    radiusMeters: 100.0,
-                    campusPreset: campusId,
-                  ));
+                  onChanged(
+                    LocationData(
+                      lat: 18.0179,
+                      lng: -76.7491,
+                      radiusMeters: 100.0,
+                      campusPreset: campusId,
+                    ),
+                  );
                 } else if (campusId == 'up_park_camp') {
-                  onChanged(LocationData(
-                    lat: 17.9778,
-                    lng: -76.7947,
-                    radiusMeters: 150.0,
-                    campusPreset: campusId,
-                  ));
+                  onChanged(
+                    LocationData(
+                      lat: 17.9778,
+                      lng: -76.7947,
+                      radiusMeters: 150.0,
+                      campusPreset: campusId,
+                    ),
+                  );
                 } else {
                   onChanged(location.copyWith(campusPreset: null));
                 }
@@ -481,12 +511,16 @@ class _AdminGeofenceProfileEditorState extends State<AdminGeofenceProfileEditor>
                       labelText: 'Latitude',
                       border: OutlineInputBorder(),
                     ),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     initialValue: location.lat.toStringAsFixed(6),
                     onChanged: (value) {
                       final lat = double.tryParse(value);
                       if (lat != null) {
-                        onChanged(location.copyWith(lat: lat, campusPreset: null));
+                        onChanged(
+                          location.copyWith(lat: lat, campusPreset: null),
+                        );
                       }
                     },
                   ),
@@ -498,12 +532,16 @@ class _AdminGeofenceProfileEditorState extends State<AdminGeofenceProfileEditor>
                       labelText: 'Longitude',
                       border: OutlineInputBorder(),
                     ),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     initialValue: location.lng.toStringAsFixed(6),
                     onChanged: (value) {
                       final lng = double.tryParse(value);
                       if (lng != null) {
-                        onChanged(location.copyWith(lng: lng, campusPreset: null));
+                        onChanged(
+                          location.copyWith(lng: lng, campusPreset: null),
+                        );
                       }
                     },
                   ),
@@ -561,18 +599,18 @@ class _AdminGeofenceProfileEditorState extends State<AdminGeofenceProfileEditor>
         desiredAccuracy: LocationAccuracy.high,
       );
 
-      onChanged(LocationData(
-        lat: position.latitude,
-        lng: position.longitude,
-        radiusMeters: 100.0,
-        campusPreset: null,
-      ));
+      onChanged(
+        LocationData(
+          lat: position.latitude,
+          lng: position.longitude,
+          radiusMeters: 100.0,
+          campusPreset: null,
+        ),
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Location updated to current position'),
-          ),
+          const SnackBar(content: Text('Location updated to current position')),
         );
       }
     } catch (e) {
@@ -621,27 +659,31 @@ class _AdminGeofenceProfileEditorState extends State<AdminGeofenceProfileEditor>
         final profile = entry.value;
 
         if (profile.hasCustomProfile && !profile.useDefaults) {
-        // Save custom profile
-        final geofenceProfile = GeofenceProfile(
-          dayOfWeek: dayOfWeek,
-          userId: widget.studentId,
-          bandTypeOverride: profile.bandType,
-          outsidePolicy: profile.outsidePolicy,
-          outsideMessageText: profile.outsideMessage,
-          checkInSlot: GeofenceSlotConfig(
-            lat: profile.checkInLocation.lat,
-            lng: profile.checkInLocation.lng,
-            radiusMeters: profile.checkInLocation.radiusMeters,
-          ),
-          checkOutSlot: GeofenceSlotConfig(
-            lat: profile.checkOutLocation.lat,
-            lng: profile.checkOutLocation.lng,
-            radiusMeters: profile.checkOutLocation.radiusMeters,
-          ),
-        );          await GeofenceProfileService.saveGeofenceProfile(geofenceProfile);
+          // Save custom profile
+          final geofenceProfile = GeofenceProfile(
+            dayOfWeek: dayOfWeek,
+            userId: widget.studentId,
+            bandTypeOverride: profile.bandType,
+            outsidePolicy: profile.outsidePolicy,
+            outsideMessageText: profile.outsideMessage,
+            checkInSlot: GeofenceSlotConfig(
+              lat: profile.checkInLocation.lat,
+              lng: profile.checkInLocation.lng,
+              radiusMeters: profile.checkInLocation.radiusMeters,
+            ),
+            checkOutSlot: GeofenceSlotConfig(
+              lat: profile.checkOutLocation.lat,
+              lng: profile.checkOutLocation.lng,
+              radiusMeters: profile.checkOutLocation.radiusMeters,
+            ),
+          );
+          await GeofenceProfileService.saveGeofenceProfile(geofenceProfile);
         } else if (profile.useDefaults) {
           // Remove custom profile (revert to defaults)
-          await GeofenceProfileService.deleteGeofenceProfile(widget.studentId, dayOfWeek);
+          await GeofenceProfileService.deleteGeofenceProfile(
+            widget.studentId,
+            dayOfWeek,
+          );
         }
       }
 
@@ -675,25 +717,28 @@ class _AdminGeofenceProfileEditorState extends State<AdminGeofenceProfileEditor>
 
   Future<bool> _showUnsavedChangesDialog() async {
     return await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Unsaved Changes'),
-        content: const Text('You have unsaved changes. Do you want to save them before leaving?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Discard'),
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Unsaved Changes'),
+            content: const Text(
+              'You have unsaved changes. Do you want to save them before leaving?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Discard'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context, false);
+                  _saveAllProfiles();
+                },
+                child: const Text('Save & Exit'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context, false);
-              _saveAllProfiles();
-            },
-            child: const Text('Save & Exit'),
-          ),
-        ],
-      ),
-    ) ?? false;
+        ) ??
+        false;
   }
 }
 
@@ -721,7 +766,10 @@ class DayProfileData {
     required this.outsideMessage,
   });
 
-  factory DayProfileData.fromGeofenceProfile(GeofenceProfile profile, String defaultCampusId) {
+  factory DayProfileData.fromGeofenceProfile(
+    GeofenceProfile profile,
+    String defaultCampusId,
+  ) {
     return DayProfileData(
       dayOfWeek: profile.dayOfWeek,
       hasCustomProfile: true,
@@ -759,8 +807,6 @@ class LocationData {
     required this.radiusMeters,
     this.campusPreset,
   });
-
-
 
   factory LocationData.defaultLocation() {
     return LocationData(

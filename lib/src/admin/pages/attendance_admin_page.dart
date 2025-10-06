@@ -546,6 +546,75 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     );
   }
 
+  Widget _buildWeekendRow(DateTime date, String dateStr) {
+    final weekendDay = date.weekday == 6 ? 'Saturday' : 'Sunday';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!, width: 1),
+      ),
+      child: Row(
+        children: [
+          // Date Section
+          Expanded(
+            flex: 3,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _formatDisplayDate(date),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: Color(0xFF2E3440),
+                  ),
+                ),
+                SizedBox(height: 4),
+                _buildStatusChip('weekend', isRealTime: false),
+              ],
+            ),
+          ),
+
+          // Weekend Message Section
+          Expanded(
+            flex: 4,
+            child: Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Color(0xFF9B59B6).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Color(0xFF9B59B6).withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.weekend, size: 16, color: Color(0xFF9B59B6)),
+                  SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      '$weekendDay - No attendance required',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF9B59B6),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // No action menu for weekends
+          SizedBox(width: 24),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAttendanceRow(
     String studentUid,
     DateTime date,
@@ -554,6 +623,11 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
     final data = doc?.data() as Map<String, dynamic>? ?? {};
     final dateStr = _formatDateString(date);
     final rawStatus = data['status'] ?? 'not_marked';
+
+    // Check if this is a weekend day first (Saturday = 6, Sunday = 7)
+    if (date.weekday > 5) {
+      return _buildWeekendRow(date, dateStr);
+    }
 
     // Normalize status - if user has checked in (early/late), they are present
     String status;
@@ -851,6 +925,11 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
         color = Colors.blue;
         label = 'Early';
         icon = Icons.fast_forward;
+        break;
+      case 'weekend':
+        color = Color(0xFF9B59B6);
+        label = 'WEEKEND';
+        icon = Icons.weekend;
         break;
       case 'absent':
         color = Colors.red;

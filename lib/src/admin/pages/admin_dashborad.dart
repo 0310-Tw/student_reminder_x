@@ -1612,7 +1612,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         if (status == 'late' || data['lateReason'] != null) {
           lateStudents.add(userId);
           allAttendedStudents.add(userId);
-        } 
+        }
         // Count students who were present (not late)
         else if (status == 'present' || status == 'early') {
           presentStudents.add(userId);

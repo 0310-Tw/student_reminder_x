@@ -12,8 +12,8 @@ class OrgConfigService {
     0: 'up_park_camp', // Sunday
     1: 'up_park_camp', // Monday
     2: 'up_park_camp', // Tuesday
-    3: 'stony_hill',   // Wednesday
-    4: 'stony_hill',   // Thursday
+    3: 'stony_hill', // Wednesday
+    4: 'stony_hill', // Thursday
     5: 'up_park_camp', // Friday
     6: 'up_park_camp', // Saturday
   };
@@ -72,15 +72,18 @@ class OrgConfigService {
   }
 
   /// Update campus mapping for a specific day
-  static Future<void> updateDefaultCampusForDay(int dayOfWeek, String campusId) async {
+  static Future<void> updateDefaultCampusForDay(
+    int dayOfWeek,
+    String campusId,
+  ) async {
     try {
       await _firestore
           .collection(_orgConfigCollection)
           .doc(_defaultsDocument)
           .update({
-        'campus_by_day.$dayOfWeek': campusId,
-        'updated_at': FieldValue.serverTimestamp(),
-      });
+            'campus_by_day.$dayOfWeek': campusId,
+            'updated_at': FieldValue.serverTimestamp(),
+          });
     } catch (e) {
       print('Error updating campus for day $dayOfWeek: $e');
       rethrow;
@@ -90,27 +93,33 @@ class OrgConfigService {
   /// Get all available campus locations with their default assignments
   static Map<String, Map<String, dynamic>> getCampusAssignments() {
     final assignments = <String, Map<String, dynamic>>{};
-    
+
     for (int day = 0; day <= 6; day++) {
       final dayName = _getDayName(day);
       final campus = getDefaultCampusForDay(day);
-      
+
       if (!assignments.containsKey(campus)) {
         assignments[campus] = {'days': <String>[], 'count': 0};
       }
-      
+
       assignments[campus]!['days'].add(dayName);
-      assignments[campus]!['count'] = (assignments[campus]!['count'] as int) + 1;
+      assignments[campus]!['count'] =
+          (assignments[campus]!['count'] as int) + 1;
     }
-    
+
     return assignments;
   }
 
   /// Convert day number to name
   static String _getDayName(int dayOfWeek) {
     const dayNames = [
-      'Sunday', 'Monday', 'Tuesday', 'Wednesday',
-      'Thursday', 'Friday', 'Saturday'
+      'Sunday',
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
     ];
     return dayNames[dayOfWeek];
   }

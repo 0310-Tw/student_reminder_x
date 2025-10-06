@@ -22,21 +22,23 @@ class StudentGeofenceProfileService {
     DateTime date,
   ) async {
     final dayOfWeek = date.weekday % 7; // Convert to 0-6 format
-    
+
     // Try to get student-specific profile first
     final customProfile = await GeofenceProfileService.loadGeofenceProfile(
-      studentId, 
-      dayOfWeek
+      studentId,
+      dayOfWeek,
     );
 
     if (customProfile != null && customProfile.checkInSlot != null) {
       // Use custom profile
       return EffectiveGeofence(
         checkIn: customProfile.checkInSlot!.toGeofence(),
-        checkOut: customProfile.checkOutSlot?.toGeofence() ?? 
-                  customProfile.checkInSlot!.toGeofence(),
+        checkOut:
+            customProfile.checkOutSlot?.toGeofence() ??
+            customProfile.checkInSlot!.toGeofence(),
         bandType: customProfile.bandTypeOverride ?? BandType.fixed,
-        outsidePolicy: customProfile.outsidePolicy ?? OutsidePolicy.allowAndFlag,
+        outsidePolicy:
+            customProfile.outsidePolicy ?? OutsidePolicy.allowAndFlag,
         outsideMessageText: customProfile.outsideMessageText,
       );
     }
@@ -44,12 +46,13 @@ class StudentGeofenceProfileService {
     // Fall back to organization defaults
     final defaultCampusId = OrgConfigService.getDefaultCampusForDay(dayOfWeek);
     final defaultGeofence = await _createDefaultGeofence(defaultCampusId);
-    
+
     return EffectiveGeofence(
       checkIn: defaultGeofence,
       checkOut: defaultGeofence,
       bandType: BandType.fixed, // Default to fixed
-      outsidePolicy: OutsidePolicy.allowAndFlag, // Default to allow with incident logging
+      outsidePolicy:
+          OutsidePolicy.allowAndFlag, // Default to allow with incident logging
       outsideMessageText: 'You are outside the designated campus area.',
     );
   }
@@ -58,20 +61,12 @@ class StudentGeofenceProfileService {
   static Future<Geofence> _createDefaultGeofence(String campusId) async {
     // Default coordinates based on campus
     final Map<String, Map<String, double>> campusDefaults = {
-      'stony_hill': {
-        'lat': 18.0179,
-        'lng': -76.7491,
-        'radius': 100.0,
-      },
-      'up_park_camp': {
-        'lat': 17.9778,
-        'lng': -76.7947,
-        'radius': 150.0,
-      },
+      'stony_hill': {'lat': 18.0179, 'lng': -76.7491, 'radius': 100.0},
+      'up_park_camp': {'lat': 17.9778, 'lng': -76.7947, 'radius': 150.0},
     };
 
     final coords = campusDefaults[campusId] ?? campusDefaults['up_park_camp']!;
-    
+
     return Geofence(
       coords['lat']!,
       coords['lng']!,
@@ -89,15 +84,15 @@ class StudentGeofenceProfileService {
     required BuildContext? context,
   }) async {
     final effective = await getEffectiveGeofence(studentId, date);
-    final targetGeofence = slot == GeofenceSlot.checkIn 
-        ? effective.checkIn 
+    final targetGeofence = slot == GeofenceSlot.checkIn
+        ? effective.checkIn
         : effective.checkOut;
 
     final distance = targetGeofence.distanceTo(
-      currentPosition.latitude, 
-      currentPosition.longitude
+      currentPosition.latitude,
+      currentPosition.longitude,
     );
-    
+
     final isInside = distance <= targetGeofence.radiusMeters;
 
     // If floating band, always allow
@@ -123,12 +118,12 @@ class StudentGeofenceProfileService {
     // Outside geofence - handle based on policy
     if (effective.outsidePolicy == OutsidePolicy.block) {
       // Show message if provided
-      if (effective.outsideMessageText != null && 
-          effective.outsideMessageText!.isNotEmpty && 
+      if (effective.outsideMessageText != null &&
+          effective.outsideMessageText!.isNotEmpty &&
           context != null) {
         await _showOutsideMessage(context, effective.outsideMessageText!);
       }
-      
+
       return GeofenceValidationResult(
         allowed: false,
         status: AttStatus.outsideAttempt,
@@ -147,12 +142,12 @@ class StudentGeofenceProfileService {
       );
 
       // Show message if provided
-      if (effective.outsideMessageText != null && 
-          effective.outsideMessageText!.isNotEmpty && 
+      if (effective.outsideMessageText != null &&
+          effective.outsideMessageText!.isNotEmpty &&
           context != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(effective.outsideMessageText!))
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(effective.outsideMessageText!)));
       }
 
       return GeofenceValidationResult(
@@ -165,7 +160,10 @@ class StudentGeofenceProfileService {
   }
 
   /// Shows outside geofence message dialog
-  static Future<void> _showOutsideMessage(BuildContext context, String message) async {
+  static Future<void> _showOutsideMessage(
+    BuildContext context,
+    String message,
+  ) async {
     return showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -199,7 +197,9 @@ class StudentGeofenceProfileService {
           .get();
       if (userDoc.exists) {
         final userData = userDoc.data()!;
-        studentName = '${userData['firstName'] ?? ''} ${userData['lastName'] ?? ''}'.trim();
+        studentName =
+            '${userData['firstName'] ?? ''} ${userData['lastName'] ?? ''}'
+                .trim();
         if (studentName.isEmpty) {
           studentName = userData['email'] ?? 'Unknown Student';
         }
@@ -236,14 +236,14 @@ class StudentGeofenceProfileService {
 
   /// Gets student's geofence profile summary
   static Future<StudentGeofenceProfileSummary> getStudentProfileSummary(
-    String studentId
+    String studentId,
   ) async {
     final customProfiles = <int, bool>{};
-    
+
     for (int day = 0; day <= 6; day++) {
       final profile = await GeofenceProfileService.loadGeofenceProfile(
-        studentId, 
-        day
+        studentId,
+        day,
       );
       customProfiles[day] = profile != null;
     }
@@ -261,11 +261,11 @@ class StudentGeofenceProfileService {
     required Map<int, EffectiveGeofence> dayConfigurations,
   }) async {
     final batch = _firestore.batch();
-    
+
     for (final entry in dayConfigurations.entries) {
       final dayOfWeek = entry.key;
       final config = entry.value;
-      
+
       final profile = GeofenceProfile(
         dayOfWeek: dayOfWeek,
         userId: studentId,
@@ -300,11 +300,11 @@ class StudentGeofenceProfileService {
 
   /// Removes custom profiles for specific days (revert to defaults)
   static Future<void> removeCustomProfiles(
-    String studentId, 
-    List<int> daysOfWeek
+    String studentId,
+    List<int> daysOfWeek,
   ) async {
     final batch = _firestore.batch();
-    
+
     for (final dayOfWeek in daysOfWeek) {
       final docRef = _firestore
           .collection('geofence_profiles')

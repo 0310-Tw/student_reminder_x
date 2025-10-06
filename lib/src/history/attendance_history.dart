@@ -1265,41 +1265,61 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
               // Single dynamic Clock In / Clock Out button
               Padding(
                 padding: const EdgeInsets.all(8),
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    if (_isClockedIn) {
-                      await _clockOut(uid);
-                    } else {
-                      await _clockIn(uid);
-                    }
-                    await _loadTodayClockStatus();
+                child: Builder(
+                  builder: (context) {
+                    final now = DateTime.now();
+                    final isWeekend = now.weekday > 5;
+                    final weekendDay = now.weekday == 6 ? 'Saturday' : 'Sunday';
+
+                    return ElevatedButton.icon(
+                      onPressed: isWeekend
+                          ? null
+                          : () async {
+                              if (_isClockedIn) {
+                                await _clockOut(uid);
+                              } else {
+                                await _clockIn(uid);
+                              }
+                              await _loadTodayClockStatus();
+                            },
+                      icon: Icon(
+                        isWeekend
+                            ? Icons.weekend
+                            : _isClockedIn
+                            ? Icons.logout
+                            : Icons.login,
+                        size: 16,
+                      ),
+                      label: Text(
+                        isWeekend
+                            ? "Weekend - Enjoy your $weekendDay!"
+                            : _isClockedIn
+                            ? "Clock Out"
+                            : "Clock In",
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isWeekend
+                            ? Colors.grey
+                            : _isClockedIn
+                            ? const Color(0xFFE74C3C)
+                            : const Color(0xFF3498DB),
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 48),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 2,
+                      ),
+                    );
                   },
-                  icon: Icon(
-                    _isClockedIn ? Icons.logout : Icons.login,
-                    size: 16,
-                  ),
-                  label: Text(
-                    _isClockedIn ? "Clock Out" : "Clock In",
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _isClockedIn
-                        ? const Color(0xFFE74C3C)
-                        : const Color(0xFF3498DB),
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(double.infinity, 48),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 2,
-                  ),
                 ),
               ),
               Expanded(
@@ -1436,6 +1456,16 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
   // ------------------ Clock In ------------------
   Future<void> _clockIn(String uid) async {
     final now = DateTime.now();
+
+    // Check if today is a weekend (Saturday = 6, Sunday = 7)
+    if (now.weekday > 5) {
+      final weekendDay = now.weekday == 6 ? 'Saturday' : 'Sunday';
+      _showSnack(
+        "Clock in is not available on weekends. Enjoy your $weekendDay!",
+      );
+      return;
+    }
+
     final eightAM = DateTime(now.year, now.month, now.day, 8, 0);
     final eightThirty = DateTime(now.year, now.month, now.day, 8, 30);
 
@@ -1519,6 +1549,15 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
   // ------------------ Clock Out ------------------
   Future<void> _clockOut(String uid) async {
     final now = DateTime.now();
+
+    // Check if today is a weekend (Saturday = 6, Sunday = 7)
+    if (now.weekday > 5) {
+      final weekendDay = now.weekday == 6 ? 'Saturday' : 'Sunday';
+      _showSnack(
+        "Clock out is not available on weekends. Enjoy your $weekendDay!",
+      );
+      return;
+    }
 
     Position? location;
     try {
@@ -1715,6 +1754,11 @@ class _DayItem {
   String get rawStatus => (data?['status'] ?? 'absent').toString();
 
   String get status {
+    // Check if this is a weekend day first (Saturday = 6, Sunday = 7)
+    if (date.weekday > 5) {
+      return 'weekend';
+    }
+
     // If there's no data for this day, it's absent
     if (data == null) return 'absent';
 
@@ -1764,6 +1808,8 @@ Color _statusColor(String status) {
       return Color(0xFF27AE60); // Sage Green
     case 'late':
       return Color(0xFFF39C12); // Warm Amber
+    case 'weekend':
+      return Color(0xFF9B59B6); // Purple for weekends
     case 'absent':
     default:
       return Color(0xFFE74C3C); // Soft Red
@@ -1821,6 +1867,10 @@ Widget _statusChip(String status, [String? reason]) {
       break;
     case 'late':
       c = Colors.orange;
+      break;
+    case 'weekend':
+      c = Color(0xFF9B59B6); // Purple for weekends
+      label = 'WEEKEND';
       break;
     case 'absent':
     default:

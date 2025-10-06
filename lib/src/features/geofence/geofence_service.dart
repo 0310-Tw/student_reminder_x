@@ -878,7 +878,8 @@ class GeofenceService {
       outRadius: def['radius']!,
       bandType: 'fixed', // default band type
       outsidePolicy: 'allow_flag', // default policy - allow but log incidents
-      outsideMessage: 'You are outside the designated campus area.', // informative message
+      outsideMessage:
+          'You are outside the designated campus area.', // informative message
     );
   }
 
