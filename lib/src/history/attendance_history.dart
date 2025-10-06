@@ -1173,6 +1173,7 @@ import 'package:intl/intl.dart';
 import 'package:students_reminder/src/history/shift_timeline.dart';
 import 'package:students_reminder/src/services/attendance_service.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
+import 'package:students_reminder/src/services/helper.dart';
 import 'package:students_reminder/src/shared/misc.dart';
 import 'package:students_reminder/src/widgets/atrisk_banner_notifications.dart';
 import 'package:students_reminder/src/widgets/suspension_check.dart';
@@ -1256,156 +1257,178 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
         ],
       ),
       body: SuspensionCheck(
-        child: Column(
-          children: [
-            AtRiskBannerNotifications(),
-            // Single dynamic Clock In / Clock Out button
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  if (_isClockedIn) {
-                    await _clockOut(uid);
-                  } else {
-                    await _clockIn(uid);
-                  }
-                  await _loadTodayClockStatus();
-                },
-                icon: Icon(_isClockedIn ? Icons.logout : Icons.login, size: 16),
-                label: Text(
-                  _isClockedIn ? "Clock Out" : "Clock In",
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(0, 8, 0, 40),
+          child: Column(
+            children: [
+              AtRiskBannerNotifications(),
+              // Single dynamic Clock In / Clock Out button
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    if (_isClockedIn) {
+                      await _clockOut(uid);
+                    } else {
+                      await _clockIn(uid);
+                    }
+                    await _loadTodayClockStatus();
+                  },
+                  icon: Icon(
+                    _isClockedIn ? Icons.logout : Icons.login,
+                    size: 16,
+                  ),
+                  label: Text(
+                    _isClockedIn ? "Clock Out" : "Clock In",
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _isClockedIn
+                        ? const Color(0xFFE74C3C)
+                        : const Color(0xFF3498DB),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 48),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 2,
                   ),
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _isClockedIn
-                      ? const Color(0xFFE74C3C)
-                      : const Color(0xFF3498DB),
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 48),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 2,
+              ),
+              Expanded(
+                child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: AttendanceService.streamLast14Days(uid),
+                  builder: (context, snap) {
+                    if (snap.connectionState == ConnectionState.waiting) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            CircularProgressIndicator(),
+                            SizedBox(height: 16),
+                            Text(
+                              'Loading attendance data...',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    if (snap.connectionState == ConnectionState.none) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.wifi_off,
+                              size: 64,
+                              color: Colors.grey[400],
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'No connection',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Please check your internet connection',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    if (snap.hasError) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.error_outline,
+                              size: 64,
+                              color: Colors.red[400],
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Error loading attendance data',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Error: ${snap.error}',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: () => setState(() {}),
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    final docs =
+                        snap.data?.docs ??
+                        <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+                    final byDate = {
+                      for (final d in docs)
+                        (d.data()['dayId'] as String): d.data(),
+                    };
+
+                    final items = <_DayItem>[];
+                    for (int i = 13; i >= 0; i--) {
+                      final day = end.subtract(Duration(days: i));
+                      final id = JmTime.dateId(day);
+                      items.add(
+                        _DayItem(date: day, dateId: id, data: byDate[id]),
+                      );
+                    }
+
+                    return _showCalendar
+                        ? _CalendarGrid(uid: uid, days: items)
+                        : _HistoryList(uid: uid, days: items);
+                  },
                 ),
               ),
-            ),
-            Expanded(
-              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: AttendanceService.streamLast14Days(uid),
-                builder: (context, snap) {
-                  if (snap.connectionState == ConnectionState.waiting) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          CircularProgressIndicator(),
-                          SizedBox(height: 16),
-                          Text(
-                            'Loading attendance data...',
-                            style: TextStyle(fontSize: 16, color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  if (snap.connectionState == ConnectionState.none) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.wifi_off,
-                            size: 64,
-                            color: Colors.grey[400],
-                          ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'No connection',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Please check your internet connection',
-                            style: TextStyle(fontSize: 14, color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  if (snap.hasError) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.error_outline,
-                            size: 64,
-                            color: Colors.red[400],
-                          ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Error loading attendance data',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Error: ${snap.error}',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: () => setState(() {}),
-                            child: const Text('Retry'),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  final docs =
-                      snap.data?.docs ??
-                      <QueryDocumentSnapshot<Map<String, dynamic>>>[];
-                  final byDate = {
-                    for (final d in docs)
-                      (d.data()['dayId'] as String): d.data(),
-                  };
-
-                  final items = <_DayItem>[];
-                  for (int i = 13; i >= 0; i--) {
-                    final day = end.subtract(Duration(days: i));
-                    final id = JmTime.dateId(day);
-                    items.add(
-                      _DayItem(date: day, dateId: id, data: byDate[id]),
-                    );
-                  }
-
-                  return _showCalendar
-                      ? _CalendarGrid(uid: uid, days: items)
-                      : _HistoryList(uid: uid, days: items);
-                },
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.pushNamed(context, '/student-geofence-dashboard');
+        },
+        icon: Icon(Icons.location_on),
+        label: Text('Geofencing'),
+        backgroundColor: Colors.blue.shade600,
+        foregroundColor: Colors.white,
+        tooltip: 'Set up your geofencing locations',
       ),
     );
   }
@@ -1447,8 +1470,22 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
     // Get place name for better user experience
     final placeName = await _getPlaceName(location);
 
+    // Validate geofence before proceeding with clock-in
+    final dateId = JmTime.dateId(now);
+    final canProceed = await handleClockAction(
+      context: context,
+      studentId: uid,
+      dateId: dateId,
+      actionType: 'checkin',
+    );
+
+    if (!canProceed) {
+      _showSnack("Clock In blocked - outside designated area");
+      return;
+    }
+
     final attendanceData = {
-      'dayId': JmTime.dateId(now),
+      'dayId': dateId,
       'inAt': Timestamp.fromDate(now),
       'inLoc': GeoPoint(location.latitude, location.longitude),
       'placeIn': placeName,
@@ -1463,7 +1500,7 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
         .collection('attendance')
         .doc(uid)
         .collection('days')
-        .doc(JmTime.dateId(now))
+        .doc(dateId)
         .set(attendanceData, SetOptions(merge: true));
 
     // Start live location tracking
@@ -1508,6 +1545,20 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
 
     // Get place name for better user experience
     final placeName = await _getPlaceName(location);
+
+    // Validate geofence before proceeding with clock-out
+    final dateId = JmTime.dateId(now);
+    final canProceed = await handleClockAction(
+      context: context,
+      studentId: uid,
+      dateId: dateId,
+      actionType: 'checkout',
+    );
+
+    if (!canProceed) {
+      _showSnack("Clock Out blocked - outside designated area");
+      return;
+    }
 
     // Maintain the original status (present/late) when clocking out
     await dayDoc.set({

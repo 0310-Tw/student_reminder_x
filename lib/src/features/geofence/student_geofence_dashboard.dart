@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import '../../geofence/services/geofence_service.dart';
+import 'package:students_reminder/src/features/geofence/geofence_service.dart';
+
 import '../../services/helper.dart';
 import '../../services/auth_service.dart';
 import '../../shared/routes.dart';
@@ -239,7 +240,7 @@ class _StudentGeofenceDashboardState extends State<StudentGeofenceDashboard> {
           const SizedBox(height: 16),
           _buildGeofenceStatusCard(),
           const SizedBox(height: 16),
-          _buildCheckInOutButtons(),
+          // _buildCheckInOutButtons(),
           const SizedBox(height: 16),
           _buildLocationScheduleButton(),
           const SizedBox(height: 16),
@@ -420,110 +421,110 @@ class _StudentGeofenceDashboardState extends State<StudentGeofenceDashboard> {
     );
   }
 
-  Widget _buildCheckInOutButtons() {
-    final canCheckIn = _locationStatus?['canCheckIn'] as bool? ?? false;
-    final canCheckOut = _locationStatus?['canCheckOut'] as bool? ?? false;
+  // Widget _buildCheckInOutButtons() {
+  //   final canCheckIn = _locationStatus?['canCheckIn'] as bool? ?? false;
+  //   final canCheckOut = _locationStatus?['canCheckOut'] as bool? ?? false;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.access_time,
-                  color: Colors.blue.withValues(alpha: 0.7),
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Attendance Actions',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: (canCheckIn && !_isCheckingIn)
-                        ? _handleCheckIn
-                        : null,
-                    icon: _isCheckingIn
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.login),
-                    label: Text(_isCheckingIn ? 'Checking In...' : 'Check In'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: canCheckIn ? Colors.green : Colors.grey,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: (canCheckOut && !_isCheckingIn)
-                        ? _handleCheckOut
-                        : null,
-                    icon: _isCheckingIn
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.logout),
-                    label: Text(
-                      _isCheckingIn ? 'Checking Out...' : 'Check Out',
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: canCheckOut
-                          ? Colors.orange
-                          : Colors.grey,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (!canCheckIn && !canCheckOut) ...[
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.amber.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: Colors.amber.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info, color: Colors.amber.shade700, size: 20),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text(
-                        'Move closer to a check-in or check-out zone to enable attendance actions',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
+  //   return Card(
+  //     child: Padding(
+  //       padding: const EdgeInsets.all(16),
+  //       child: Column(
+  //         crossAxisAlignment: CrossAxisAlignment.start,
+  //         children: [
+  //           Row(
+  //             children: [
+  //               Icon(
+  //                 Icons.access_time,
+  //                 color: Colors.blue.withValues(alpha: 0.7),
+  //               ),
+  //               const SizedBox(width: 8),
+  //               const Text(
+  //                 'Attendance Actions',
+  //                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+  //               ),
+  //             ],
+  //           ),
+  //           const SizedBox(height: 16),
+  //           Row(
+  //             children: [
+  //               Expanded(
+  //                 child: ElevatedButton.icon(
+  //                   onPressed: (canCheckIn && !_isCheckingIn)
+  //                       ? _handleCheckIn
+  //                       : null,
+  //                   icon: _isCheckingIn
+  //                       ? const SizedBox(
+  //                           width: 16,
+  //                           height: 16,
+  //                           child: CircularProgressIndicator(strokeWidth: 2),
+  //                         )
+  //                       : const Icon(Icons.login),
+  //                   label: Text(_isCheckingIn ? 'Checking In...' : 'Check In'),
+  //                   style: ElevatedButton.styleFrom(
+  //                     backgroundColor: canCheckIn ? Colors.green : Colors.grey,
+  //                     foregroundColor: Colors.white,
+  //                     padding: const EdgeInsets.symmetric(vertical: 12),
+  //                   ),
+  //                 ),
+  //               ),
+  //               const SizedBox(width: 12),
+  //               Expanded(
+  //                 child: ElevatedButton.icon(
+  //                   onPressed: (canCheckOut && !_isCheckingIn)
+  //                       ? _handleCheckOut
+  //                       : null,
+  //                   icon: _isCheckingIn
+  //                       ? const SizedBox(
+  //                           width: 16,
+  //                           height: 16,
+  //                           child: CircularProgressIndicator(strokeWidth: 2),
+  //                         )
+  //                       : const Icon(Icons.logout),
+  //                   label: Text(
+  //                     _isCheckingIn ? 'Checking Out...' : 'Check Out',
+  //                   ),
+  //                   style: ElevatedButton.styleFrom(
+  //                     backgroundColor: canCheckOut
+  //                         ? Colors.orange
+  //                         : Colors.grey,
+  //                     foregroundColor: Colors.white,
+  //                     padding: const EdgeInsets.symmetric(vertical: 12),
+  //                   ),
+  //                 ),
+  //               ),
+  //             ],
+  //           ),
+  //           if (!canCheckIn && !canCheckOut) ...[
+  //             const SizedBox(height: 8),
+  //             Container(
+  //               width: double.infinity,
+  //               padding: const EdgeInsets.all(12),
+  //               decoration: BoxDecoration(
+  //                 color: Colors.amber.withValues(alpha: 0.1),
+  //                 borderRadius: BorderRadius.circular(8),
+  //                 border: Border.all(
+  //                   color: Colors.amber.withValues(alpha: 0.3),
+  //                 ),
+  //               ),
+  //               child: Row(
+  //                 children: [
+  //                   Icon(Icons.info, color: Colors.amber.shade700, size: 20),
+  //                   const SizedBox(width: 8),
+  //                   const Expanded(
+  //                     child: Text(
+  //                       'Move closer to a check-in or check-out zone to enable attendance actions',
+  //                       style: TextStyle(fontSize: 12),
+  //                     ),
+  //                   ),
+  //                 ],
+  //               ),
+  //             ),
+  //           ],
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  
 
   Widget _buildLocationScheduleButton() {
     return Card(

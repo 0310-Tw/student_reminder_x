@@ -38,6 +38,8 @@ class AppRoutes {
   static const locationSelection = '/location-selection';
   static const profile = '/profile'; // ✅ Added profile route
   static const trends = '/trends';
+  static const studentGeofenceDashboard = '/student-geofence-dashboard';
+
 
   static Route<dynamic> onGenerateRoute(RouteSettings setting) {
     final url = Uri.parse(setting.name ?? '');
@@ -68,6 +70,10 @@ class AppRoutes {
       case time:
         return MaterialPageRoute(
           builder: (_) => const TimetableGeneratorScreen(),
+        );
+      case studentGeofenceDashboard:
+        return MaterialPageRoute(
+          builder: (_) => const StudentGeofenceDashboard(),
         );
       case trends:
         return MaterialPageRoute(builder: (_) => const TrendsPage());

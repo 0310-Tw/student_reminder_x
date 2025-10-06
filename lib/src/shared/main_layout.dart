@@ -128,7 +128,7 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
         TimetableGeneratorScreen(),
         PublicFeeds(),
         AttendanceHistory14d(),
-        const StudentGeofenceDashboard(),
+       
       ];
 
       // Reset index if switching between admin/student mode or if current index is out of bounds
@@ -153,7 +153,7 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
         Icon(Icons.calendar_month, size: 30, color: Colors.white), // timetable
         Icon(Icons.public, size: 30, color: Colors.white),
         Icon(Icons.history, size: 30, color: Colors.white),
-        Icon(Icons.location_on, size: 30, color: Colors.white), // geofence
+       
       ];
     }
   }

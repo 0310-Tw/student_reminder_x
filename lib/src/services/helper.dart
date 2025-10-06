@@ -1,8 +1,9 @@
 // lib/src/services/geofence_helper.dart
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import '../geofence/services/geofence_service.dart';
+
 import 'package:students_reminder/src/admin/models/geofence_model.dart';
+import 'package:students_reminder/src/features/geofence/geofence_service.dart';
 
 /// Checks if the current GPS position is inside the geofence and
 /// logs an incident or blocks based on the admin override.
