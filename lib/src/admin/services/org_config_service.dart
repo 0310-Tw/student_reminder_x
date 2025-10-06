@@ -42,7 +42,7 @@ class OrgConfigService {
         'default_geofence_settings': {
           'default_radius_meters': 100.0,
           'default_band_type': 'fixed',
-          'default_outside_policy': 'block',
+          'default_outside_policy': 'allow_flag',
           'grace_period_minutes': 10,
         },
         'updated_at': FieldValue.serverTimestamp(),

@@ -36,7 +36,7 @@ class StudentGeofenceProfileService {
         checkOut: customProfile.checkOutSlot?.toGeofence() ?? 
                   customProfile.checkInSlot!.toGeofence(),
         bandType: customProfile.bandTypeOverride ?? BandType.fixed,
-        outsidePolicy: customProfile.outsidePolicy ?? OutsidePolicy.block,
+        outsidePolicy: customProfile.outsidePolicy ?? OutsidePolicy.allowAndFlag,
         outsideMessageText: customProfile.outsideMessageText,
       );
     }
@@ -49,8 +49,8 @@ class StudentGeofenceProfileService {
       checkIn: defaultGeofence,
       checkOut: defaultGeofence,
       bandType: BandType.fixed, // Default to fixed
-      outsidePolicy: OutsidePolicy.block, // Default to block
-      outsideMessageText: null,
+      outsidePolicy: OutsidePolicy.allowAndFlag, // Default to allow with incident logging
+      outsideMessageText: 'You are outside the designated campus area.',
     );
   }
 

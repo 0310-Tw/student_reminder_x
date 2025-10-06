@@ -53,7 +53,7 @@ class _AdminGeofenceProfileEditorState extends State<AdminGeofenceProfileEditor>
         checkInLocation: LocationData.defaultLocation(),
         checkOutLocation: LocationData.defaultLocation(),
         bandType: BandType.fixed,
-        outsidePolicy: OutsidePolicy.block,
+        outsidePolicy: OutsidePolicy.allowAndFlag,
         outsideMessage: '',
       );
     }
@@ -740,7 +740,7 @@ class DayProfileData {
         campusPreset: null,
       ),
       bandType: profile.bandTypeOverride ?? BandType.fixed,
-      outsidePolicy: profile.outsidePolicy ?? OutsidePolicy.block,
+      outsidePolicy: profile.outsidePolicy ?? OutsidePolicy.allowAndFlag,
       outsideMessage: profile.outsideMessageText ?? '',
     );
   }

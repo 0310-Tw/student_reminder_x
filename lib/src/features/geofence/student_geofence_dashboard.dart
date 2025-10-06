@@ -509,7 +509,7 @@ class _StudentGeofenceDashboardState extends State<StudentGeofenceDashboard> {
   //               child: Row(
   //                 children: [
   //                   Icon(Icons.info, color: Colors.amber.shade700, size: 20),
-  //                   const SizedBox(width: 8),
+  //                   const SizedBox(width: 8),at
   //                   const Expanded(
   //                     child: Text(
   //                       'Move closer to a check-in or check-out zone to enable attendance actions',

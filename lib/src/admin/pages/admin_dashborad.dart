@@ -1597,8 +1597,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
     // Filter to only include weekday records
     final weekdayRecords = _filterWeekdayRecords(attendanceRecords);
 
-    Set<String> uniqueStudents = {};
+    Set<String> presentStudents = {};
     Set<String> lateStudents = {};
+    Set<String> allAttendedStudents = {};
 
     for (final record in weekdayRecords) {
       final data = record.data() as Map<String, dynamic>;
@@ -1606,26 +1607,30 @@ class _AdminDashboardState extends State<AdminDashboard> {
           record.reference.parent.parent?.id; // Get userId from document path
       final status = data['status'] as String? ?? 'absent';
 
-      if (userId != null &&
-          (status == 'present' || status == 'late' || status == 'early')) {
-        uniqueStudents.add(userId);
-      }
-
-      // Count unique students who were late (not individual late records)
-      if (userId != null && (status == 'late' || data['lateReason'] != null)) {
-        lateStudents.add(userId);
+      if (userId != null) {
+        // Count students who were late
+        if (status == 'late' || data['lateReason'] != null) {
+          lateStudents.add(userId);
+          allAttendedStudents.add(userId);
+        } 
+        // Count students who were present (not late)
+        else if (status == 'present' || status == 'early') {
+          presentStudents.add(userId);
+          allAttendedStudents.add(userId);
+        }
       }
     }
 
-    final present = uniqueStudents.length;
-    final absent = totalStudents - present;
+    final present = presentStudents.length;
     final late = lateStudents.length;
+    final attended = allAttendedStudents.length;
+    final absent = totalStudents - attended;
 
     return {
       'present': present,
       'absent': absent,
       'late': late,
-      'total': totalStudents,
+      'total': attended + absent, // This should equal totalStudents
     };
   }
 

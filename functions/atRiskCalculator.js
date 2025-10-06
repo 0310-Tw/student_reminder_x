@@ -154,12 +154,11 @@ async function getStudentAbsencesForPeriod(studentId, startDate, endDate) {
     }
     
     // Query attendance records for the period (only weekdays)
+    // Note: Attendance records use dayId format (YYYYMMDD) as document IDs
     const attendanceQuery = await admin.firestore()
       .collection('attendance')
       .doc(studentId)
       .collection('days')
-      .where('createdAt', '>=', admin.firestore.Timestamp.fromDate(adjustedStartDate))
-      .where('createdAt', '<=', admin.firestore.Timestamp.fromDate(adjustedEndDate))
       .get();
     
     let recordedAbsences = 0;
@@ -168,30 +167,58 @@ async function getStudentAbsencesForPeriod(studentId, startDate, endDate) {
     // Count recorded absences and track which weekdays have records
     attendanceQuery.forEach(doc => {
       const data = doc.data();
-      const recordDate = data.createdAt.toDate();
+      const dayId = data.dayId || doc.id; // Use dayId field or document ID
       
-      // Double-check it's a weekday (Monday-Friday only)
-      const dayOfWeek = recordDate.getDay();
-      if (dayOfWeek >= 1 && dayOfWeek <= 5) {
-        const dayKey = recordDate.toDateString();
-        recordedWeekdays.add(dayKey);
+      // Convert dayId (YYYYMMDD) to date
+      if (dayId && dayId.length === 8) {
+        const year = parseInt(dayId.substring(0, 4));
+        const month = parseInt(dayId.substring(4, 6)) - 1; // Month is 0-indexed
+        const day = parseInt(dayId.substring(6, 8));
+        const recordDate = new Date(year, month, day);
         
-        if (data.status === 'absent') {
-          recordedAbsences++;
+        // Check if this date falls within our query range and is a weekday
+        if (recordDate >= adjustedStartDate && recordDate <= adjustedEndDate) {
+          const dayOfWeek = recordDate.getDay();
+          if (dayOfWeek >= 1 && dayOfWeek <= 5) { // Monday-Friday only
+            const dayKey = recordDate.toDateString();
+            recordedWeekdays.add(dayKey);
+            
+            // Count as absence only if status is explicitly 'absent'
+            // Present students have status 'present' or 'late'
+            if (data.status === 'absent') {
+              recordedAbsences++;
+            }
+          }
         }
       }
     });
     
-    // Count total weekdays in the period
-    const totalWeekdaysInPeriod = countWeekdays(adjustedStartDate, adjustedEndDate);
+    // Only count PAST weekdays (before today) as potential absences if no record
+    // Future weekdays in current week should not be counted as absences
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Start of today
     
-    // Count unrecorded weekdays as absences (no record = absent)
-    // This is conservative: assumes missing attendance record means absent
-    const unrecordedAbsences = Math.max(0, totalWeekdaysInPeriod - recordedWeekdays.size);
+    const pastWeekdays = new Set();
+    const currentDate = new Date(adjustedStartDate);
+    
+    while (currentDate < today && currentDate <= adjustedEndDate) {
+      const dayOfWeek = currentDate.getDay();
+      if (dayOfWeek >= 1 && dayOfWeek <= 5) { // Monday-Friday only
+        pastWeekdays.add(currentDate.toDateString());
+      }
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    // Count unrecorded PAST weekdays as absences
+    const unrecordedAbsences = Math.max(0, pastWeekdays.size - recordedWeekdays.size);
+    const totalWeekdaysInPeriod = countWeekdays(adjustedStartDate, adjustedEndDate);
     
     const totalAbsences = recordedAbsences + unrecordedAbsences;
     
-    console.log(`Weekday absences for ${studentId} from ${adjustedStartDate.toDateString()} to ${adjustedEndDate.toDateString()}: Total weekdays: ${totalWeekdaysInPeriod}, Recorded weekdays: ${recordedWeekdays.size}, Recorded absences: ${recordedAbsences}, Unrecorded absences: ${unrecordedAbsences}, Total absences: ${totalAbsences}`);
+    console.log(`DEBUG: ${studentId} - Today: ${today.toDateString()}`);
+    console.log(`DEBUG: ${studentId} - Past weekdays: ${Array.from(pastWeekdays).join(', ')}`);
+    console.log(`DEBUG: ${studentId} - Recorded weekdays: ${Array.from(recordedWeekdays).join(', ')}`);
+    console.log(`Weekday absences for ${studentId} from ${adjustedStartDate.toDateString()} to ${adjustedEndDate.toDateString()}: Total weekdays: ${totalWeekdaysInPeriod}, Past weekdays: ${pastWeekdays.size}, Recorded weekdays: ${recordedWeekdays.size}, Recorded absences: ${recordedAbsences}, Unrecorded absences: ${unrecordedAbsences}, Total absences: ${totalAbsences}`);
     
     return totalAbsences;
     

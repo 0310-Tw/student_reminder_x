@@ -38,7 +38,7 @@ class GeofenceProfile {
       outLng: (outLoc['lng'] as num).toDouble(),
       outRadius: (outLoc['radius'] as num).toDouble(),
       bandType: data['bandType'] ?? 'fixed',
-      outsidePolicy: data['outsidePolicy'] ?? 'block',
+      outsidePolicy: data['outsidePolicy'] ?? 'allow_flag',
       outsideMessage: data['outsideMessage'],
     );
   }
