@@ -596,62 +596,7 @@ class _StudentLocationSelectionPageState
                 end: Alignment.bottomRight,
               ),
             ),
-            child: Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.location_on_outlined,
-                    color: Colors.blue.shade600,
-                    size: 32,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Configure Your Weekly Locations',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue.shade800,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Customize your check-in locations for flexible days',
-                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      _buildLegendItem(
-                        'Flexible',
-                        Colors.green,
-                        Icons.my_location,
-                      ),
-                      const SizedBox(width: 16),
-                      _buildLegendItem(
-                        'Fixed',
-                        Colors.orange,
-                        Icons.location_on,
-                      ),
-                      const SizedBox(width: 16),
-                      _buildLegendItem('Campus', Colors.blue, Icons.school),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+            
           ),
           Expanded(
             child: ListView(
@@ -663,8 +608,7 @@ class _StudentLocationSelectionPageState
                   'wednesday',
                   'thursday',
                   'friday',
-                  'saturday',
-                  'sunday',
+                  
                 ].map((day) => _buildDayScheduleCard(day, campusOptions)),
                 const SizedBox(height: 16),
                 _buildNavigationButtons(),
@@ -1271,34 +1215,7 @@ class _StudentLocationSelectionPageState
     );
   }
 
-  Widget _buildLegendItem(String label, Color color, IconData icon) {
-    return Expanded(
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Icon(icon, size: 16, color: color),
-          ),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: Colors.grey.shade700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+ 
 
   Widget _buildSaveButton() {
     return Container(

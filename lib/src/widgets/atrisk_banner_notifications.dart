@@ -60,15 +60,114 @@ class _AtRiskBannerNotificationsState extends State<AtRiskBannerNotifications> {
     }
   }
 
-  /// Get stream of at-risk status from the existing at-risk collection
-  /// This leverages the Firebase Cloud Functions that automatically monitor attendance
-  Stream<DocumentSnapshot> _getAtRiskStatusStream(String userId) {
+  /// Get stream of at-risk status by calculating real-time attendance data
+  /// This ensures accurate at-risk detection for the current week/month
+  Stream<Map<String, dynamic>> _getAtRiskStatusStream(String userId) {
     return FirebaseFirestore.instance
-        .collection('users')
-        .doc(userId)
-        .collection('at-risk')
-        .doc('current_status')
-        .snapshots();
+        .collection('attendance_records')
+        .where('userId', isEqualTo: userId)
+        .where('date', isGreaterThanOrEqualTo: _getStartOfMonth())
+        .orderBy('date', descending: true)
+        .snapshots()
+        .asyncMap((snapshot) async {
+          return await _calculateAtRiskStatus(userId, snapshot.docs);
+        });
+  }
+
+  /// Get the start of the current month
+  DateTime _getStartOfMonth() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, 1);
+  }
+
+  /// Get the start of the current week (Monday)
+  DateTime _getStartOfWeek() {
+    final now = DateTime.now();
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    return DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
+  }
+
+  /// Calculate real-time at-risk status based on actual attendance data
+  Future<Map<String, dynamic>> _calculateAtRiskStatus(
+    String userId,
+    List<QueryDocumentSnapshot> attendanceRecords,
+  ) async {
+    final now = DateTime.now();
+    final startOfWeek = _getStartOfWeek();
+
+    // Count weekdays in current week and month (excluding weekends)
+    int weeklyWeekdays = 0;
+    int monthlyWeekdays = 0;
+
+    for (int i = 0; i < 7; i++) {
+      final day = startOfWeek.add(Duration(days: i));
+      if (day.weekday >= 1 &&
+          day.weekday <= 5 &&
+          day.isBefore(now.add(Duration(days: 1)))) {
+        weeklyWeekdays++;
+      }
+    }
+
+    for (int i = 1; i <= now.day; i++) {
+      final day = DateTime(now.year, now.month, i);
+      if (day.weekday >= 1 && day.weekday <= 5) {
+        monthlyWeekdays++;
+      }
+    }
+
+    // Count actual attendance (present days)
+    int weeklyPresent = 0;
+    int monthlyPresent = 0;
+
+    for (final record in attendanceRecords) {
+      final data = record.data() as Map<String, dynamic>;
+      final date = (data['date'] as Timestamp).toDate();
+      final isPresent = data['isPresent'] as bool? ?? false;
+
+      if (isPresent && date.weekday >= 1 && date.weekday <= 5) {
+        // Only count weekdays
+        if (date.isAfter(startOfWeek.subtract(Duration(days: 1)))) {
+          weeklyPresent++;
+        }
+        monthlyPresent++;
+      }
+    }
+
+    // Calculate absence counts and rates
+    final weeklyAbsences = weeklyWeekdays - weeklyPresent;
+    final monthlyAbsences = monthlyWeekdays - monthlyPresent;
+
+    final weeklyRate = weeklyWeekdays > 0
+        ? (weeklyPresent / weeklyWeekdays) * 100
+        : 100.0;
+    final monthlyRate = monthlyWeekdays > 0
+        ? (monthlyPresent / monthlyWeekdays) * 100
+        : 100.0;
+
+    // At-risk thresholds
+    const weeklyThreshold = 80.0; // 80% attendance required per week
+    const monthlyThreshold = 85.0; // 85% attendance required per month
+
+    final weeklyRisk =
+        weeklyRate < weeklyThreshold &&
+        weeklyWeekdays >= 3; // Only flag if at least 3 weekdays have passed
+    final monthlyRisk =
+        monthlyRate < monthlyThreshold &&
+        monthlyWeekdays >= 10; // Only flag if at least 10 weekdays have passed
+
+    return {
+      'isAtRisk': weeklyRisk || monthlyRisk,
+      'weeklyAbsences': weeklyAbsences,
+      'weeklyWeekdays': weeklyWeekdays,
+      'weeklyPresent': weeklyPresent,
+      'weeklyRate': weeklyRate,
+      'monthlyAbsences': monthlyAbsences,
+      'monthlyWeekdays': monthlyWeekdays,
+      'monthlyPresent': monthlyPresent,
+      'monthlyRate': monthlyRate,
+      'riskFactors': {'weeklyRisk': weeklyRisk, 'monthlyRisk': monthlyRisk},
+      'lastCalculated': Timestamp.now(),
+    };
   }
 
   /// Debounced wrapper for sending notifications
@@ -171,7 +270,7 @@ class _AtRiskBannerNotificationsState extends State<AtRiskBannerNotifications> {
     final user = AuthService.instance.currentUser;
     if (user == null) return SizedBox.shrink();
 
-    return StreamBuilder<DocumentSnapshot>(
+    return StreamBuilder<Map<String, dynamic>>(
       stream: _getAtRiskStatusStream(user.uid),
       builder: (context, snapshot) {
         // Handle errors or loading states
@@ -181,13 +280,12 @@ class _AtRiskBannerNotificationsState extends State<AtRiskBannerNotifications> {
         }
 
         if (!snapshot.hasData ||
-            snapshot.connectionState == ConnectionState.waiting ||
-            !snapshot.data!.exists) {
+            snapshot.connectionState == ConnectionState.waiting) {
           return SizedBox.shrink();
         }
 
-        final atRiskData = snapshot.data!.data() as Map<String, dynamic>?;
-        if (atRiskData == null) return SizedBox.shrink();
+        final atRiskData = snapshot.data!;
+        if (atRiskData.isEmpty) return SizedBox.shrink();
 
         final isAtRisk = atRiskData['isAtRisk'] ?? false;
         if (!isAtRisk) return SizedBox.shrink();
@@ -197,39 +295,38 @@ class _AtRiskBannerNotificationsState extends State<AtRiskBannerNotifications> {
         final weeklyRisk = riskFactors?['weeklyRisk'] ?? false;
         final monthlyRisk = riskFactors?['monthlyRisk'] ?? false;
 
-        // Send notifications for at-risk status
+        // Send notifications for at-risk status (only when conditions are met)
         if (monthlyRisk) {
           // Send critical monthly risk notification
-          final monthlyAbsences = atRiskData['monthlyAbsences'] ?? 0;
           final monthlyWeekdays = atRiskData['monthlyWeekdays'] ?? 0;
-          final monthlyPresent = monthlyWeekdays - monthlyAbsences;
-          final monthlyRate = monthlyWeekdays > 0
-              ? ((monthlyPresent / monthlyWeekdays) * 100).round()
-              : 100;
+          final monthlyRate = (atRiskData['monthlyRate'] ?? 100.0).round();
 
-          _sendAtRiskNotificationDebounced(
-            riskType: 'monthly',
-            title: 'CRITICAL: Monthly Attendance Risk',
-            body:
-                'Your attendance is at $monthlyRate% this month. Please contact your instructor immediately.A suspension may be imposed if no action is taken.',
-          );
+          // Only send notification if we have enough data to make an assessment
+          if (monthlyWeekdays >= 10) {
+            _sendAtRiskNotificationDebounced(
+              riskType: 'monthly',
+              title: 'CRITICAL: Monthly Attendance Risk',
+              body:
+                  'Your attendance is at $monthlyRate% this month. Please contact your instructor immediately. A suspension may be imposed if no action is taken.',
+            );
+          }
 
           return _buildMonthlyAtRiskBanner(context, atRiskData);
         } else if (weeklyRisk) {
           // Send weekly risk notification
-          final weeklyAbsences = atRiskData['weeklyAbsences'] ?? 0;
           final weeklyWeekdays = atRiskData['weeklyWeekdays'] ?? 0;
-          final weeklyPresent = weeklyWeekdays - weeklyAbsences;
-          final weeklyRate = weeklyWeekdays > 0
-              ? ((weeklyPresent / weeklyWeekdays) * 100).round()
-              : 100;
+          final weeklyRate = (atRiskData['weeklyRate'] ?? 100.0).round();
 
-          _sendAtRiskNotificationDebounced(
-            riskType: 'weekly',
-            title: 'Weekly Attendance Risk Alert',
-            body:
-                'Your attendance is at $weeklyRate% this week. You have $weeklyAbsences absences. please contact your instructor/school for follow-up or actions will be taken.',
-          );
+          // Only send notification if we have enough data to make an assessment
+          if (weeklyWeekdays >= 3) {
+            final weeklyAbsences = atRiskData['weeklyAbsences'] ?? 0;
+            _sendAtRiskNotificationDebounced(
+              riskType: 'weekly',
+              title: 'Weekly Attendance Risk Alert',
+              body:
+                  'Your attendance is at $weeklyRate% this week. You have $weeklyAbsences absences. Please contact your instructor/school for follow-up or actions will be taken.',
+            );
+          }
 
           return _buildWeeklyAtRiskBanner(context, atRiskData);
         }

@@ -242,87 +242,9 @@ class _LocationPickerMapState extends State<LocationPickerMap> {
                 end: Alignment.bottomRight,
               ),
             ),
-            child: Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          Icons.map,
-                          color: Colors.blue.shade600,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Interactive Location Picker',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blue.shade800,
-                              ),
-                            ),
-                            Text(
-                              'Tap on the map to set your check-in location',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      _buildInstructionItem(
-                        Icons.touch_app,
-                        'Tap to place',
-                        Colors.green,
-                      ),
-                      const SizedBox(width: 16),
-                      _buildInstructionItem(
-                        Icons.drag_indicator,
-                        'Drag to adjust',
-                        Colors.orange,
-                      ),
-                      const SizedBox(width: 16),
-                      _buildInstructionItem(
-                        Icons.tune,
-                        'Set radius',
-                        Colors.purple,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+           
+           
+           
           ),
 
           // Enhanced Map with better styling

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/geofence_incident_models.dart';
 import '../services/geofence_incident_service.dart';
-
 
 /// Admin incidents list page with comprehensive filtering
 class AdminIncidentsPage extends StatefulWidget {
@@ -75,8 +75,11 @@ class _AdminIncidentsPageState extends State<AdminIncidentsPage> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.check_circle, 
-                            size: 64, color: Colors.green[300]),
+                        Icon(
+                          Icons.check_circle,
+                          size: 64,
+                          color: Colors.green[300],
+                        ),
                         const SizedBox(height: 16),
                         Text(
                           _filters.hasActiveFilters
@@ -135,7 +138,8 @@ class _AdminIncidentsPageState extends State<AdminIncidentsPage> {
               onSelected: (_) {},
               onDeleted: () => _updateFilter(dateRange: null),
             ),
-          if (_filters.studentClass != null && _filters.studentClass!.isNotEmpty)
+          if (_filters.studentClass != null &&
+              _filters.studentClass!.isNotEmpty)
             FilterChip(
               label: Text('Class: ${_filters.studentClass}'),
               onSelected: (_) {},
@@ -155,7 +159,9 @@ class _AdminIncidentsPageState extends State<AdminIncidentsPage> {
             ),
           if (_filters.direction != null && _filters.direction!.isNotEmpty)
             FilterChip(
-              label: Text('Direction: ${_filters.direction?.replaceAll('_', ' ')}'),
+              label: Text(
+                'Direction: ${_filters.direction?.replaceAll('_', ' ')}',
+              ),
               onSelected: (_) {},
               onDeleted: () => _updateFilter(direction: null),
             ),
@@ -170,86 +176,216 @@ class _AdminIncidentsPageState extends State<AdminIncidentsPage> {
   }
 
   Widget _buildIncidentCard(GeofenceIncident incident) {
+    final isAcknowledged = incident.status == 'acknowledged';
+    final isPending = incident.status == 'pending';
+
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: incident.direction == 'check_in' 
-              ? Colors.green : Colors.orange,
-          child: Icon(
-            incident.direction == 'check_in' ? Icons.login : Icons.logout,
-            color: Colors.white,
-            size: 20,
-          ),
+      margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+      elevation: isPending ? 4 : 2,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: isPending
+              ? Border.all(color: Colors.red.withOpacity(0.3), width: 2)
+              : null,
         ),
-        title: Text(
-          '${incident.studentName} (${incident.studentId})',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Column(
           children: [
-            Text(
-              '${incident.directionDisplay} • ${incident.formattedDistance} outside',
-              style: TextStyle(
-                color: Colors.red[600],
-                fontWeight: FontWeight.w500,
+            ListTile(
+              leading: Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: _getIncidentStatusColor(incident),
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                child: Stack(
+                  children: [
+                    Center(
+                      child: Icon(
+                        incident.direction == 'check_in'
+                            ? Icons.login
+                            : Icons.logout,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                    if (isPending)
+                      Positioned(
+                        top: 0,
+                        right: 0,
+                        child: Container(
+                          width: 16,
+                          height: 16,
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.white, width: 1),
+                          ),
+                          child: Icon(
+                            Icons.priority_high,
+                            color: Colors.white,
+                            size: 10,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
-            Text(
-              '${_dateFormat.format(incident.occurredAt)} at ${_timeFormat.format(incident.occurredAt)}',
-            ),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: incident.bandType == 'fixed' 
-                        ? Colors.red[100] : Colors.blue[100],
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    incident.bandType.toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: incident.bandType == 'fixed' 
-                          ? Colors.red[800] : Colors.blue[800],
+              title: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${incident.studentName}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: _getStatusColor(incident.status),
-                    borderRadius: BorderRadius.circular(4),
+                  _buildStatusBadge(incident.status),
+                ],
+              ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.location_on, size: 14, color: Colors.red[600]),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${incident.formattedDistance} outside designated area',
+                        style: TextStyle(
+                          color: Colors.red[600],
+                          fontWeight: FontWeight.w500,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
                   ),
-                  child: Text(
-                    incident.statusDisplay,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Icon(Icons.schedule, size: 14, color: Colors.grey[600]),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${_dateFormat.format(incident.occurredAt)} at ${_timeFormat.format(incident.occurredAt)}',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: incident.bandType == 'fixed'
+                              ? Colors.red[100]
+                              : Colors.blue[100],
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          incident.bandType.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: incident.bandType == 'fixed'
+                                ? Colors.red[800]
+                                : Colors.blue[800],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isPending)
+                    IconButton(
+                      icon: Icon(Icons.check, color: Colors.green),
+                      onPressed: () =>
+                          _acknowledgeIncident(incident.id, incident.studentId),
+                      tooltip: 'Acknowledge',
                     ),
+                  IconButton(
+                    icon: Icon(Icons.map, color: Colors.blue),
+                    onPressed: () => _showIncidentLocation(incident),
+                    tooltip: 'View Location',
+                  ),
+                  Icon(Icons.chevron_right, color: Colors.grey),
+                ],
+              ),
+              onTap: () => _openIncidentDetail(incident),
+            ),
+            // Action buttons row
+            if (isPending || isAcknowledged)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(12),
+                    bottomRight: Radius.circular(12),
                   ),
                 ),
-              ],
-            ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    if (isPending) ...[
+                      _buildActionButton(
+                        'Acknowledge',
+                        Icons.check_circle,
+                        Colors.green,
+                        () => _acknowledgeIncident(
+                          incident.id,
+                          incident.studentId,
+                        ),
+                      ),
+                      _buildActionButton(
+                        'Message Student',
+                        Icons.message,
+                        Colors.blue,
+                        () => _messageStudent(
+                          incident.studentId,
+                          incident.studentName,
+                        ),
+                      ),
+                    ],
+                    if (isAcknowledged) ...[
+                      _buildActionButton(
+                        'Resolve',
+                        Icons.done_all,
+                        Colors.purple,
+                        () => _resolveIncident(incident.id, incident.studentId),
+                      ),
+                      _buildActionButton(
+                        'Add Note',
+                        Icons.note_add,
+                        Colors.orange,
+                        () => _addIncidentNote(incident),
+                      ),
+                    ],
+                    _buildActionButton(
+                      'View Map',
+                      Icons.map_outlined,
+                      Colors.indigo,
+                      () => _showIncidentLocation(incident),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.map, color: Colors.blue),
-              onPressed: () => _showQuickMapView(incident),
-              tooltip: 'Quick Map View',
-            ),
-            const Icon(Icons.chevron_right),
-          ],
-        ),
-        onTap: () => _openIncidentDetail(incident),
       ),
     );
   }
@@ -362,6 +498,168 @@ class _AdminIncidentsPageState extends State<AdminIncidentsPage> {
     );
   }
 
+  Future<void> _acknowledgeIncident(String incidentId, String studentId) async {
+    try {
+      await GeofenceIncidentService.acknowledgeIncident(incidentId, 'Admin');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Incident acknowledged successfully')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error acknowledging incident: $e')),
+      );
+    }
+  }
+
+  Future<void> _resolveIncident(String incidentId, String studentId) async {
+    try {
+      await GeofenceIncidentService.updateIncident(incidentId, {
+        'status': 'resolved',
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Incident resolved successfully')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error resolving incident: $e')));
+    }
+  }
+
+  Future<void> _messageStudent(String studentId, String studentName) async {
+    final TextEditingController messageController = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Message $studentName'),
+        content: TextField(
+          controller: messageController,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            hintText: 'Enter your message here...',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (messageController.text.trim().isNotEmpty) {
+                // TODO: Implement messaging service
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Message sent to $studentName')),
+                );
+              }
+            },
+            child: const Text('Send'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getIncidentStatusColor(GeofenceIncident incident) {
+    return _getStatusColor(incident.status);
+  }
+
+  Widget _buildStatusBadge(String status) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: _getStatusColor(status).withOpacity(0.1),
+        border: Border.all(color: _getStatusColor(status)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        status.toUpperCase(),
+        style: TextStyle(
+          color: _getStatusColor(status),
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButton(
+    String label,
+    IconData icon,
+    Color color,
+    VoidCallback onPressed,
+  ) {
+    return ElevatedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 16),
+      label: Text(label),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        textStyle: const TextStyle(fontSize: 12),
+      ),
+    );
+  }
+
+  void _showIncidentLocation(GeofenceIncident incident) {
+    _showQuickMapView(incident);
+  }
+
+  Future<void> _addIncidentNote(GeofenceIncident incident) async {
+    final TextEditingController noteController = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Add Note to Incident'),
+        content: TextField(
+          controller: noteController,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            hintText: 'Enter administrative note...',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (noteController.text.trim().isNotEmpty) {
+                try {
+                  await GeofenceIncidentService.updateIncident(incident.id, {
+                    'adminNotes': FieldValue.arrayUnion([
+                      {
+                        'note': noteController.text.trim(),
+                        'addedBy': 'Admin',
+                        'addedAt': FieldValue.serverTimestamp(),
+                      },
+                    ]),
+                  });
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Note added successfully')),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error adding note: $e')),
+                  );
+                }
+              }
+            },
+            child: const Text('Add Note'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showIncidentStatistics() async {
     // Show loading dialog
     showDialog(
@@ -381,7 +679,7 @@ class _AdminIncidentsPageState extends State<AdminIncidentsPage> {
 
     try {
       final stats = await GeofenceIncidentService.getIncidentStatistics();
-      
+
       if (mounted) {
         Navigator.pop(context); // Close loading dialog
         _showStatisticsDialog(stats);
@@ -412,18 +710,26 @@ class _AdminIncidentsPageState extends State<AdminIncidentsPage> {
             children: [
               _buildStatRow('Total Incidents', stats.totalIncidents.toString()),
               _buildStatRow('Pending', stats.pendingIncidents.toString()),
-              _buildStatRow('Acknowledged', stats.acknowledgedIncidents.toString()),
+              _buildStatRow(
+                'Acknowledged',
+                stats.acknowledgedIncidents.toString(),
+              ),
               _buildStatRow('Resolved', stats.resolvedIncidents.toString()),
               const Divider(),
               _buildStatRow('Fixed Band', stats.fixedBandIncidents.toString()),
-              _buildStatRow('Floating Band', stats.floatingBandIncidents.toString()),
+              _buildStatRow(
+                'Floating Band',
+                stats.floatingBandIncidents.toString(),
+              ),
               if (stats.mostActiveDay != null) ...[
                 const Divider(),
                 _buildStatRow('Most Active Day', stats.mostActiveDay!),
               ],
               if (stats.studentWithMostIncidents != null) ...[
-                _buildStatRow('Top Student', 
-                  '${stats.studentWithMostIncidents!.value} incidents'),
+                _buildStatRow(
+                  'Top Student',
+                  '${stats.studentWithMostIncidents!.value} incidents',
+                ),
               ],
             ],
           ),
@@ -487,7 +793,10 @@ class _FiltersDialogState extends State<_FiltersDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Date Range Filter
-            const Text('Date Range', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              'Date Range',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -495,7 +804,7 @@ class _FiltersDialogState extends State<_FiltersDialog> {
                   child: Text(
                     _filters.dateRange != null
                         ? '${_dateFormat.format(_filters.dateRange!.start)} - '
-                          '${_dateFormat.format(_filters.dateRange!.end)}'
+                              '${_dateFormat.format(_filters.dateRange!.end)}'
                         : 'All dates',
                   ),
                 ),
@@ -516,15 +825,23 @@ class _FiltersDialogState extends State<_FiltersDialog> {
             const SizedBox(height: 16),
 
             // Band Type Filter
-            const Text('Band Type', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              'Band Type',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
             DropdownButton<String?>(
-              value: _filters.bandType?.isEmpty == true ? null : _filters.bandType,
+              value: _filters.bandType?.isEmpty == true
+                  ? null
+                  : _filters.bandType,
               isExpanded: true,
               items: const [
                 DropdownMenuItem(value: null, child: Text('All band types')),
                 DropdownMenuItem(value: 'fixed', child: Text('Fixed Band')),
-                DropdownMenuItem(value: 'floating', child: Text('Floating Band')),
+                DropdownMenuItem(
+                  value: 'floating',
+                  child: Text('Floating Band'),
+                ),
               ],
               onChanged: (value) => setState(() {
                 _filters = _filters.copyWith(bandType: value);
@@ -542,7 +859,10 @@ class _FiltersDialogState extends State<_FiltersDialog> {
               items: const [
                 DropdownMenuItem(value: null, child: Text('All statuses')),
                 DropdownMenuItem(value: 'pending', child: Text('Pending')),
-                DropdownMenuItem(value: 'acknowledged', child: Text('Acknowledged')),
+                DropdownMenuItem(
+                  value: 'acknowledged',
+                  child: Text('Acknowledged'),
+                ),
                 DropdownMenuItem(value: 'resolved', child: Text('Resolved')),
               ],
               onChanged: (value) => setState(() {
@@ -553,10 +873,15 @@ class _FiltersDialogState extends State<_FiltersDialog> {
             const SizedBox(height: 16),
 
             // Direction Filter
-            const Text('Direction', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              'Direction',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
             DropdownButton<String?>(
-              value: _filters.direction?.isEmpty == true ? null : _filters.direction,
+              value: _filters.direction?.isEmpty == true
+                  ? null
+                  : _filters.direction,
               isExpanded: true,
               items: const [
                 DropdownMenuItem(value: null, child: Text('All directions')),
@@ -621,6 +946,28 @@ class AdminIncidentDetailPage extends StatelessWidget {
     this.onIncidentUpdated,
   });
 
+  Future<void> _acknowledgeIncidentFromDetail(
+    BuildContext context,
+    GeofenceIncident incident,
+  ) async {
+    try {
+      await GeofenceIncidentService.acknowledgeIncident(incident.id, 'Admin');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Incident acknowledged successfully')),
+        );
+        Navigator.pop(context);
+        onIncidentUpdated?.call();
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error acknowledging incident: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('EEEE, MMM dd, yyyy');
@@ -630,10 +977,11 @@ class AdminIncidentDetailPage extends StatelessWidget {
       appBar: AppBar(
         title: Text('Incident #${incident.id.substring(0, 8)}'),
         actions: [
-          if (!incident.isAcknowledged)
+          if (incident.status == 'pending')
             IconButton(
               icon: const Icon(Icons.check_circle),
-              onPressed: () => _acknowledgeIncident(context),
+              onPressed: () =>
+                  _acknowledgeIncidentFromDetail(context, incident),
               tooltip: 'Mark Acknowledged',
             ),
         ],
@@ -650,10 +998,13 @@ class AdminIncidentDetailPage extends StatelessWidget {
                 child: Row(
                   children: [
                     CircleAvatar(
-                      backgroundColor: incident.direction == 'check_in' 
-                          ? Colors.green : Colors.orange,
+                      backgroundColor: incident.direction == 'check_in'
+                          ? Colors.green
+                          : Colors.orange,
                       child: Icon(
-                        incident.direction == 'check_in' ? Icons.login : Icons.logout,
+                        incident.direction == 'check_in'
+                            ? Icons.login
+                            : Icons.logout,
                         color: Colors.white,
                       ),
                     ),
@@ -679,11 +1030,17 @@ class AdminIncidentDetailPage extends StatelessWidget {
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              _buildBadge(incident.bandType.toUpperCase(), 
-                                  incident.bandType == 'fixed' ? Colors.red : Colors.blue),
+                              _buildBadge(
+                                incident.bandType.toUpperCase(),
+                                incident.bandType == 'fixed'
+                                    ? Colors.red
+                                    : Colors.blue,
+                              ),
                               const SizedBox(width: 8),
-                              _buildBadge(incident.statusDisplay, 
-                                  _getStatusColor(incident.status)),
+                              _buildBadge(
+                                incident.statusDisplay,
+                                _getStatusColor(incident.status),
+                              ),
                             ],
                           ),
                         ],
@@ -697,38 +1054,37 @@ class AdminIncidentDetailPage extends StatelessWidget {
             const SizedBox(height: 16),
 
             // Student Info
-            _buildInfoSection(
-              'Student Information',
-              [
-                _buildInfoRow('Name', incident.studentName),
-                _buildInfoRow('ID', incident.studentId),
-              ],
-            ),
+            _buildInfoSection('Student Information', [
+              _buildInfoRow('Name', incident.studentName),
+              _buildInfoRow('ID', incident.studentId),
+            ]),
 
             const SizedBox(height: 16),
 
             // Timing Info
-            _buildInfoSection(
-              'Timing Information',
-              [
-                _buildInfoRow('Date', dateFormat.format(incident.occurredAt)),
-                _buildInfoRow('Time', timeFormat.format(incident.occurredAt)),
-                _buildInfoRow('Recorded', 
-                    '${dateFormat.format(incident.createdAt)} at ${timeFormat.format(incident.createdAt)}'),
-              ],
-            ),
+            _buildInfoSection('Timing Information', [
+              _buildInfoRow('Date', dateFormat.format(incident.occurredAt)),
+              _buildInfoRow('Time', timeFormat.format(incident.occurredAt)),
+              _buildInfoRow(
+                'Recorded',
+                '${dateFormat.format(incident.createdAt)} at ${timeFormat.format(incident.createdAt)}',
+              ),
+            ]),
 
             const SizedBox(height: 16),
 
             // Location Details
-            _buildInfoSection(
-              'Location Details',
-              [
-                _buildInfoRow('Distance Outside', incident.formattedDistance),
-                _buildInfoRow('Designated Location', incident.designatedLocation.coordinates),
-                _buildInfoRow('Actual Location', incident.actualLocation.coordinates),
-              ],
-            ),
+            _buildInfoSection('Location Details', [
+              _buildInfoRow('Distance Outside', incident.formattedDistance),
+              _buildInfoRow(
+                'Designated Location',
+                incident.designatedLocation.coordinates,
+              ),
+              _buildInfoRow(
+                'Actual Location',
+                incident.actualLocation.coordinates,
+              ),
+            ]),
 
             const SizedBox(height: 16),
 
@@ -775,50 +1131,48 @@ class AdminIncidentDetailPage extends StatelessWidget {
             const SizedBox(height: 16),
 
             // Message Text (if any)
-            if (incident.messageText != null && incident.messageText!.isNotEmpty)
-              _buildInfoSection(
-                'Message Text',
-                [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(incident.messageText!),
+            if (incident.messageText != null &&
+                incident.messageText!.isNotEmpty)
+              _buildInfoSection('Message Text', [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                ],
-              ),
+                  child: Text(incident.messageText!),
+                ),
+              ]),
 
             // Acknowledgment Info (if acknowledged)
             if (incident.isAcknowledged) ...[
               const SizedBox(height: 16),
-              _buildInfoSection(
-                'Acknowledgment Details',
-                [
-                  _buildInfoRow('Status', incident.statusDisplay),
-                  if (incident.acknowledgedBy != null)
-                    _buildInfoRow('Acknowledged By', incident.acknowledgedBy!),
-                  if (incident.acknowledgedAt != null)
-                    _buildInfoRow('Acknowledged At', 
-                        '${dateFormat.format(incident.acknowledgedAt!)} at ${timeFormat.format(incident.acknowledgedAt!)}'),
-                  if (incident.notes != null && incident.notes!.isNotEmpty)
-                    _buildInfoRow('Notes', incident.notes!),
-                ],
-              ),
+              _buildInfoSection('Acknowledgment Details', [
+                _buildInfoRow('Status', incident.statusDisplay),
+                if (incident.acknowledgedBy != null)
+                  _buildInfoRow('Acknowledged By', incident.acknowledgedBy!),
+                if (incident.acknowledgedAt != null)
+                  _buildInfoRow(
+                    'Acknowledged At',
+                    '${dateFormat.format(incident.acknowledgedAt!)} at ${timeFormat.format(incident.acknowledgedAt!)}',
+                  ),
+                if (incident.notes != null && incident.notes!.isNotEmpty)
+                  _buildInfoRow('Notes', incident.notes!),
+              ]),
             ],
 
             const SizedBox(height: 80), // Space for FAB
           ],
         ),
       ),
-      floatingActionButton: incident.isAcknowledged 
-          ? null 
-          : FloatingActionButton.extended(
-              onPressed: () => _acknowledgeIncident(context),
+      floatingActionButton: incident.status == 'pending'
+          ? FloatingActionButton.extended(
+              onPressed: () =>
+                  _acknowledgeIncidentFromDetail(context, incident),
               icon: const Icon(Icons.check),
               label: const Text('Mark Acknowledged'),
-            ),
+            )
+          : null,
     );
   }
 
@@ -849,10 +1203,7 @@ class AdminIncidentDetailPage extends StatelessWidget {
           children: [
             Text(
               title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             ...children,
@@ -875,9 +1226,7 @@ class AdminIncidentDetailPage extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.w500),
             ),
           ),
-          Expanded(
-            child: Text(value),
-          ),
+          Expanded(child: Text(value)),
         ],
       ),
     );
@@ -893,132 +1242,6 @@ class AdminIncidentDetailPage extends StatelessWidget {
         return Colors.green;
       default:
         return Colors.grey;
-    }
-  }
-
-  void _acknowledgeIncident(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => _AcknowledgeIncidentDialog(
-        incident: incident,
-        onAcknowledged: () {
-          if (context.mounted) {
-            Navigator.pop(context); // Close detail page
-            onIncidentUpdated?.call();
-          }
-        },
-      ),
-    );
-  }
-}
-
-/// Dialog for acknowledging incidents
-class _AcknowledgeIncidentDialog extends StatefulWidget {
-  final GeofenceIncident incident;
-  final VoidCallback? onAcknowledged;
-
-  const _AcknowledgeIncidentDialog({
-    required this.incident,
-    this.onAcknowledged,
-  });
-
-  @override
-  State<_AcknowledgeIncidentDialog> createState() => _AcknowledgeIncidentDialogState();
-}
-
-class _AcknowledgeIncidentDialogState extends State<_AcknowledgeIncidentDialog> {
-  final _notesController = TextEditingController();
-  bool _isLoading = false;
-
-  @override
-  void dispose() {
-    _notesController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Acknowledge Incident'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Mark this incident as acknowledged for ${widget.incident.studentName}?',
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _notesController,
-            decoration: const InputDecoration(
-              labelText: 'Notes (optional)',
-              hintText: 'Add any additional notes...',
-              border: OutlineInputBorder(),
-            ),
-            maxLines: 3,
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: _isLoading ? null : () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: _isLoading ? null : _acknowledgeIncident,
-          child: _isLoading
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Acknowledge'),
-        ),
-      ],
-    );
-  }
-
-  void _acknowledgeIncident() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      // TODO: Get current admin user ID - for now using placeholder
-      const adminId = 'current_admin_id';
-      
-      await GeofenceIncidentService.acknowledgeIncident(
-        widget.incident.id,
-        adminId,
-        notes: _notesController.text.trim().isEmpty 
-            ? null 
-            : _notesController.text.trim(),
-      );
-
-      if (mounted) {
-        Navigator.pop(context); // Close dialog
-        widget.onAcknowledged?.call();
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Incident acknowledged successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error acknowledging incident: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     }
   }
 }

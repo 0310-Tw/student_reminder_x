@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:students_reminder/src/features/geofence/geofence_service.dart';
 
-import '../../services/helper.dart';
-import '../../services/auth_service.dart';
 import '../../shared/routes.dart';
 
 class StudentGeofenceDashboard extends StatefulWidget {
@@ -22,7 +20,6 @@ class _StudentGeofenceDashboardState extends State<StudentGeofenceDashboard> {
   Map<String, dynamic>? _locationStatus;
   bool _isLoading = true;
   String? _errorMessage;
-  bool _isCheckingIn = false;
 
   @override
   void initState() {
@@ -30,12 +27,19 @@ class _StudentGeofenceDashboardState extends State<StudentGeofenceDashboard> {
     _initializeData();
   }
 
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
   Future<void> _initializeData() async {
     try {
-      setState(() {
-        _isLoading = true;
-        _errorMessage = null;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = true;
+          _errorMessage = null;
+        });
+      }
 
       // Get current position
       _currentPosition = await _geofenceService.getCurrentLocation();
@@ -48,119 +52,23 @@ class _StudentGeofenceDashboardState extends State<StudentGeofenceDashboard> {
         _locationStatus = await _geofenceService.getLocationStatus();
       }
 
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to load geofence data: $e';
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to load geofence data: $e';
+          _isLoading = false;
+        });
+      }
     }
   }
 
   Future<void> _refreshLocation() async {
     await _initializeData();
-  }
-
-  Future<void> _handleCheckIn() async {
-    final user = AuthService.instance.currentUser;
-    if (user == null) {
-      _showError('User not authenticated');
-      return;
-    }
-
-    setState(() => _isCheckingIn = true);
-
-    try {
-      // Generate current date ID
-      final today = DateTime.now();
-      final dateId =
-          '${today.year}${today.month.toString().padLeft(2, '0')}${today.day.toString().padLeft(2, '0')}';
-
-      // Use helper function for complete validation and incident handling
-      final canProceed = await handleClockAction(
-        context: context,
-        studentId: user.uid,
-        dateId: dateId,
-        actionType: 'checkin',
-      );
-
-      if (canProceed) {
-        // Here you would normally integrate with your attendance system
-        // For now, we'll just show a success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Check-in successful! (Integrate with attendance system)',
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
-
-        // Refresh status
-        await _refreshLocation();
-      } else {
-        _showError('Check-in blocked due to geofence policy');
-      }
-    } catch (e) {
-      _showError('Check-in failed: $e');
-    } finally {
-      setState(() => _isCheckingIn = false);
-    }
-  }
-
-  Future<void> _handleCheckOut() async {
-    final user = AuthService.instance.currentUser;
-    if (user == null) {
-      _showError('User not authenticated');
-      return;
-    }
-
-    setState(() => _isCheckingIn = true);
-
-    try {
-      // Generate current date ID
-      final today = DateTime.now();
-      final dateId =
-          '${today.year}${today.month.toString().padLeft(2, '0')}${today.day.toString().padLeft(2, '0')}';
-
-      // Use helper function for complete validation and incident handling
-      final canProceed = await handleClockAction(
-        context: context,
-        studentId: user.uid,
-        dateId: dateId,
-        actionType: 'checkout',
-      );
-
-      if (canProceed) {
-        // Here you would normally integrate with your attendance system
-        // For now, we'll just show a success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Check-out successful! (Integrate with attendance system)',
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
-
-        // Refresh status
-        await _refreshLocation();
-      } else {
-        _showError('Check-out blocked due to geofence policy');
-      }
-    } catch (e) {
-      _showError('Check-out failed: $e');
-    } finally {
-      setState(() => _isCheckingIn = false);
-    }
-  }
-
-  void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
   }
 
   @override
@@ -524,7 +432,6 @@ class _StudentGeofenceDashboardState extends State<StudentGeofenceDashboard> {
   //       ),
   //     ),
   //   );
-  
 
   Widget _buildLocationScheduleButton() {
     return Card(

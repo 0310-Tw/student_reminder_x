@@ -65,14 +65,19 @@ class GeofenceService {
     return _campusService.getCampusOptions();
   }
 
-  /// Get today's geofence profile for current user or specified student
-  Future<Map<String, dynamic>?> getTodayGeofenceProfile([
+  /// Get today's geofence profile for current user or specified student - Never returns null
+  Future<Map<String, dynamic>> getTodayGeofenceProfile([
     String? studentId,
   ]) async {
     try {
       final user = AuthService.instance.currentUser;
       final userId = studentId ?? user?.uid;
-      if (userId == null) return null;
+      if (userId == null) {
+        print('⚠️ No user ID found, using Up Park Camp fallback');
+        final now = DateTime.now();
+        final dayName = _getDayName(now.weekday);
+        return _createCampusProfile('up_park_camp', dayName);
+      }
 
       final today = DateTime.now();
       final dateId =
@@ -87,9 +92,10 @@ class GeofenceService {
           .doc(dateId)
           .get();
 
-      if (doc.exists) {
-        print('✅ Geofence profile found: ${doc.data()}');
-        return doc.data();
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data()!;
+        print('✅ Geofence profile found: $data');
+        return data;
       } else {
         // No admin-set profile found, create one based on student's schedule
         print('📍 No admin profile found, creating from student schedule');
@@ -99,7 +105,12 @@ class GeofenceService {
       }
     } catch (e) {
       print('❌ Error getting geofence profile: $e');
-      return null;
+      // Always provide a fallback default profile
+      final now = DateTime.now();
+      final dayName = _getDayName(now.weekday);
+      final defaultCampus = _getDefaultCampusForDay(now.weekday);
+      print('🔧 Using emergency fallback profile: $defaultCampus for $dayName');
+      return _createCampusProfile(defaultCampus, dayName);
     }
   }
 
@@ -156,9 +167,10 @@ class GeofenceService {
                   _extractDouble(customLocationData['radius']) ?? 100.0;
 
               if (lat != null && lng != null) {
-                print('✅ Custom location: $lat, $lng, radius: $radius');
+                print('✅ Custom location found: lat=$lat, lng=$lng, radius=${radius}m');
+                print('📍 Creating custom geofence profile for $dayName');
 
-                return {
+                final profile = {
                   'checkInLocation': {'lat': lat, 'lng': lng, 'radius': radius},
                   'checkOutLocation': {
                     'lat': lat,
@@ -170,8 +182,16 @@ class GeofenceService {
                   'outsideMessage':
                       'You are outside your custom location for $dayName (${radius.toInt()}m radius).',
                   'isCustomLocation': true,
+                  'campusId': 'custom_location',
+                  'campusName': 'Custom Location',
                 };
+                print('🎯 Returning custom profile: $profile');
+                return profile;
+              } else {
+                print('❌ Invalid custom location coordinates: lat=$lat, lng=$lng');
               }
+            } else {
+              print('❌ No custom location data found');
             }
 
             // No custom location found - use campus fallback
@@ -213,15 +233,32 @@ class GeofenceService {
 
   /// Create a campus-based geofence profile
   Map<String, dynamic> _createCampusProfile(String campusId, String dayName) {
-    final profile = createProfileFromCampus(
-      campusId,
-      bandType: 'fixed',
-      outsidePolicy: 'allow_flag',
-      outsideMessage:
-          'You are outside the ${campusId.replaceAll('_', ' ')} campus area.',
-    );
-    profile['isCustomLocation'] = false;
-    return profile;
+    try {
+      print('🏫 Creating campus profile for: $campusId');
+      final profile = createProfileFromCampus(
+        campusId,
+        bandType: 'fixed',
+        outsidePolicy: 'allow_flag',
+        outsideMessage:
+            'You are outside the ${campusId.replaceAll('_', ' ')} campus area.',
+      );
+      profile['isCustomLocation'] = false;
+      print('✅ Campus profile created successfully: $profile');
+      return profile;
+    } catch (e) {
+      print('❌ Error creating campus profile for $campusId: $e');
+      // Return hardcoded fallback profile for Up Park Camp
+      return {
+        'checkInLocation': {'lat': 18.0123, 'lng': -76.7890, 'radius': 100.0},
+        'checkOutLocation': {'lat': 18.0123, 'lng': -76.7890, 'radius': 100.0},
+        'bandType': 'fixed',
+        'outsidePolicy': 'allow_flag',
+        'outsideMessage': 'You are outside the Up Park Camp area.',
+        'campusId': 'up_park_camp',
+        'campusName': 'Up Park Camp',
+        'isCustomLocation': false,
+      };
+    }
   }
 
   /// Get day name from weekday number
@@ -239,12 +276,10 @@ class GeofenceService {
     return days[weekday];
   }
 
-  /// Get default campus based on day of week
+  /// Get default campus based on day of week - Always defaults to Up Park Camp as fallback
   String _getDefaultCampusForDay(int weekday) {
-    // Wednesday (3) and Thursday (4) default to Stony Hill
-    if (weekday == DateTime.wednesday || weekday == DateTime.thursday) {
-      return 'stony_hill';
-    }
+    // Always use Up Park Camp as default fallback instead of day-specific logic
+    print('🏫 Using Up Park Camp as default campus for any day');
     return 'up_park_camp';
   }
 
@@ -658,15 +693,6 @@ class GeofenceService {
       final position = await getCurrentLocation();
       final profile = await getTodayGeofenceProfile();
 
-      if (profile == null) {
-        return {
-          'hasProfile': false,
-          'message': 'No geofence profile for today',
-          'canCheckIn': false,
-          'canCheckOut': false,
-        };
-      }
-
       final checkInLocation =
           profile['checkInLocation'] as Map<String, dynamic>?;
       final checkOutLocation =
@@ -738,9 +764,7 @@ class GeofenceService {
 
       // Check for geofence violations
       final profile = await getTodayGeofenceProfile();
-      if (profile != null) {
-        await _checkGeofenceViolations(position, profile, onGeofenceViolation);
-      }
+      await _checkGeofenceViolations(position, profile, onGeofenceViolation);
     }, onError: (e) => print('Location monitoring error: $e'));
   }
 
