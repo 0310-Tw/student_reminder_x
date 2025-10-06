@@ -1,14 +1,10 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:students_reminder/firebase_options.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/session_manager.dart';
-
-// Background message handler for FCM
-Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  print("Handling a background message: ${message.messageId}");
-}
 
 Future<void> initFirebase() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,14 +14,18 @@ Future<void> initFirebase() async {
   }
 }
 
+// Background message handler for FCM
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  print("Handling a background message: ${message.messageId}");
+}
+
 Future<void> initNotifications() async {
-  // Set up background message handler
+  // Register background message handler
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-  // Initialize FCM and get token
-  FirebaseMessaging messaging = FirebaseMessaging.instance;
+  final FirebaseMessaging messaging = FirebaseMessaging.instance;
 
-  // Request permission
+  // Request notification permission
   NotificationSettings settings = await messaging.requestPermission(
     alert: true,
     announcement: false,
@@ -36,28 +36,31 @@ Future<void> initNotifications() async {
     sound: true,
   );
 
-  // Check if permissions were granted and setup notifications accordingly
-  if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-    print("Notification permissions granted");
+  if (settings.authorizationStatus == AuthorizationStatus.authorized ||
+      settings.authorizationStatus == AuthorizationStatus.provisional) {
+    print("✅ Notification permissions granted");
 
-    // Get the token
-    String? token = await messaging.getToken();
-    print("FCM Token: $token");
+    // ⚠️ Pass the VAPID key on web builds
+    final String? token = await messaging.getToken(
+      vapidKey: kIsWeb ? 'YOUR_PUBLIC_VAPID_KEY_HERE' : null,
+    );
 
-    // Setup foreground message handling
+    print("✅ FCM Token: $token");
+
+    // Foreground messages (while app is open)
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print("Foreground message received: ${message.notification?.title}");
+      print("📩 Foreground message received: ${message.notification?.title}");
+      // TODO: display a local notification or update your UI here
     });
 
-    // Setup message handling when app is opened from notification
+    // When app is opened from notification click
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      print("App opened from notification: ${message.notification?.title}");
+      print("📩 App opened from notification: ${message.notification?.title}");
+      // TODO: navigate user or update UI accordingly
     });
   } else if (settings.authorizationStatus == AuthorizationStatus.denied) {
-    print("Notification permissions denied");
-  } else if (settings.authorizationStatus == AuthorizationStatus.provisional) {
-    print("Notification permissions provisional");
+    print("⚠️ Notification permissions denied (user clicked Block)");
   } else {
-    print("Notification permission status: ${settings.authorizationStatus}");
+    print("⚠️ Notification permission status: ${settings.authorizationStatus}");
   }
 }

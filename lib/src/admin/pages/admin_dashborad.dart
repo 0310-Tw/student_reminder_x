@@ -67,43 +67,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   _buildAttendanceOverview(),
                   SizedBox(height: 20),
 
-                  // ✅ Campus Defaults Editor quick card (added)
-                  GestureDetector(
-                    onTap: () => Navigator.pushNamed(context, '/defaultseditor'),
-                    child: Container(
-                      padding: EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                            offset: Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.map, color: Color(0xFF3498DB)),
-                          SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'Campus Defaults Editor',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF2C3E50),
-                              ),
-                            ),
-                          ),
-                          Icon(Icons.chevron_right, color: Color(0xFF95A5A6)),
-                        ],
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 20),
-
                   // Student List
                   _buildStudentAttendanceList(),
                   SizedBox(height: 16), // Bottom padding
