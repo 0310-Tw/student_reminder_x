@@ -250,7 +250,10 @@ class _AdminGeofenceEditorState extends State<AdminGeofenceEditor> {
                           const SizedBox(height: 8),
                           Container(
                             width: double.infinity,
-                            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               border: Border.all(color: Colors.grey),
                               borderRadius: BorderRadius.circular(4),
@@ -268,7 +271,8 @@ class _AdminGeofenceEditorState extends State<AdminGeofenceEditor> {
                                   DropdownMenuItem<GeofenceBandType>(
                                     value: GeofenceBandType.fixed,
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Text(
@@ -290,7 +294,8 @@ class _AdminGeofenceEditorState extends State<AdminGeofenceEditor> {
                                   DropdownMenuItem<GeofenceBandType>(
                                     value: GeofenceBandType.floating,
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Text(
