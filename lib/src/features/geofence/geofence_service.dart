@@ -167,7 +167,9 @@ class GeofenceService {
                   _extractDouble(customLocationData['radius']) ?? 100.0;
 
               if (lat != null && lng != null) {
-                print('✅ Custom location found: lat=$lat, lng=$lng, radius=${radius}m');
+                print(
+                  '✅ Custom location found: lat=$lat, lng=$lng, radius=${radius}m',
+                );
                 print('📍 Creating custom geofence profile for $dayName');
 
                 final profile = {
@@ -188,7 +190,9 @@ class GeofenceService {
                 print('🎯 Returning custom profile: $profile');
                 return profile;
               } else {
-                print('❌ Invalid custom location coordinates: lat=$lat, lng=$lng');
+                print(
+                  '❌ Invalid custom location coordinates: lat=$lat, lng=$lng',
+                );
               }
             } else {
               print('❌ No custom location data found');
