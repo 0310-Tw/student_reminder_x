@@ -236,7 +236,7 @@ class _AdminIncidentsPageState extends State<AdminIncidentsPage> {
                 children: [
                   Expanded(
                     child: Text(
-                      '${incident.studentName}',
+                      incident.studentName,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,

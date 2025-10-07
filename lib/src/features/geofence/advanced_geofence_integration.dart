@@ -5,8 +5,6 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:students_reminder/src/admin/models/advanced_attendance_service.dart';
-import 'package:students_reminder/src/admin/models/advanced_geofence_models.dart';
 
 import '../../admin/models/advanced_geofence_models.dart' as advanced;
 import '../../admin/models/effective_geofence_resolver.dart';

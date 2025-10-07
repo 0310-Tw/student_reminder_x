@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
+import '../models/comprehensive_geofence_resolver.dart';
 
 class AdminGeofenceEditor extends StatefulWidget {
   final String studentId;
@@ -18,153 +18,408 @@ class AdminGeofenceEditor extends StatefulWidget {
 }
 
 class _AdminGeofenceEditorState extends State<AdminGeofenceEditor> {
-  LatLng? inLocation, outLocation;
-  double inRadius = 100, outRadius = 100;
-  String bandType = 'fixed';
-  String outsidePolicy = 'block';
-  final messageController = TextEditingController();
+  LatLng? selectedLocation;
+  double radius = 100;
+  Set<Marker> markers = {};
+  bool isLoading = true;
+  Map<String, dynamic>? existingLocation;
+  GeofenceBandType bandType = GeofenceBandType.fixed;
+  String outsideAreaMessage = '';
+  late TextEditingController _messageController;
+
+  @override
+  void initState() {
+    super.initState();
+    _messageController = TextEditingController();
+    _loadExistingLocation();
+    _loadStudentCustomLocations();
+  }
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadExistingLocation() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.studentId)
+          .collection('geofence_profiles')
+          .doc(widget.dateId)
+          .get();
+
+      if (doc.exists) {
+        final data = doc.data()!;
+        setState(() {
+          existingLocation = data;
+          selectedLocation = LatLng(
+            data['latitude']?.toDouble() ?? 18.0179,
+            data['longitude']?.toDouble() ?? -76.8099,
+          );
+          radius = data['radius']?.toDouble() ?? 100.0;
+
+          // Load band type and outside area message
+          String? bandTypeString = data['bandType']?.toString();
+          bandType = bandTypeString?.toLowerCase() == 'floating'
+              ? GeofenceBandType.floating
+              : GeofenceBandType.fixed;
+          outsideAreaMessage = data['outsideAreaMessage']?.toString() ?? '';
+          _messageController.text = outsideAreaMessage;
+        });
+      }
+    } catch (e) {
+      print('Error loading existing location: $e');
+    }
+  }
+
+  Future<void> _loadStudentCustomLocations() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.studentId)
+          .collection('geofence_profiles')
+          .get();
+
+      Set<Marker> studentMarkers = {};
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        if (data['source'] == 'studentCustom') {
+          final lat = data['latitude']?.toDouble();
+          final lng = data['longitude']?.toDouble();
+          final description = data['description'] ?? 'Student Location';
+
+          if (lat != null && lng != null) {
+            studentMarkers.add(
+              Marker(
+                markerId: MarkerId('student_${doc.id}'),
+                position: LatLng(lat, lng),
+                infoWindow: InfoWindow(
+                  title: _formatDay(doc.id),
+                  snippet: description,
+                ),
+                icon: BitmapDescriptor.defaultMarkerWithHue(
+                  BitmapDescriptor.hueBlue,
+                ),
+              ),
+            );
+          }
+        }
+      }
+
+      setState(() {
+        markers = studentMarkers;
+        isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading student locations: $e');
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Geofence Editor ${widget.dateId}')),
-      body: Column(
-        children: [
-          Expanded(
-            child: GoogleMap(
-              initialCameraPosition: const CameraPosition(
-                target: LatLng(18.0, -76.8),
-                zoom: 12,
-              ),
-              markers: {
-                if (inLocation != null)
-                  Marker(
-                    markerId: const MarkerId('in'),
-                    position: inLocation!,
-                    infoWindow: const InfoWindow(title: 'Check-In'),
-                    icon: BitmapDescriptor.defaultMarkerWithHue(
-                      BitmapDescriptor.hueGreen,
-                    ),
-                  ),
-                if (outLocation != null)
-                  Marker(
-                    markerId: const MarkerId('out'),
-                    position: outLocation!,
-                    infoWindow: const InfoWindow(title: 'Check-Out'),
-                    icon: BitmapDescriptor.defaultMarkerWithHue(
-                      BitmapDescriptor.hueRed,
-                    ),
-                  ),
-              },
-              onTap: (pos) {
-                if (inLocation == null) {
-                  setState(() => inLocation = pos);
-                } else if (outLocation == null) {
-                  setState(() => outLocation = pos);
-                } else {
-                  setState(() {
-                    inLocation = pos;
-                    outLocation = null;
-                  });
-                }
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
+      appBar: AppBar(
+        backgroundColor: Color(0xFF2C3E50),
+        foregroundColor: Colors.white,
+        title: Text('Set Location - ${_formatDay(widget.dateId)}'),
+        elevation: 0,
+      ),
+      body: isLoading
+          ? Center(child: CircularProgressIndicator())
+          : Column(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: bandType,
-                        decoration: const InputDecoration(
-                          labelText: 'Band Type',
+                // Instructions
+                Container(
+                  padding: EdgeInsets.all(16),
+                  color: Colors.blue[50],
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.blue[700]),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Tap on the map to set a new location for ${_formatDay(widget.dateId)}. Blue markers show other student custom locations.',
+                          style: TextStyle(
+                            color: Colors.blue[700],
+                            fontSize: 14,
+                          ),
                         ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'fixed',
-                            child: Text('Fixed'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'floating',
-                            child: Text('Floating'),
-                          ),
-                        ],
-                        onChanged: (v) => setState(() => bandType = v!),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: outsidePolicy,
-                        decoration: const InputDecoration(
-                          labelText: 'Outside Policy',
-                        ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'block',
-                            child: Text('Block'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'allow_flag',
-                            child: Text('Allow & Flag'),
-                          ),
-                        ],
-                        onChanged: (v) => setState(() => outsidePolicy = v!),
-                      ),
-                    ),
-                  ],
-                ),
-                TextField(
-                  controller: messageController,
-                  decoration: const InputDecoration(
-                    labelText: 'Outside Message',
+                    ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                ElevatedButton(
-                  onPressed: _saveProfile,
-                  child: const Text('Save Profile'),
+
+                // Map
+                Expanded(
+                  child: GoogleMap(
+                    initialCameraPosition: CameraPosition(
+                      target: selectedLocation ?? LatLng(18.0179, -76.8099),
+                      zoom: 14,
+                    ),
+                    markers: {
+                      ...markers, // Student's other custom locations
+                      if (selectedLocation != null)
+                        Marker(
+                          markerId: const MarkerId('selected'),
+                          position: selectedLocation!,
+                          infoWindow: InfoWindow(
+                            title: 'New Location',
+                            snippet:
+                                'Selected location for ${_formatDay(widget.dateId)}',
+                          ),
+                          icon: BitmapDescriptor.defaultMarkerWithHue(
+                            BitmapDescriptor.hueGreen,
+                          ),
+                        ),
+                    },
+                    circles: selectedLocation != null
+                        ? {
+                            Circle(
+                              circleId: CircleId('geofence'),
+                              center: selectedLocation!,
+                              radius: radius,
+                              fillColor: Colors.green.withOpacity(0.2),
+                              strokeColor: Colors.green,
+                              strokeWidth: 2,
+                            ),
+                          }
+                        : {},
+                    onTap: (pos) {
+                      setState(() {
+                        selectedLocation = pos;
+                      });
+                    },
+                  ),
+                ),
+
+                // Controls
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  color: Colors.white,
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Radius: ${radius.toInt()}m',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                Slider(
+                                  value: radius,
+                                  min: 50,
+                                  max: 500,
+                                  divisions: 18,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      radius = value;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Band Type Selection
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Band Type:',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: RadioListTile<GeofenceBandType>(
+                                  title: Text('Fixed Band'),
+                                  subtitle: Text(
+                                    'Must be within designated geofence',
+                                  ),
+                                  value: GeofenceBandType.fixed,
+                                  groupValue: bandType,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      bandType = value!;
+                                    });
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: RadioListTile<GeofenceBandType>(
+                                  title: Text('Floating Band'),
+                                  subtitle: Text('May clock in/out anywhere'),
+                                  value: GeofenceBandType.floating,
+                                  groupValue: bandType,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      bandType = value!;
+                                    });
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Outside Area Message
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Outside Area Message:',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _messageController,
+                            onChanged: (value) {
+                              outsideAreaMessage = value;
+                            },
+                            decoration: InputDecoration(
+                              hintText:
+                                  'Custom message when student is outside area',
+                              border: OutlineInputBorder(),
+                              helperText:
+                                  'Shown when student tries to clock in/out outside designated area',
+                            ),
+                            maxLines: 3,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: selectedLocation == null
+                                  ? null
+                                  : _saveLocation,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Color(0xFF2C3E50),
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: Text(
+                                existingLocation != null
+                                    ? 'Update Location'
+                                    : 'Save Location',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
-      ),
     );
   }
 
-  Future<void> _saveProfile() async {
-    if (inLocation == null || outLocation == null) {
+  Future<void> _saveLocation() async {
+    if (selectedLocation == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tap map to pick both locations')),
+        const SnackBar(content: Text('Please select a location on the map')),
       );
       return;
     }
 
-    // Build a GeofenceProfile with flat fields
-    final profile = GeofenceProfile(
-      inLat: inLocation!.latitude,
-      inLng: inLocation!.longitude,
-      inRadius: inRadius,
-      outLat: outLocation!.latitude,
-      outLng: outLocation!.longitude,
-      outRadius: outRadius,
-      bandType: bandType,
-      outsidePolicy: outsidePolicy,
-      outsideMessage: messageController.text.isNotEmpty
-          ? messageController.text
-          : null,
-    );
+    try {
+      // Save to the users/{userId}/geofence_profiles/{day} collection
+      // This matches the format expected by the enhanced geofence page
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.studentId)
+          .collection('geofence_profiles')
+          .doc(widget.dateId)
+          .set({
+            'dayOfWeek': widget.dateId,
+            'latitude': selectedLocation!.latitude,
+            'longitude': selectedLocation!.longitude,
+            'radius': radius,
+            'description': 'Custom location for ${_formatDay(widget.dateId)}',
+            'isEnabled': true,
+            'source': 'studentCustom',
+            'bandType': bandType == GeofenceBandType.floating
+                ? 'floating'
+                : 'fixed',
+            'outsideAreaMessage': outsideAreaMessage.trim().isEmpty
+                ? null
+                : outsideAreaMessage.trim(),
+            'lastModified': FieldValue.serverTimestamp(),
+            'modifiedBy': 'admin_override',
+          });
 
-    await GeofenceService.instance.setProfile(
-      studentId: widget.studentId,
-      dateId: widget.dateId,
-      profile: profile,
-    );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Location saved successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
 
-    if (mounted) Navigator.pop(context);
+      // Return true to indicate success
+      Navigator.pop(context, true);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error saving location: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  String _formatDay(String day) {
+    switch (day.toLowerCase()) {
+      case 'monday':
+        return 'Monday';
+      case 'tuesday':
+        return 'Tuesday';
+      case 'wednesday':
+        return 'Wednesday';
+      case 'thursday':
+        return 'Thursday';
+      case 'friday':
+        return 'Friday';
+      default:
+        return day;
+    }
   }
 }

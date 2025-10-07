@@ -47,20 +47,24 @@ class _EnhancedAdminGeofencePageState extends State<EnhancedAdminGeofencePage>
           .orderBy('lastName')
           .get();
 
-      // Calculate real statistics
+      // Calculate real statistics by checking geofence_profiles subcollection
       int usersWithGeofences = 0;
       int totalCustomLocations = 0;
 
       for (var doc in snapshot.docs) {
-        final data = doc.data();
+        try {
+          final geofenceProfilesSnapshot = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(doc.id)
+              .collection('geofence_profiles')
+              .get();
 
-        // Check if user has any geofences
-        if (data['geofences'] != null) {
-          final geofences = data['geofences'] as Map<String, dynamic>;
-          if (geofences.isNotEmpty) {
+          if (geofenceProfilesSnapshot.docs.isNotEmpty) {
             usersWithGeofences++;
-            totalCustomLocations += geofences.length;
+            totalCustomLocations += geofenceProfilesSnapshot.docs.length;
           }
+        } catch (e) {
+          // Skip if error reading geofence profiles
         }
       }
 

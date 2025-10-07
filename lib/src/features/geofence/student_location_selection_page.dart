@@ -5,7 +5,6 @@ import 'package:geocoding/geocoding.dart';
 import 'package:students_reminder/src/features/geofence/geofence_service.dart';
 
 import '../../services/auth_service.dart';
-import '../../shared/routes.dart';
 import 'widgets/location_picker_map.dart';
 
 class StudentLocationSelectionPage extends StatefulWidget {

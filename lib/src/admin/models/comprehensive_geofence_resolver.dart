@@ -3,12 +3,16 @@
 /// to provide admins with complete visibility into student geofence configurations
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:students_reminder/src/services/user_custom_locations_service.dart';
 
 enum LocationSource {
   setDay, // Mandatory Wed/Thu days
   fallback, // Default campus locations
   studentCustom, // Student's own custom locations
+}
+
+enum GeofenceBandType {
+  fixed, // Must be within designated geofence
+  floating, // May clock in/out anywhere
 }
 
 class GeofenceLocationInfo {
@@ -18,6 +22,8 @@ class GeofenceLocationInfo {
   final double radius;
   final LocationSource source;
   final String description;
+  final GeofenceBandType bandType;
+  final String? outsideAreaMessage;
 
   GeofenceLocationInfo({
     required this.day,
@@ -26,6 +32,8 @@ class GeofenceLocationInfo {
     required this.radius,
     required this.source,
     required this.description,
+    this.bandType = GeofenceBandType.fixed,
+    this.outsideAreaMessage,
   });
 
   String get sourceDisplay {
@@ -36,6 +44,15 @@ class GeofenceLocationInfo {
         return 'Fallback';
       case LocationSource.studentCustom:
         return 'Student Custom';
+    }
+  }
+
+  String get bandTypeDisplay {
+    switch (bandType) {
+      case GeofenceBandType.fixed:
+        return 'Fixed Band';
+      case GeofenceBandType.floating:
+        return 'Floating Band';
     }
   }
 }
@@ -108,24 +125,38 @@ class ComprehensiveGeofenceResolver {
     try {
       final List<GeofenceLocationInfo> allLocations = [];
 
-      // Get student's custom locations
-      final customLocations = await UserCustomLocationsService.instance
-          .getAllCustomLocations(userId);
+      // Get student's geofence profiles from the new subcollection
+      final geofenceProfilesSnapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('geofence_profiles')
+          .get();
+
+      Map<String, Map<String, dynamic>> profilesData = {};
+      for (final doc in geofenceProfilesSnapshot.docs) {
+        profilesData[doc.id] = doc.data();
+      }
 
       // Process each weekday
       for (final day in allWeekdays) {
         GeofenceLocationInfo locationInfo;
 
-        if (customLocations.containsKey(day)) {
-          // Student has custom location for this day
-          final customData = customLocations[day]!;
+        if (profilesData.containsKey(day)) {
+          // Student has profile for this day
+          final profileData = profilesData[day]!;
+          final source = profileData['source']?.toString();
+
           locationInfo = GeofenceLocationInfo(
             day: day,
-            lat: _extractDouble(customData['lat']) ?? 0.0,
-            lng: _extractDouble(customData['lng']) ?? 0.0,
-            radius: _extractDouble(customData['radius']) ?? 100.0,
-            source: LocationSource.studentCustom,
-            description: 'Custom location set by student',
+            lat: _extractDouble(profileData['latitude']) ?? 0.0,
+            lng: _extractDouble(profileData['longitude']) ?? 0.0,
+            radius: _extractDouble(profileData['radius']) ?? 100.0,
+            source: source == 'studentCustom'
+                ? LocationSource.studentCustom
+                : LocationSource.setDay,
+            description: profileData['description'] ?? 'Location for $day',
+            bandType: _parseBandType(profileData['bandType']),
+            outsideAreaMessage: profileData['outsideAreaMessage']?.toString(),
           );
         } else if (setDays.contains(day)) {
           // Set day - use Stony Hill campus
@@ -138,6 +169,7 @@ class ComprehensiveGeofenceResolver {
             source: LocationSource.setDay,
             description:
                 'Mandatory ${_getDayDisplayName(day)} - ${campus['name']}',
+            bandType: GeofenceBandType.fixed, // Set days are always fixed
           );
         } else {
           // Fallback day - use Up Park Camp
@@ -149,6 +181,7 @@ class ComprehensiveGeofenceResolver {
             radius: campus['radius'],
             source: LocationSource.fallback,
             description: 'Default fallback - ${campus['name']}',
+            bandType: GeofenceBandType.fixed, // Fallback locations are fixed
           );
         }
 
@@ -285,9 +318,22 @@ class ComprehensiveGeofenceResolver {
   /// Check if student has overridden any set days
   Future<bool> hasOverriddenSetDays(String userId) async {
     try {
-      final customLocations = await UserCustomLocationsService.instance
-          .getAllCustomLocations(userId);
-      return setDays.any((setDay) => customLocations.containsKey(setDay));
+      final geofenceProfilesSnapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('geofence_profiles')
+          .get();
+
+      Map<String, Map<String, dynamic>> profilesData = {};
+      for (final doc in geofenceProfilesSnapshot.docs) {
+        profilesData[doc.id] = doc.data();
+      }
+
+      return setDays.any(
+        (setDay) =>
+            profilesData.containsKey(setDay) &&
+            profilesData[setDay]!['source'] == 'studentCustom',
+      );
     } catch (e) {
       print('❌ Error checking set day overrides for $userId: $e');
       return false;
@@ -315,6 +361,13 @@ class ComprehensiveGeofenceResolver {
     if (value is int) return value.toDouble();
     if (value is num) return value.toDouble();
     return null;
+  }
+
+  GeofenceBandType _parseBandType(dynamic value) {
+    if (value?.toString().toLowerCase() == 'floating') {
+      return GeofenceBandType.floating;
+    }
+    return GeofenceBandType.fixed; // Default to fixed
   }
 
   String _getDayDisplayName(String day) {

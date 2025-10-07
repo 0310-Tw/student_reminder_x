@@ -537,7 +537,7 @@ class _AttendanceAdminPageState extends State<AttendanceAdminPage> {
                       );
 
                   return _buildAttendanceRow(studentUid, date, attendanceDoc);
-                }).toList(),
+                }),
               ],
             ),
           );

@@ -216,8 +216,7 @@ class _EnhancedAdminIncidentPageState extends State<EnhancedAdminIncidentPage> {
                                       ],
                                     ),
                                   );
-                                })
-                                .toList(),
+                                }),
                           ],
                           onChanged: (value) {
                             setState(() {

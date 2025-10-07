@@ -15,7 +15,6 @@ import 'package:students_reminder/src/services/notification_service.dart';
 import 'package:students_reminder/src/admin/pages/admin_public_feeds.dart';
 import 'package:students_reminder/src/admin/pages/attendance_admin_page.dart';
 import 'package:students_reminder/src/timetable/timetable.dart';
-import 'package:students_reminder/src/features/geofence/student_geofence_dashboard.dart';
 
 class MainLayoutPage extends StatefulWidget {
   const MainLayoutPage({super.key});
