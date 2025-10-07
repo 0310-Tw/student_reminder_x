@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'package:students_reminder/src/admin/pages/enhanced_admin_geofence_page.dart';
-import 'package:students_reminder/src/admin/pages/enhanced_admin_incident_page.dart';
+import 'package:students_reminder/src/admin/pages/admin_geofence_page.dart';
+import 'package:students_reminder/src/admin/pages/admin_incident_page.dart';
 
 class TrendsPage extends StatefulWidget {
   const TrendsPage({super.key});
