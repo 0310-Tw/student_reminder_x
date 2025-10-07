@@ -595,7 +595,6 @@ class _StudentLocationSelectionPageState
                 end: Alignment.bottomRight,
               ),
             ),
-            
           ),
           Expanded(
             child: ListView(
@@ -607,10 +606,9 @@ class _StudentLocationSelectionPageState
                   'wednesday',
                   'thursday',
                   'friday',
-                  
                 ].map((day) => _buildDayScheduleCard(day, campusOptions)),
                 const SizedBox(height: 16),
-                
+
                 const SizedBox(height: 16),
                 _buildSaveButton(),
               ],
@@ -1041,11 +1039,6 @@ class _StudentLocationSelectionPageState
       ),
     );
   }
-
-      
-  
-
- 
 
   Widget _buildSaveButton() {
     return Container(

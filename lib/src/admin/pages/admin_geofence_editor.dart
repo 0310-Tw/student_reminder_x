@@ -124,6 +124,7 @@ class _AdminGeofenceEditorState extends State<AdminGeofenceEditor> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         backgroundColor: Color(0xFF2C3E50),
         foregroundColor: Colors.white,
@@ -247,41 +248,70 @@ class _AdminGeofenceEditorState extends State<AdminGeofenceEditor> {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: RadioListTile<GeofenceBandType>(
-                                  title: Text('Fixed Band'),
-                                  subtitle: Text(
-                                    'Must be within designated geofence',
+                          Container(
+                            width: double.infinity,
+                            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<GeofenceBandType>(
+                                value: bandType,
+                                isExpanded: true,
+                                onChanged: (GeofenceBandType? newValue) {
+                                  setState(() {
+                                    bandType = newValue!;
+                                  });
+                                },
+                                items: [
+                                  DropdownMenuItem<GeofenceBandType>(
+                                    value: GeofenceBandType.fixed,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          'Fixed Band',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        Text(
+                                          'Must be within designated geofence',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey[600],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                  value: GeofenceBandType.fixed,
-                                  groupValue: bandType,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      bandType = value!;
-                                    });
-                                  },
-                                ),
+                                  DropdownMenuItem<GeofenceBandType>(
+                                    value: GeofenceBandType.floating,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          'Floating Band',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        Text(
+                                          'May clock in/out anywhere',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey[600],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: RadioListTile<GeofenceBandType>(
-                                  title: Text('Floating Band'),
-                                  subtitle: Text('May clock in/out anywhere'),
-                                  value: GeofenceBandType.floating,
-                                  groupValue: bandType,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      bandType = value!;
-                                    });
-                                  },
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
                         ],
                       ),

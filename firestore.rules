@@ -177,6 +177,12 @@ service cloud.firestore {
       allow list: if isAdmin() || isOwner(userId);
     }
 
+    // Geofencing collections - geofence profiles (new structure)
+    match /users/{userId}/geofence_profiles/{profileId} {
+      allow read, write: if isAdmin() || isOwner(userId);
+      allow list: if isAdmin() || isOwner(userId);
+    }
+
     // Geofencing collections - geofence incidents
     match /geofence_incidents/{incidentId} {
       allow read, write: if isAdmin();

@@ -59,7 +59,6 @@ class _TrendsPageState extends State<TrendsPage> {
 
             // Incident Details Tab
             EnhancedAdminIncidentPage(),
-            
           ],
         ),
       ),
@@ -94,8 +93,6 @@ class _TrendsPageState extends State<TrendsPage> {
           _buildOverviewStats(),
 
           SizedBox(height: 16),
-
-         
 
           SizedBox(height: 24),
 
@@ -141,8 +138,6 @@ class _TrendsPageState extends State<TrendsPage> {
   }
 
   // Incidents Tab Content
- 
-  
 
   // Weekly Trend Comparison Widget
   Widget _buildWeeklyTrendComparison() {
@@ -907,8 +902,4 @@ class _TrendsPageState extends State<TrendsPage> {
       ),
     );
   }
-
-
-
-
 }

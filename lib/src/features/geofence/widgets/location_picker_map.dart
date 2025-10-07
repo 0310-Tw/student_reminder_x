@@ -121,8 +121,6 @@ class _LocationPickerMapState extends State<LocationPickerMap> {
     }
   }
 
-
-
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -215,9 +213,6 @@ class _LocationPickerMapState extends State<LocationPickerMap> {
                 end: Alignment.bottomRight,
               ),
             ),
-           
-           
-           
           ),
 
           // Enhanced Map with better styling
