@@ -40,7 +40,6 @@ class AppRoutes {
   static const trends = '/trends';
   static const studentGeofenceDashboard = '/student-geofence-dashboard';
 
-
   static Route<dynamic> onGenerateRoute(RouteSettings setting) {
     final url = Uri.parse(setting.name ?? '');
     if (url.pathSegments.isNotEmpty && url.pathSegments[0] == 'student') {

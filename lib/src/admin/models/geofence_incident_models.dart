@@ -44,13 +44,14 @@ class GeofenceIncident {
       studentId: data['studentId'] ?? '',
       studentName: data['studentName'] ?? '',
       direction: data['direction'] ?? 'check_in',
-      occurredAt: (data['occurredAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      occurredAt:
+          (data['occurredAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       distance: (data['distance'] ?? 0.0).toDouble(),
       designatedLocation: IncidentLocation.fromMap(
-        data['designatedLocation'] ?? <String, dynamic>{}
+        data['designatedLocation'] ?? <String, dynamic>{},
       ),
       actualLocation: IncidentLocation.fromMap(
-        data['actualLocation'] ?? <String, dynamic>{}
+        data['actualLocation'] ?? <String, dynamic>{},
       ),
       bandType: data['bandType'] ?? 'fixed',
       status: data['status'] ?? 'pending',
@@ -77,7 +78,9 @@ class GeofenceIncident {
       'createdAt': Timestamp.fromDate(createdAt),
       'messageText': messageText,
       'acknowledgedBy': acknowledgedBy,
-      'acknowledgedAt': acknowledgedAt != null ? Timestamp.fromDate(acknowledgedAt!) : null,
+      'acknowledgedAt': acknowledgedAt != null
+          ? Timestamp.fromDate(acknowledgedAt!)
+          : null,
       'notes': notes,
     };
   }
@@ -186,7 +189,8 @@ class IncidentLocation {
   }
 
   /// Get coordinates as string
-  String get coordinates => '${lat.toStringAsFixed(6)}, ${lng.toStringAsFixed(6)}';
+  String get coordinates =>
+      '${lat.toStringAsFixed(6)}, ${lng.toStringAsFixed(6)}';
 }
 
 /// Filter options for incident list
@@ -194,7 +198,8 @@ class IncidentFilters {
   final DateTimeRange? dateRange;
   final String? studentClass;
   final String? bandType; // 'fixed', 'floating', or null for all
-  final String? status; // 'pending', 'acknowledged', 'resolved', or null for all
+  final String?
+  status; // 'pending', 'acknowledged', 'resolved', or null for all
   final String? direction; // 'check_in', 'check_out', or null for all
 
   const IncidentFilters({
@@ -225,10 +230,10 @@ class IncidentFilters {
   /// Check if any filters are active
   bool get hasActiveFilters {
     return dateRange != null ||
-           studentClass != null ||
-           bandType != null ||
-           status != null ||
-           direction != null;
+        studentClass != null ||
+        bandType != null ||
+        status != null ||
+        direction != null;
   }
 
   /// Get active filters count
@@ -302,7 +307,7 @@ class IncidentStatistics {
       incidentsByDay[dayKey] = (incidentsByDay[dayKey] ?? 0) + 1;
 
       // Count by student
-      incidentsByStudent[incident.studentId] = 
+      incidentsByStudent[incident.studentId] =
           (incidentsByStudent[incident.studentId] ?? 0) + 1;
     }
 
@@ -335,7 +340,8 @@ class IncidentStatistics {
   /// Get most incidents by student
   MapEntry<String, int>? get studentWithMostIncidents {
     if (incidentsByStudent.isEmpty) return null;
-    return incidentsByStudent.entries
-        .reduce((a, b) => a.value > b.value ? a : b);
+    return incidentsByStudent.entries.reduce(
+      (a, b) => a.value > b.value ? a : b,
+    );
   }
 }

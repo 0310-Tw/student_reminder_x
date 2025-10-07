@@ -22,13 +22,14 @@ class GeofenceAttendanceService {
   }) async {
     try {
       // Validate geofence first
-      final validation = await StudentGeofenceProfileService.validateAttendanceAttempt(
-        studentId: userId,
-        date: DateTime.now(),
-        slot: GeofenceSlot.checkIn,
-        currentPosition: position,
-        context: context,
-      );
+      final validation =
+          await StudentGeofenceProfileService.validateAttendanceAttempt(
+            studentId: userId,
+            date: DateTime.now(),
+            slot: GeofenceSlot.checkIn,
+            currentPosition: position,
+            context: context,
+          );
 
       if (!validation.allowed) {
         return AttendanceResult(
@@ -41,8 +42,9 @@ class GeofenceAttendanceService {
 
       // Proceed with regular clock-in
       final now = DateTime.now();
-      final dateId = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-      
+      final dateId =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
       final attendanceData = {
         'uid': userId,
         'inAt': Timestamp.now(),
@@ -87,13 +89,14 @@ class GeofenceAttendanceService {
   }) async {
     try {
       // Validate geofence first
-      final validation = await StudentGeofenceProfileService.validateAttendanceAttempt(
-        studentId: userId,
-        date: DateTime.now(),
-        slot: GeofenceSlot.checkOut,
-        currentPosition: position,
-        context: context,
-      );
+      final validation =
+          await StudentGeofenceProfileService.validateAttendanceAttempt(
+            studentId: userId,
+            date: DateTime.now(),
+            slot: GeofenceSlot.checkOut,
+            currentPosition: position,
+            context: context,
+          );
 
       if (!validation.allowed) {
         return AttendanceResult(
@@ -106,22 +109,23 @@ class GeofenceAttendanceService {
 
       // Proceed with regular clock-out
       final now = DateTime.now();
-      final dateId = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-      
+      final dateId =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
       await _firestore
           .collection('attendance')
           .doc(userId)
           .collection('days')
           .doc(dateId)
           .update({
-        'outAt': Timestamp.now(),
-        'outLat': position.latitude,
-        'outLng': position.longitude,
-        'outPlace': placeName,
-        'outGeofenceDistance': validation.distance,
-        'outGeofenceValidated': true,
-        'updatedAt': Timestamp.now(),
-      });
+            'outAt': Timestamp.now(),
+            'outLat': position.latitude,
+            'outLng': position.longitude,
+            'outPlace': placeName,
+            'outGeofenceDistance': validation.distance,
+            'outGeofenceValidated': true,
+            'updatedAt': Timestamp.now(),
+          });
 
       return AttendanceResult(
         success: true,
@@ -148,13 +152,15 @@ class GeofenceAttendanceService {
 
     for (final studentId in studentIds) {
       try {
-        final effective = await StudentGeofenceProfileService.getEffectiveGeofence(
-          studentId, 
-          date
-        );
-        
+        final effective =
+            await StudentGeofenceProfileService.getEffectiveGeofence(
+              studentId,
+              date,
+            );
+
         // Get today's attendance record
-        final dateId = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+        final dateId =
+            '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
         final attendanceDoc = await _firestore
             .collection('attendance')
             .doc(studentId)
@@ -163,7 +169,7 @@ class GeofenceAttendanceService {
             .get();
 
         StudentComplianceStatus status;
-        
+
         if (!attendanceDoc.exists) {
           status = StudentComplianceStatus(
             studentId: studentId,
@@ -181,15 +187,17 @@ class GeofenceAttendanceService {
 
         results.add(status);
       } catch (e) {
-        results.add(StudentComplianceStatus(
-          studentId: studentId,
-          date: date,
-          isCompliant: false,
-          complianceLevel: ComplianceLevel.error,
-          message: 'Validation error: $e',
-          checkInDistance: null,
-          checkOutDistance: null,
-        ));
+        results.add(
+          StudentComplianceStatus(
+            studentId: studentId,
+            date: date,
+            isCompliant: false,
+            complianceLevel: ComplianceLevel.error,
+            message: 'Validation error: $e',
+            checkInDistance: null,
+            checkOutDistance: null,
+          ),
+        );
       }
     }
 
@@ -205,18 +213,18 @@ class GeofenceAttendanceService {
   ) {
     final hasCheckIn = attendanceData['inAt'] != null;
     final hasCheckOut = attendanceData['outAt'] != null;
-    
+
     // For floating bands, always compliant if checked in
     if (effective.bandType == BandType.floating) {
       return StudentComplianceStatus(
         studentId: studentId,
         date: date,
         isCompliant: hasCheckIn,
-        complianceLevel: hasCheckIn 
-            ? ComplianceLevel.full 
+        complianceLevel: hasCheckIn
+            ? ComplianceLevel.full
             : ComplianceLevel.absent,
-        message: hasCheckIn 
-            ? 'Floating band - compliant' 
+        message: hasCheckIn
+            ? 'Floating band - compliant'
             : 'No check-in recorded',
         checkInDistance: null,
         checkOutDistance: null,
@@ -366,10 +374,10 @@ class StudentComplianceStatus {
 
 /// Levels of geofence compliance
 enum ComplianceLevel {
-  full,     // Fully compliant with geofences
-  partial,  // Some violations but present
-  absent,   // No attendance record
-  error,    // Error in validation
+  full, // Fully compliant with geofences
+  partial, // Some violations but present
+  absent, // No attendance record
+  error, // Error in validation
 }
 
 /// Geofence statistics for dashboard

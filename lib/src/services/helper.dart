@@ -57,6 +57,9 @@ Future<bool> handleClockAction({
   }
 
   // Outside zone:
+  print(
+    '🌐 Outside geofence - Distance: ${distance.toInt()}m, Policy: ${profile.outsidePolicy}',
+  );
   if (profile.outsidePolicy == 'block') {
     // Show optional message if provided
     if (profile.outsideMessage != null && profile.outsideMessage!.isNotEmpty) {
@@ -76,8 +79,11 @@ Future<bool> handleClockAction({
       );
     }
     return false; // Block clock-in/out
-  } else {
+  } else if (profile.outsidePolicy == 'allow_flag') {
     // allow_flag: allow but log incident
+    print(
+      '🚨 Creating geofence incident: ${actionType.toUpperCase()} violation - Distance: ${distance.toInt()}m',
+    );
     await GeofenceService.instance.logIncident(
       studentId: studentId,
       dateId: dateId,
@@ -88,6 +94,7 @@ Future<bool> handleClockAction({
       designatedLng: targetLng,
       distance: distance,
     );
+    print('✅ Geofence incident created successfully');
 
     // Optionally still show message
     if (profile.outsideMessage != null && profile.outsideMessage!.isNotEmpty) {
@@ -97,6 +104,10 @@ Future<bool> handleClockAction({
       ).showSnackBar(SnackBar(content: Text(profile.outsideMessage!)));
     }
 
+    return true; // Allow
+  } else {
+    // Default case for 'allow' policy (no incident logging)
+    print('✅ Allow policy - no incident logged');
     return true; // Allow
   }
 }

@@ -12,7 +12,7 @@ class GeofenceIncidentService {
       final docRef = await _firestore
           .collection(_incidentsCollection)
           .add(incident.toMap());
-      
+
       return docRef.id;
     } catch (e) {
       print('Error creating incident: $e');
@@ -28,17 +28,24 @@ class GeofenceIncidentService {
     bool descending = true,
   }) {
     try {
-      Query<Map<String, dynamic>> query = _firestore
-          .collection(_incidentsCollection);
+      Query<Map<String, dynamic>> query = _firestore.collection(
+        _incidentsCollection,
+      );
 
       // Apply filters
       if (filters != null) {
         if (filters.dateRange != null) {
           query = query
-              .where('occurredAt', 
-                  isGreaterThanOrEqualTo: Timestamp.fromDate(filters.dateRange!.start))
-              .where('occurredAt', 
-                  isLessThanOrEqualTo: Timestamp.fromDate(filters.dateRange!.end));
+              .where(
+                'occurredAt',
+                isGreaterThanOrEqualTo: Timestamp.fromDate(
+                  filters.dateRange!.start,
+                ),
+              )
+              .where(
+                'occurredAt',
+                isLessThanOrEqualTo: Timestamp.fromDate(filters.dateRange!.end),
+              );
         }
 
         if (filters.studentClass != null && filters.studentClass!.isNotEmpty) {
@@ -86,10 +93,10 @@ class GeofenceIncidentService {
           .limit(limit)
           .snapshots()
           .map((snapshot) {
-        return snapshot.docs
-            .map((doc) => GeofenceIncident.fromMap(doc.data(), doc.id))
-            .toList();
-      });
+            return snapshot.docs
+                .map((doc) => GeofenceIncident.fromMap(doc.data(), doc.id))
+                .toList();
+          });
     } catch (e) {
       print('Error getting incidents for student $studentId: $e');
       return Stream.value([]);
@@ -116,7 +123,7 @@ class GeofenceIncidentService {
 
   /// Update an incident (e.g., acknowledge it)
   static Future<void> updateIncident(
-    String incidentId, 
+    String incidentId,
     Map<String, dynamic> updates,
   ) async {
     try {
@@ -132,7 +139,7 @@ class GeofenceIncidentService {
 
   /// Acknowledge an incident
   static Future<void> acknowledgeIncident(
-    String incidentId, 
+    String incidentId,
     String acknowledgedBy, {
     String? notes,
   }) async {
@@ -151,7 +158,7 @@ class GeofenceIncidentService {
 
   /// Mark incident as resolved
   static Future<void> resolveIncident(
-    String incidentId, 
+    String incidentId,
     String resolvedBy, {
     String? notes,
   }) async {
@@ -187,17 +194,22 @@ class GeofenceIncidentService {
     DateTime? endDate,
   }) async {
     try {
-      Query<Map<String, dynamic>> query = _firestore
-          .collection(_incidentsCollection);
+      Query<Map<String, dynamic>> query = _firestore.collection(
+        _incidentsCollection,
+      );
 
       if (startDate != null) {
-        query = query.where('occurredAt', 
-            isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
+        query = query.where(
+          'occurredAt',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
+        );
       }
 
       if (endDate != null) {
-        query = query.where('occurredAt', 
-            isLessThanOrEqualTo: Timestamp.fromDate(endDate));
+        query = query.where(
+          'occurredAt',
+          isLessThanOrEqualTo: Timestamp.fromDate(endDate),
+        );
       }
 
       final snapshot = await query.get();
@@ -250,7 +262,7 @@ class GeofenceIncidentService {
 
   /// Bulk operations for multiple incidents
   static Future<void> bulkAcknowledge(
-    List<String> incidentIds, 
+    List<String> incidentIds,
     String acknowledgedBy,
   ) async {
     try {
@@ -260,7 +272,7 @@ class GeofenceIncidentService {
         final docRef = _firestore
             .collection(_incidentsCollection)
             .doc(incidentId);
-        
+
         batch.update(docRef, {
           'status': 'acknowledged',
           'acknowledgedBy': acknowledgedBy,

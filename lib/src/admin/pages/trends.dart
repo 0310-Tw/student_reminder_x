@@ -781,7 +781,7 @@ class _TrendsPageState extends State<TrendsPage> {
 
         return StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
-              .collection('geofence_incidents')
+              .collectionGroup('incidents')
               .snapshots(),
           builder: (context, incidentsSnapshot) {
             // Count recent incidents/overrides (last 30 days)

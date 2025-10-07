@@ -53,11 +53,11 @@ class _EnhancedAdminIncidentPageState extends State<EnhancedAdminIncidentPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Color(0xFFF7F9FC),
-      
+
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
-            .collection('geofence_incidents')
-            .orderBy('timestamp', descending: true)
+            .collectionGroup('incidents')
+            .orderBy('createdAt', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -87,13 +87,13 @@ class _EnhancedAdminIncidentPageState extends State<EnhancedAdminIncidentPage> {
           final Set<String> studentsWithIncidents = {};
 
           for (final incident in incidents) {
-            final userId = incident['userId'] as String?;
-            if (userId != null) {
-              studentsWithIncidents.add(userId);
-              if (!incidentsByStudent.containsKey(userId)) {
-                incidentsByStudent[userId] = [];
+            final studentId = incident['studentId'] as String?;
+            if (studentId != null) {
+              studentsWithIncidents.add(studentId);
+              if (!incidentsByStudent.containsKey(studentId)) {
+                incidentsByStudent[studentId] = [];
               }
-              incidentsByStudent[userId]!.add(incident);
+              incidentsByStudent[studentId]!.add(incident);
             }
           }
 
@@ -106,8 +106,6 @@ class _EnhancedAdminIncidentPageState extends State<EnhancedAdminIncidentPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    
-
                     // Quick Stats Row
                     Row(
                       children: [

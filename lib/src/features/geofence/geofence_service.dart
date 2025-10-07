@@ -745,11 +745,12 @@ class GeofenceService {
       return const Stream.empty();
     }
 
-    // Simplified query to avoid composite index requirement
+    // Query the correct collection structure: geofenceIncidents/{studentId}/incidents
     // The date filtering will be done client-side in the UI
     return _firestore
-        .collection('geofence_incidents')
-        .where('studentId', isEqualTo: userId)
+        .collection('geofenceIncidents')
+        .doc(userId)
+        .collection('incidents')
         .orderBy('createdAt', descending: true)
         .limit(100) // Limit to reduce data transfer
         .snapshots();
@@ -944,7 +945,9 @@ class GeofenceService {
             outLng: data['longitude'].toDouble(),
             outRadius: (data['radius'] ?? 100.0).toDouble(),
             bandType: data['bandType'] ?? 'fixed',
-            outsidePolicy: 'allow',
+            outsidePolicy:
+                data['outsidePolicy'] ??
+                'allow_flag', // Use configured policy or default to allow_flag
             outsideMessage: data['outsideAreaMessage'],
           );
         }
@@ -970,20 +973,53 @@ class GeofenceService {
     required double designatedLng,
     required double distance,
   }) async {
-    await _firestore
-        .collection('geofenceIncidents')
-        .doc(studentId)
-        .collection('incidents')
-        .add({
-          'type': type,
-          'dateId': dateId,
-          'actualLat': actualLat,
-          'actualLng': actualLng,
-          'designatedLat': designatedLat,
-          'designatedLng': designatedLng,
-          'distance': distance,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
+    try {
+      // Get user details for better incident tracking
+      String userName = 'Unknown Student';
+      try {
+        final userDoc = await _firestore
+            .collection('users')
+            .doc(studentId)
+            .get();
+        final userData = userDoc.data();
+        if (userData != null) {
+          final firstName = userData['firstName'] ?? '';
+          final lastName = userData['lastName'] ?? '';
+          userName = '$firstName $lastName'.trim();
+          if (userName.isEmpty) {
+            userName = userData['email'] ?? 'Unknown Student';
+          }
+        }
+      } catch (e) {
+        print('Error getting user name: $e');
+      }
+
+      await _firestore
+          .collection('geofenceIncidents')
+          .doc(studentId)
+          .collection('incidents')
+          .add({
+            'type': type,
+            'dateId': dateId,
+            'studentId': studentId, // Add studentId for admin queries
+            'userName': userName, // Add userName for admin display
+            'actualLat': actualLat,
+            'actualLng': actualLng,
+            'actualLatitude': actualLat, // Add admin-expected field name
+            'actualLongitude': actualLng, // Add admin-expected field name
+            'designatedLat': designatedLat,
+            'designatedLng': designatedLng,
+            'expectedLatitude': designatedLat, // Add admin-expected field name
+            'expectedLongitude': designatedLng, // Add admin-expected field name
+            'distance': distance,
+            'createdAt': FieldValue.serverTimestamp(),
+            'timestamp':
+                FieldValue.serverTimestamp(), // Add admin-expected field name
+          });
+      print('✅ Geofence incident logged for $userName ($type)');
+    } catch (e) {
+      print('❌ Error logging incident: $e');
+    }
   }
 
   /// Stream incidents for a student (from original service)

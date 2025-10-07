@@ -187,12 +187,21 @@ service cloud.firestore {
     // Main geofenceIncidents collection with nested incidents subcollection
     match /geofenceIncidents/{studentId} {
       allow read, write: if isAdmin() || isOwner(studentId);
+      allow create: if isAuthenticated(); // Allow creating student documents
       
       // Nested incidents subcollection
       match /incidents/{incidentId} {
-        allow read, write: if isAdmin() || isOwner(studentId);
-        allow create: if isAuthenticated();
+        allow read: if isAdmin() || isOwner(studentId);
+        allow write: if isAdmin() || isOwner(studentId);
+        allow create: if isAuthenticated(); // Allow system/students to create incidents
+        allow list: if isAdmin() || isOwner(studentId); // Allow querying incidents
       }
+    }
+
+    // Collection group query for all incidents (admin access)
+    match /{path=**}/incidents/{incidentId} {
+      allow read: if isAdmin();
+      allow list: if isAdmin();
     }
 
     // Alternative geofence incidents collection structure
