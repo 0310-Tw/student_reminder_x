@@ -167,11 +167,7 @@ service cloud.firestore {
       allow list: if isAdmin();
     }
 
-    // Geofencing collections - geofence profiles
-    match /users/{userId}/geofences/{geofenceId} {
-      allow read, write: if isAdmin() || isOwner(userId);
-      allow list: if isAdmin() || isOwner(userId);
-    }
+
 
     // Geofencing collections - geofence profiles (new structure)
     match /users/{userId}/geofence_profiles/{profileId} {
@@ -205,12 +201,7 @@ service cloud.firestore {
       allow list: if isAdmin() || isOwner(userId);
     }
 
-    // Global geofence collection group queries
-    match /{path=**}/geofences/{geofenceId} {
-      allow read: if isAdmin() || 
-                     (isAuthenticated() && 
-                      resource.data.studentId == request.auth.uid);
-    }
+
 
     match /{path=**}/geofenceIncidents/{incidentId} {
       allow read: if isAdmin() || 

@@ -746,10 +746,10 @@ class _TrendsPageState extends State<TrendsPage> {
   }
 
   Widget _buildOverviewStats() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('users').snapshots(),
-      builder: (context, usersSnapshot) {
-        if (usersSnapshot.connectionState == ConnectionState.waiting) {
+    return FutureBuilder<Map<String, int>>(
+      future: _calculateGeofenceStatistics(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(
             child: Padding(
               padding: EdgeInsets.all(32),
@@ -758,38 +758,26 @@ class _TrendsPageState extends State<TrendsPage> {
           );
         }
 
-        if (usersSnapshot.hasError) {
+        if (snapshot.hasError) {
           return Center(
             child: Padding(
               padding: EdgeInsets.all(16),
-              child: Text('Error loading data: ${usersSnapshot.error}'),
+              child: Text('Error loading data: ${snapshot.error}'),
             ),
           );
         }
 
-        // Calculate real statistics from user data
-        int totalStudents = 0;
-        int usersWithGeofences = 0;
-        int totalCustomLocations = 0;
+        final stats =
+            snapshot.data ??
+            {
+              'totalStudents': 0,
+              'usersWithGeofences': 0,
+              'totalCustomLocations': 0,
+            };
 
-        if (usersSnapshot.hasData) {
-          for (var doc in usersSnapshot.data!.docs) {
-            final data = doc.data() as Map<String, dynamic>?;
-
-            if (data != null) {
-              // Count all users as students (exclude admin check for now)
-              totalStudents++;
-
-              // Check if user has geofences configured
-              if (data['geofences'] != null) {
-                usersWithGeofences++;
-
-                final geofences = data['geofences'] as Map<String, dynamic>;
-                totalCustomLocations += geofences.length;
-              }
-            }
-          }
-        }
+        final totalStudents = stats['totalStudents']!;
+        final usersWithGeofences = stats['usersWithGeofences']!;
+        final totalCustomLocations = stats['totalCustomLocations']!;
 
         return StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
@@ -856,6 +844,64 @@ class _TrendsPageState extends State<TrendsPage> {
         );
       },
     );
+  }
+
+  // Calculate real geofence statistics using the same logic as Enhanced Geofence Management
+  Future<Map<String, int>> _calculateGeofenceStatistics() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .orderBy('lastName')
+          .get();
+
+      // Calculate real statistics by checking geofence_profiles subcollection
+      // Only count students, not admins
+      int totalStudents = 0;
+      int usersWithGeofences = 0;
+      int totalCustomLocations = 0;
+
+      for (var doc in snapshot.docs) {
+        try {
+          final userData = doc.data();
+          final userRole = userData['role'] ?? 'student';
+
+          // Skip admin users for statistics
+          if (userRole == 'admin') {
+            continue;
+          }
+
+          // Count as student
+          totalStudents++;
+
+          final geofenceProfilesSnapshot = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(doc.id)
+              .collection('geofence_profiles')
+              .get();
+
+          if (geofenceProfilesSnapshot.docs.isNotEmpty) {
+            usersWithGeofences++;
+            totalCustomLocations += geofenceProfilesSnapshot.docs.length;
+          }
+        } catch (e) {
+          // Skip if error reading geofence profiles
+          print('Error processing user ${doc.id}: $e');
+        }
+      }
+
+      return {
+        'totalStudents': totalStudents,
+        'usersWithGeofences': usersWithGeofences,
+        'totalCustomLocations': totalCustomLocations,
+      };
+    } catch (e) {
+      print('Error calculating geofence statistics: $e');
+      return {
+        'totalStudents': 0,
+        'usersWithGeofences': 0,
+        'totalCustomLocations': 0,
+      };
+    }
   }
 
   Widget _buildStatCard(

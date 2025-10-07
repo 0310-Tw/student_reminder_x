@@ -88,40 +88,59 @@ class GeofenceService {
 
       print('🔍 Getting geofence profile for student: $userId, date: $dateId');
 
-      print('🔍 Checking geofences collection: geofences/$userId/days/$dateId');
-      final doc = await _firestore
-          .collection('geofences')
+      // First check users/{userId}/geofence_profiles/{dayName} where students and admins save
+      final dayName = _getDayName(today.weekday);
+      print(
+        '🔍 Checking geofence_profiles collection: users/$userId/geofence_profiles/${dayName.toLowerCase()}',
+      );
+      final geofenceDoc = await _firestore
+          .collection('users')
           .doc(userId)
-          .collection('days')
-          .doc(dateId)
+          .collection('geofence_profiles')
+          .doc(dayName.toLowerCase())
           .get();
 
-      if (doc.exists && doc.data() != null) {
-        final data = doc.data()!;
-        print('✅ Geofence profile found: $data');
-        return data;
-      } else {
-        // No admin-set profile found, create one based on student's schedule
-        print('📍 No admin profile found, creating from student schedule');
-        print(
-          '🎯 About to call _createProfileFromStudentSchedule with userId: $userId, today: $today',
-        );
+      if (geofenceDoc.exists && geofenceDoc.data() != null) {
+        final geofenceData = geofenceDoc.data()!;
+        print('✅ Geofence profile found: $geofenceData');
 
-        try {
-          final profile = await _createProfileFromStudentSchedule(
-            userId,
-            today,
-          );
-          print('📊 _createProfileFromStudentSchedule returned: $profile');
-          return profile;
-        } catch (scheduleError) {
-          print(
-            '💥 ERROR in _createProfileFromStudentSchedule: $scheduleError',
-          );
-          print('📝 Error type: ${scheduleError.runtimeType}');
-          print('📜 Stack trace: ${StackTrace.current}');
-          rethrow; // This will be caught by the outer catch block
+        // Convert from geofence_profiles format to expected format
+        if (geofenceData['latitude'] != null &&
+            geofenceData['longitude'] != null) {
+          return {
+            'checkInLocation': {
+              'lat': geofenceData['latitude'],
+              'lng': geofenceData['longitude'],
+              'radius': geofenceData['radius'] ?? 100.0,
+            },
+            'checkOutLocation': {
+              'lat': geofenceData['latitude'],
+              'lng': geofenceData['longitude'],
+              'radius': geofenceData['radius'] ?? 100.0,
+            },
+            'bandType': geofenceData['bandType'] ?? 'fixed',
+            'outsidePolicy': 'allow',
+            'outsideMessage': geofenceData['outsideAreaMessage'],
+            'source': geofenceData['source'] ?? 'unknown',
+          };
         }
+      }
+
+      // No admin-set profile found, create one based on student's schedule
+      print('📍 No admin profile found, creating from student schedule');
+      print(
+        '🎯 About to call _createProfileFromStudentSchedule with userId: $userId, today: $today',
+      );
+
+      try {
+        final profile = await _createProfileFromStudentSchedule(userId, today);
+        print('📊 _createProfileFromStudentSchedule returned: $profile');
+        return profile;
+      } catch (scheduleError) {
+        print('💥 ERROR in _createProfileFromStudentSchedule: $scheduleError');
+        print('📝 Error type: ${scheduleError.runtimeType}');
+        print('📜 Stack trace: ${StackTrace.current}');
+        rethrow; // This will be caught by the outer catch block
       }
     } catch (e) {
       print('❌ Error getting geofence profile: $e');
@@ -866,12 +885,32 @@ class GeofenceService {
     required String dateId, // e.g. 20251001
     required GeofenceProfile profile,
   }) async {
-    await _firestore
-        .collection('geofences')
-        .doc(studentId)
-        .collection('days')
-        .doc(dateId)
-        .set(profile.toMap(), SetOptions(merge: true));
+    try {
+      // Parse dateId to get day of week
+      final dt = DateTime.parse(dateId);
+      final dayName = _getDayName(dt.weekday);
+
+      // Save to geofence_profiles collection (same as students and admins)
+      await _firestore
+          .collection('users')
+          .doc(studentId)
+          .collection('geofence_profiles')
+          .doc(dayName.toLowerCase())
+          .set({
+            'latitude': profile.inLat,
+            'longitude': profile.inLng,
+            'radius': profile.inRadius,
+            'bandType': profile.bandType,
+            'outsideAreaMessage': profile.outsideMessage,
+            'source': 'systemGenerated',
+            'description': 'System generated profile',
+            'updatedAt': FieldValue.serverTimestamp(),
+            'updatedBy': 'system',
+          }, SetOptions(merge: true));
+    } catch (e) {
+      print('Error setting profile: $e');
+      rethrow;
+    }
   }
 
   /// Fetch a geofence profile for a specific day, falling back to default if none exists
@@ -879,20 +918,45 @@ class GeofenceService {
     required String studentId,
     required String dateId,
   }) async {
-    final doc = await _firestore
-        .collection('geofences')
-        .doc(studentId)
-        .collection('days')
-        .doc(dateId)
-        .get();
+    try {
+      // Parse dateId to get day of week
+      final dt = DateTime.parse(dateId); // dateId like 20251001
+      final dayName = _getDayName(dt.weekday);
 
-    if (doc.exists) {
-      return GeofenceProfile.fromDoc(doc);
+      // Check geofence_profiles collection (where students and admins save)
+      final geofenceDoc = await _firestore
+          .collection('users')
+          .doc(studentId)
+          .collection('geofence_profiles')
+          .doc(dayName.toLowerCase())
+          .get();
+
+      if (geofenceDoc.exists && geofenceDoc.data() != null) {
+        final data = geofenceDoc.data()!;
+
+        // Convert from geofence_profiles format to GeofenceProfile format
+        if (data['latitude'] != null && data['longitude'] != null) {
+          return GeofenceProfile(
+            inLat: data['latitude'].toDouble(),
+            inLng: data['longitude'].toDouble(),
+            inRadius: (data['radius'] ?? 100.0).toDouble(),
+            outLat: data['latitude'].toDouble(),
+            outLng: data['longitude'].toDouble(),
+            outRadius: (data['radius'] ?? 100.0).toDouble(),
+            bandType: data['bandType'] ?? 'fixed',
+            outsidePolicy: 'allow',
+            outsideMessage: data['outsideAreaMessage'],
+          );
+        }
+      }
+
+      // No profile saved → return default based on day of week
+      return _defaultProfileForDay(dt);
+    } catch (e) {
+      print('Error getting profile: $e');
+      final dt = DateTime.parse(dateId);
+      return _defaultProfileForDay(dt);
     }
-
-    // No profile saved → return default based on day of week
-    final dt = DateTime.parse(dateId); // dateId like 20251001
-    return _defaultProfileForDay(dt);
   }
 
   /// Log a geofence incident when a student clocks in/out outside the zone (from original service)
@@ -961,14 +1025,15 @@ class GeofenceService {
     String studentId,
   ) async {
     try {
+      // Get from geofence_profiles collection (where students and admins save)
       final snapshot = await _firestore
-          .collection('geofences')
+          .collection('users')
           .doc(studentId)
-          .collection('days')
+          .collection('geofence_profiles')
           .get();
 
       return snapshot.docs
-          .map((doc) => {'dateId': doc.id, ...doc.data()})
+          .map((doc) => {'day': doc.id, ...doc.data()})
           .toList();
     } catch (e) {
       print('Error getting student profiles: $e');
@@ -976,100 +1041,43 @@ class GeofenceService {
     }
   }
 
-  /// Save geofence for a specific weekday (Mon–Fri only)
-  Future<void> saveGeofence(
-    String userId,
-    String day,
-    double lat,
-    double lng,
-    double radius,
-  ) async {
-    // ensure day is lowercase and valid
-    final validDays = ["monday", "tuesday", "wednesday", "thursday", "friday"];
-    if (!validDays.contains(day.toLowerCase())) {
-      throw Exception("Invalid day. Use Monday–Friday only.");
-    }
-
-    await _firestore.collection("users").doc(userId).set({
-      "geofences": {
-        day.toLowerCase(): {"lat": lat, "lng": lng, "radius": radius},
-      },
-    }, SetOptions(merge: true));
-  }
-
-  /// Get one day's geofence
+  /// Get one day's geofence - Updated to read from geofence_profiles where students/admins save
   Future<Map<String, dynamic>?> getGeofence(String userId, String day) async {
     try {
       print('🔍 GetGeofence: Looking up user: $userId, day: $day');
-      final snapshot = await _firestore.collection("users").doc(userId).get();
-      if (!snapshot.exists) {
-        print('❌ User document does not exist');
-        return null;
+
+      // Check the geofence_profiles subcollection first (where students and admins save)
+      final geofenceDoc = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('geofence_profiles')
+          .doc(day.toLowerCase())
+          .get();
+
+      if (geofenceDoc.exists && geofenceDoc.data() != null) {
+        final geofenceData = geofenceDoc.data()!;
+        print('✅ Found geofence in geofence_profiles: $geofenceData');
+
+        // Convert to expected format
+        if (geofenceData['latitude'] != null &&
+            geofenceData['longitude'] != null) {
+          return {
+            'lat': geofenceData['latitude'],
+            'lng': geofenceData['longitude'],
+            'radius': geofenceData['radius'] ?? 100.0,
+            'source': geofenceData['source'] ?? 'unknown',
+            'bandType': geofenceData['bandType'] ?? 'fixed',
+          };
+        }
       }
 
-      final data = snapshot.data();
-      print('📄 User document data: $data');
-
-      if (data == null || data["geofences"] == null) {
-        print('❌ No geofences field in user document');
-        return null;
-      }
-
-      final geofences = data["geofences"];
-      print(
-        '📍 Raw geofences data: $geofences (type: ${geofences.runtimeType})',
-      );
-
-      if (geofences is! Map<String, dynamic>) {
-        print(
-          '❌ Geofences is not a Map<String, dynamic>, it is: ${geofences.runtimeType}',
-        );
-        return null;
-      }
-
-      final dayData = geofences[day.toLowerCase()];
-      print('📅 Day data for $day: $dayData (type: ${dayData?.runtimeType})');
-
-      if (dayData == null) return null;
-
-      if (dayData is Map<String, dynamic>) {
-        print('✅ Returning valid geofence data: $dayData');
-        return dayData;
-      } else {
-        print('❌ Day data is not a Map, it is: ${dayData.runtimeType}');
-        return null;
-      }
+      // No geofence profile found
+      print('❌ No geofence profile found for user: $userId, day: $day');
+      return null;
     } catch (e) {
       print('❌ Exception in getGeofence: $e');
       return null;
     }
-  }
-
-  /// Get all geofences (Mon–Fri)
-  Future<Map<String, Map<String, dynamic>>> getAllGeofences(
-    String userId,
-  ) async {
-    final snapshot = await _firestore.collection("users").doc(userId).get();
-    final Map<String, Map<String, dynamic>> result = {};
-
-    if (snapshot.exists && snapshot.data() != null) {
-      final data = snapshot.data()!;
-      if (data["geofences"] != null) {
-        final geofences = data["geofences"] as Map<String, dynamic>;
-        for (final day in [
-          "monday",
-          "tuesday",
-          "wednesday",
-          "thursday",
-          "friday",
-        ]) {
-          if (geofences[day] != null) {
-            result[day] = Map<String, dynamic>.from(geofences[day]);
-          }
-        }
-      }
-    }
-    return result;
   }
 
   /// Helper method to safely extract double values

@@ -13,9 +13,9 @@ class GeofenceProfilesList extends StatelessWidget {
       appBar: AppBar(title: const Text('Geofence Profiles')),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
-            .collection('geofences')
+            .collection('users')
             .doc(studentId)
-            .collection('days')
+            .collection('geofence_profiles')
             .orderBy(FieldPath.documentId)
             .snapshots(),
         builder: (context, snapshot) {

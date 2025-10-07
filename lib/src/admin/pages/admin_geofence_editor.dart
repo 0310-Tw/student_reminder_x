@@ -76,28 +76,30 @@ class _AdminGeofenceEditorState extends State<AdminGeofenceEditor> {
 
   Future<void> _loadStudentCustomLocations() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
+      Set<Marker> allMarkers = {};
+
+      // Load current student's other day locations (blue markers)
+      final currentStudentSnapshot = await FirebaseFirestore.instance
           .collection('users')
           .doc(widget.studentId)
           .collection('geofence_profiles')
           .get();
 
-      Set<Marker> studentMarkers = {};
-
-      for (final doc in snapshot.docs) {
+      for (final doc in currentStudentSnapshot.docs) {
         final data = doc.data();
-        if (data['source'] == 'studentCustom') {
+        if (doc.id != widget.dateId) {
+          // Don't show current day being edited
           final lat = data['latitude']?.toDouble();
           final lng = data['longitude']?.toDouble();
-          final description = data['description'] ?? 'Student Location';
+          final description = data['description'] ?? 'Your Other Days';
 
           if (lat != null && lng != null) {
-            studentMarkers.add(
+            allMarkers.add(
               Marker(
-                markerId: MarkerId('student_${doc.id}'),
+                markerId: MarkerId('current_student_${doc.id}'),
                 position: LatLng(lat, lng),
                 infoWindow: InfoWindow(
-                  title: _formatDay(doc.id),
+                  title: 'Your ${_formatDay(doc.id)}',
                   snippet: description,
                 ),
                 icon: BitmapDescriptor.defaultMarkerWithHue(
@@ -109,10 +111,66 @@ class _AdminGeofenceEditorState extends State<AdminGeofenceEditor> {
         }
       }
 
+      // Load other students' locations for the same day (grey markers)
+      final allUsersSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('role', isEqualTo: 'student')
+          .get();
+
+      for (final userDoc in allUsersSnapshot.docs) {
+        if (userDoc.id != widget.studentId) {
+          // Skip current student
+          try {
+            final otherStudentProfile = await FirebaseFirestore.instance
+                .collection('users')
+                .doc(userDoc.id)
+                .collection('geofence_profiles')
+                .doc(widget.dateId)
+                .get();
+
+            if (otherStudentProfile.exists) {
+              final profileData = otherStudentProfile.data()!;
+              final lat = profileData['latitude']?.toDouble();
+              final lng = profileData['longitude']?.toDouble();
+
+              if (lat != null && lng != null) {
+                final userData = userDoc.data();
+                final studentName =
+                    '${userData['firstName'] ?? ''} ${userData['lastName'] ?? ''}'
+                        .trim();
+                final source = profileData['source'] ?? 'unknown';
+
+                allMarkers.add(
+                  Marker(
+                    markerId: MarkerId('other_student_${userDoc.id}'),
+                    position: LatLng(lat, lng),
+                    alpha: 0.7, // Semi-transparent
+                    infoWindow: InfoWindow(
+                      title: studentName,
+                      snippet:
+                          '${_formatDay(widget.dateId)} - ${_formatSource(source)}',
+                    ),
+                    icon: BitmapDescriptor.defaultMarkerWithHue(
+                      BitmapDescriptor.hueViolet, // Purple for other students
+                    ),
+                  ),
+                );
+              }
+            }
+          } catch (e) {
+            print('Error loading profile for student ${userDoc.id}: $e');
+          }
+        }
+      }
+
       setState(() {
-        markers = studentMarkers;
+        markers = allMarkers;
         isLoading = false;
       });
+
+      print(
+        'Loaded ${allMarkers.length} markers: ${allMarkers.where((m) => m.markerId.value.startsWith('current_student')).length} from current student, ${allMarkers.where((m) => m.markerId.value.startsWith('other_student')).length} from other students',
+      );
     } catch (e) {
       print('Error loading student locations: $e');
       setState(() {
@@ -145,7 +203,7 @@ class _AdminGeofenceEditorState extends State<AdminGeofenceEditor> {
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Tap on the map to set a new location for ${_formatDay(widget.dateId)}. Blue markers show other student custom locations.',
+                          'Tap on the map to set a new location for ${_formatDay(widget.dateId)}. Blue markers show your other days. Purple markers show other students\' locations for this day.',
                           style: TextStyle(
                             color: Colors.blue[700],
                             fontSize: 14,
@@ -457,6 +515,21 @@ class _AdminGeofenceEditorState extends State<AdminGeofenceEditor> {
         return 'Friday';
       default:
         return day;
+    }
+  }
+
+  String _formatSource(String source) {
+    switch (source) {
+      case 'setDay':
+        return 'Campus Default';
+      case 'fallback':
+        return 'Fallback';
+      case 'studentCustom':
+        return 'Student Set';
+      case 'adminOverride':
+        return 'Admin Override';
+      default:
+        return source;
     }
   }
 }

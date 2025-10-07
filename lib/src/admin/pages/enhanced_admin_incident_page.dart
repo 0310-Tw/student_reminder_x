@@ -106,26 +106,7 @@ class _EnhancedAdminIncidentPageState extends State<EnhancedAdminIncidentPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Icon(Icons.warning, color: Colors.red, size: 28),
-                        SizedBox(width: 12),
-                        Text(
-                          'Incident Management',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF2C3E50),
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Track students who violated geofence boundaries and analyze their locations',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                    ),
-                    SizedBox(height: 16),
+                    
 
                     // Quick Stats Row
                     Row(

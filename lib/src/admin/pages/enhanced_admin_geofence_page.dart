@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:students_reminder/src/admin/pages/admin_geofence_editor.dart';
 import 'package:students_reminder/src/admin/models/comprehensive_geofence_resolver.dart';
+import 'package:students_reminder/src/admin/pages/campus_location.dart';
+import 'package:students_reminder/src/admin/pages/daily_clockin_map_page.dart';
 
 class EnhancedAdminGeofencePage extends StatefulWidget {
   const EnhancedAdminGeofencePage({super.key});
@@ -48,11 +50,20 @@ class _EnhancedAdminGeofencePageState extends State<EnhancedAdminGeofencePage>
           .get();
 
       // Calculate real statistics by checking geofence_profiles subcollection
+      // Only count students, not admins
       int usersWithGeofences = 0;
       int totalCustomLocations = 0;
 
       for (var doc in snapshot.docs) {
         try {
+          final userData = doc.data();
+          final userRole = userData['role'] ?? 'student';
+
+          // Skip admin users for statistics
+          if (userRole == 'admin') {
+            continue;
+          }
+
           final geofenceProfilesSnapshot = await FirebaseFirestore.instance
               .collection('users')
               .doc(doc.id)
@@ -68,30 +79,37 @@ class _EnhancedAdminGeofencePageState extends State<EnhancedAdminGeofencePage>
         }
       }
 
-      setState(() {
-        allUsers = snapshot.docs.map((doc) {
-          final data = doc.data();
-          return {
-            'id': doc.id,
-            'name': '${data['firstName'] ?? ''} ${data['lastName'] ?? ''}',
-            'email': data['email'] ?? '',
-            'role': data['role'] ?? 'student',
-          };
-        }).toList();
+      if (mounted) {
+        setState(() {
+          allUsers = snapshot.docs.map((doc) {
+            final data = doc.data();
+            return {
+              'id': doc.id,
+              'name': '${data['firstName'] ?? ''} ${data['lastName'] ?? ''}',
+              'email': data['email'] ?? '',
+              'role': data['role'] ?? 'student',
+            };
+          }).toList();
 
-        // Update real statistics
-        totalUsers = allUsers.length;
-        activeGeofences = usersWithGeofences;
-        customLocations = totalCustomLocations;
-        overrides = 0; // Could be calculated from admin overrides if needed
+          // Update real statistics - only count students
+          final studentsOnly = allUsers
+              .where((user) => user['role'] == 'student')
+              .toList();
+          totalUsers = studentsOnly.length;
+          activeGeofences = usersWithGeofences;
+          customLocations = totalCustomLocations;
+          overrides = 0; // Could be calculated from admin overrides if needed
 
-        isLoading = false;
-      });
+          isLoading = false;
+        });
+      }
     } catch (e) {
       print('Error loading users: $e');
-      setState(() {
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
 
@@ -146,7 +164,7 @@ class _EnhancedAdminGeofencePageState extends State<EnhancedAdminGeofencePage>
             children: [
               Expanded(
                 child: _buildStatCard(
-                  'Total Users',
+                  'Total Students',
                   totalUsers.toString(),
                   Icons.people,
                   Colors.blue,
@@ -155,7 +173,7 @@ class _EnhancedAdminGeofencePageState extends State<EnhancedAdminGeofencePage>
               SizedBox(width: 12),
               Expanded(
                 child: _buildStatCard(
-                  'Active Geofences',
+                  'Students with Geofences',
                   activeGeofences.toString(),
                   Icons.location_on,
                   Colors.green,
@@ -217,6 +235,64 @@ class _EnhancedAdminGeofencePageState extends State<EnhancedAdminGeofencePage>
                 style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
               SizedBox(height: 12),
+              Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          icon: Icon(Icons.map, size: 20),
+                          label: Text('View Daily Clock-In Map'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Color(0xFF2C3E50),
+                            foregroundColor: Colors.white,
+                            padding: EdgeInsets.symmetric(
+                              vertical: 12,
+                              horizontal: 16,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          onPressed: () {
+                            _showDatePicker();
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 8),
+                  // Row(
+                  //   children: [
+                  //     Expanded(
+                  //       child: ElevatedButton.icon(
+                  //         icon: Icon(Icons.today, size: 20),
+                  //         label: Text('View Today\'s Clock-Ins'),
+                  //         style: ElevatedButton.styleFrom(
+                  //           backgroundColor: Colors.green,
+                  //           foregroundColor: Colors.white,
+                  //           padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  //           shape: RoundedRectangleBorder(
+                  //             borderRadius: BorderRadius.circular(8),
+                  //           ),
+                  //         ),
+                  //         onPressed: () {
+                  //           Navigator.push(
+                  //             context,
+                  //             MaterialPageRoute(
+                  //               builder: (context) => DailyClockInMapPage(
+                  //                 selectedDate: DateTime.now(),
+                  //               ),
+                  //             ),
+                  //           );
+                  //         },
+                  //       ),
+                  //     ),
+                  //   ],
+                  // ),
+                ],
+              ),
+              SizedBox(height: 12),
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 12),
                 decoration: BoxDecoration(
@@ -238,9 +314,11 @@ class _EnhancedAdminGeofencePageState extends State<EnhancedAdminGeofencePage>
                         })
                         .toList(),
                     onChanged: (value) {
-                      setState(() {
-                        selectedUserId = value;
-                      });
+                      if (mounted) {
+                        setState(() {
+                          selectedUserId = value;
+                        });
+                      }
                     },
                   ),
                 ),
@@ -618,22 +696,14 @@ class _EnhancedAdminGeofencePageState extends State<EnhancedAdminGeofencePage>
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   children: [
                     _buildOverrideOption(
-                      'Set to Campus Location',
-                      'Use the default campus location for this day',
+                      'Set to Camp Location',
+                      'Use the default camp location for this day',
                       Icons.location_city,
                       Colors.green,
                       () => _setDayLocation(day, userId, LocationSource.setDay),
                     ),
                     const SizedBox(height: 12),
-                    _buildOverrideOption(
-                      'Set to Fallback Location',
-                      'Use the fallback campus location',
-                      Icons.backup,
-                      Colors.orange,
-                      () =>
-                          _setDayLocation(day, userId, LocationSource.fallback),
-                    ),
-                    const SizedBox(height: 12),
+
                     _buildOverrideOption(
                       'Set Custom Location',
                       'Choose a specific location for this student',
@@ -648,14 +718,6 @@ class _EnhancedAdminGeofencePageState extends State<EnhancedAdminGeofencePage>
                       Icons.clear,
                       Colors.red,
                       () => _clearDayLocations(day, userId),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildOverrideOption(
-                      'Add Additional Location',
-                      'Add another location option for this day',
-                      Icons.add_location,
-                      Colors.purple,
-                      () => _showAddLocationDialog(day, userId),
                     ),
                   ],
                 ),
@@ -811,7 +873,7 @@ class _EnhancedAdminGeofencePageState extends State<EnhancedAdminGeofencePage>
       ),
     );
 
-    if (result == true) {
+    if (result == true && mounted) {
       // Refresh the profile
       setState(() {});
     }
@@ -834,27 +896,33 @@ class _EnhancedAdminGeofencePageState extends State<EnhancedAdminGeofencePage>
 
       switch (source) {
         case LocationSource.setDay:
+          // Use Up Park Camp coordinates from campus_location.dart
+          final upParkCamp = campusLocations['up_park_camp']!;
           coordinates = {
-            'latitude': 18.0179,
-            'longitude': -76.8099,
-          }; // UTech campus
-          description = 'UTech Campus - ${_formatDay(day)}';
+            'latitude': upParkCamp.latitude,
+            'longitude': upParkCamp.longitude,
+          };
+          description = 'Up Park Camp - ${_formatDay(day)}';
           break;
         case LocationSource.fallback:
+          // Use Up Park Camp coordinates from campus_location.dart
+          final upParkCamp = campusLocations['up_park_camp']!;
           coordinates = {
-            'latitude': 18.0179,
-            'longitude': -76.8099,
-          }; // Same as campus for now
-          description = 'Fallback Campus Location';
+            'latitude': upParkCamp.latitude,
+            'longitude': upParkCamp.longitude,
+          };
+          description = 'Fallback Campus Location (Up Park Camp)';
           break;
         case LocationSource.studentCustom:
           // This should go through custom location picker
           return;
         case LocationSource.adminOverride:
+          // Use Up Park Camp coordinates from campus_location.dart as default
+          final upParkCamp = campusLocations['up_park_camp']!;
           coordinates = {
-            'latitude': 18.0179,
-            'longitude': -76.8099,
-          }; // Default admin location
+            'latitude': upParkCamp.latitude,
+            'longitude': upParkCamp.longitude,
+          };
           description = 'Admin Override - ${_formatDay(day)}';
           break;
       }
@@ -882,7 +950,9 @@ class _EnhancedAdminGeofencePageState extends State<EnhancedAdminGeofencePage>
       );
 
       // Refresh the profile
-      setState(() {});
+      if (mounted) {
+        setState(() {});
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -913,7 +983,9 @@ class _EnhancedAdminGeofencePageState extends State<EnhancedAdminGeofencePage>
       );
 
       // Refresh the profile
-      setState(() {});
+      if (mounted) {
+        setState(() {});
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -947,12 +1019,43 @@ class _EnhancedAdminGeofencePageState extends State<EnhancedAdminGeofencePage>
       );
 
       // Refresh the profile
-      setState(() {});
+      if (mounted) {
+        setState(() {});
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error removing override: $e'),
           backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _showDatePicker() async {
+    final DateTime? selectedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now().subtract(Duration(days: 365)),
+      lastDate: DateTime.now().add(Duration(days: 30)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Color(0xFF2C3E50),
+              onPrimary: Colors.white,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (selectedDate != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => DailyClockInMapPage(selectedDate: selectedDate),
         ),
       );
     }
