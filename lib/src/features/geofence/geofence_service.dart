@@ -69,9 +69,12 @@ class GeofenceService {
   Future<Map<String, dynamic>> getTodayGeofenceProfile([
     String? studentId,
   ]) async {
+    print('🚀 START getTodayGeofenceProfile - studentId: $studentId');
     try {
       final user = AuthService.instance.currentUser;
       final userId = studentId ?? user?.uid;
+      print('🔑 User ID resolved to: $userId');
+
       if (userId == null) {
         print('⚠️ No user ID found, using Up Park Camp fallback');
         final now = DateTime.now();
@@ -85,6 +88,7 @@ class GeofenceService {
 
       print('🔍 Getting geofence profile for student: $userId, date: $dateId');
 
+      print('🔍 Checking geofences collection: geofences/$userId/days/$dateId');
       final doc = await _firestore
           .collection('geofences')
           .doc(userId)
@@ -99,9 +103,25 @@ class GeofenceService {
       } else {
         // No admin-set profile found, create one based on student's schedule
         print('📍 No admin profile found, creating from student schedule');
-        final profile = await _createProfileFromStudentSchedule(userId, today);
-        print('✅ Generated profile: $profile');
-        return profile;
+        print(
+          '🎯 About to call _createProfileFromStudentSchedule with userId: $userId, today: $today',
+        );
+
+        try {
+          final profile = await _createProfileFromStudentSchedule(
+            userId,
+            today,
+          );
+          print('📊 _createProfileFromStudentSchedule returned: $profile');
+          return profile;
+        } catch (scheduleError) {
+          print(
+            '💥 ERROR in _createProfileFromStudentSchedule: $scheduleError',
+          );
+          print('📝 Error type: ${scheduleError.runtimeType}');
+          print('📜 Stack trace: ${StackTrace.current}');
+          rethrow; // This will be caught by the outer catch block
+        }
       }
     } catch (e) {
       print('❌ Error getting geofence profile: $e');
@@ -131,15 +151,19 @@ class GeofenceService {
 
       if (scheduleDoc.exists && scheduleDoc.data() != null) {
         final data = scheduleDoc.data()!;
+        print('📋 Student schedule data: $data');
         final weeklySchedule = data['weeklySchedule'] as Map<String, dynamic>?;
+        print('📅 Weekly schedule: $weeklySchedule');
 
         if (weeklySchedule != null && weeklySchedule[dayName] != null) {
           final dayConfig = weeklySchedule[dayName];
+          print('🎯 Day config for $dayName: $dayConfig');
 
           // Handle new format with type and custom locations
           if (dayConfig is Map<String, dynamic> &&
               dayConfig['type'] == 'custom') {
             print('📍 Using custom location for $dayName');
+            print('🔍 DayConfig contents: ${dayConfig.keys.toList()}');
 
             // Check if custom location is set in the schedule
             Map<String, dynamic>? customLocationData;
@@ -148,23 +172,40 @@ class GeofenceService {
                 dayConfig['customLocation'] is Map<String, dynamic>) {
               customLocationData =
                   dayConfig['customLocation'] as Map<String, dynamic>;
+              print('✅ Found customLocation in dayConfig: $customLocationData');
             } else {
+              print(
+                '⚠️ No customLocation in dayConfig, trying geofence service...',
+              );
               // Fallback to the new geofence service
               try {
+                print(
+                  '🔄 Attempting getGeofence for user: ${AuthService.instance.currentUser?.uid}, day: ${dayName.toLowerCase()}',
+                );
                 customLocationData = await getGeofence(
                   AuthService.instance.currentUser?.uid ?? '',
                   dayName.toLowerCase(),
                 );
+                print('🎯 GetGeofence returned: $customLocationData');
               } catch (e) {
-                print('Error loading geofence for $dayName: $e');
+                print('❌ Error loading geofence for $dayName: $e');
               }
             }
 
             if (customLocationData != null) {
+              print('🎯 Processing custom location data: $customLocationData');
+              print(
+                '🎯 Data types - lat: ${customLocationData['lat']?.runtimeType}, lng: ${customLocationData['lng']?.runtimeType}, radius: ${customLocationData['radius']?.runtimeType}',
+              );
+
               final lat = _extractDouble(customLocationData['lat']);
               final lng = _extractDouble(customLocationData['lng']);
               final radius =
                   _extractDouble(customLocationData['radius']) ?? 100.0;
+
+              print(
+                '🎯 Extracted values - lat: $lat, lng: $lng, radius: $radius',
+              );
 
               if (lat != null && lng != null) {
                 print(
@@ -202,7 +243,11 @@ class GeofenceService {
             final campusId =
                 dayConfig['campusId'] as String? ??
                 _getDefaultCampusForDay(today.weekday);
-            print('⚠️ Custom day but no location set, using campus: $campusId');
+            print(
+              '⚠️ Custom day but no location data found! Using campus fallback: $campusId',
+            );
+            print('🔍 DayConfig keys available: ${dayConfig.keys.toList()}');
+            print('🔍 CustomLocation value: ${dayConfig['customLocation']}');
             return _createCampusProfile(campusId, dayName);
           } else {
             // Handle old format or fixed location
@@ -954,14 +999,50 @@ class GeofenceService {
 
   /// Get one day's geofence
   Future<Map<String, dynamic>?> getGeofence(String userId, String day) async {
-    final snapshot = await _firestore.collection("users").doc(userId).get();
-    if (!snapshot.exists) return null;
+    try {
+      print('🔍 GetGeofence: Looking up user: $userId, day: $day');
+      final snapshot = await _firestore.collection("users").doc(userId).get();
+      if (!snapshot.exists) {
+        print('❌ User document does not exist');
+        return null;
+      }
 
-    final data = snapshot.data();
-    if (data == null || data["geofences"] == null) return null;
+      final data = snapshot.data();
+      print('📄 User document data: $data');
 
-    final geofences = data["geofences"] as Map<String, dynamic>;
-    return geofences[day.toLowerCase()] as Map<String, dynamic>?;
+      if (data == null || data["geofences"] == null) {
+        print('❌ No geofences field in user document');
+        return null;
+      }
+
+      final geofences = data["geofences"];
+      print(
+        '📍 Raw geofences data: $geofences (type: ${geofences.runtimeType})',
+      );
+
+      if (geofences is! Map<String, dynamic>) {
+        print(
+          '❌ Geofences is not a Map<String, dynamic>, it is: ${geofences.runtimeType}',
+        );
+        return null;
+      }
+
+      final dayData = geofences[day.toLowerCase()];
+      print('📅 Day data for $day: $dayData (type: ${dayData?.runtimeType})');
+
+      if (dayData == null) return null;
+
+      if (dayData is Map<String, dynamic>) {
+        print('✅ Returning valid geofence data: $dayData');
+        return dayData;
+      } else {
+        print('❌ Day data is not a Map, it is: ${dayData.runtimeType}');
+        return null;
+      }
+    } catch (e) {
+      print('❌ Exception in getGeofence: $e');
+      return null;
+    }
   }
 
   /// Get all geofences (Mon–Fri)

@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:students_reminder/src/admin/pages/admin_geofence_editor.dart';
-import 'package:students_reminder/src/admin/pages/admin_incident_detail_page.dart';
-import 'package:students_reminder/src/admin/pages/admin_incident_list.dart';
-import 'package:students_reminder/src/admin/pages/geofence_profile_list.dart';
+
+import 'package:students_reminder/src/admin/pages/enhanced_admin_geofence_page.dart';
+import 'package:students_reminder/src/admin/pages/enhanced_admin_incident_page.dart';
 
 class TrendsPage extends StatefulWidget {
   const TrendsPage({super.key});
@@ -59,7 +58,8 @@ class _TrendsPageState extends State<TrendsPage> {
             _buildGeofenceTab(),
 
             // Incident Details Tab
-            _buildIncidentsTab(),
+            EnhancedAdminIncidentPage(),
+            
           ],
         ),
       ),
@@ -90,63 +90,47 @@ class _TrendsPageState extends State<TrendsPage> {
       padding: EdgeInsets.all(16),
       child: Column(
         children: [
+          // Overview Statistics Grid
+          _buildOverviewStats(),
+
+          SizedBox(height: 16),
+
+         
+
+          SizedBox(height: 24),
+
+          // Divider and Enhanced Management Section
+          Divider(color: Colors.grey[300]),
+          SizedBox(height: 16),
+
           Text(
-            'Geofence Management',
+            'Advanced Management',
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: Color(0xFF2C3E50),
             ),
           ),
-          SizedBox(height: 20),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFF3498DB),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-            ),
-            icon: Icon(Icons.location_on, color: Colors.white),
-            label: Text(
-              'Open Geofence Editor',
-              style: TextStyle(color: Colors.white, fontSize: 16),
-            ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => AdminGeofenceEditor(
-                    studentId:
-                        'default_student', // You can modify this as needed
-                    dateId: DateTime.now().toString().substring(0, 10),
-                  ),
-                ),
-              );
-            },
-          ),
           SizedBox(height: 16),
+
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFF27AE60),
+              backgroundColor: Color(0xFF9B59B6),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
               padding: EdgeInsets.symmetric(vertical: 16, horizontal: 24),
             ),
-            icon: Icon(Icons.list_alt, color: Colors.white),
+            icon: Icon(Icons.admin_panel_settings, color: Colors.white),
             label: Text(
-              'View Geofence Profiles',
+              'Tap to Edit and View',
               style: TextStyle(color: Colors.white, fontSize: 16),
             ),
             onPressed: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => GeofenceProfilesList(
-                    studentId:
-                        'default_student', // You can modify this as needed
-                  ),
+                  builder: (context) => EnhancedAdminGeofencePage(),
                 ),
               );
             },
@@ -157,84 +141,8 @@ class _TrendsPageState extends State<TrendsPage> {
   }
 
   // Incidents Tab Content
-  Widget _buildIncidentsTab() {
-    return Padding(
-      padding: EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Text(
-            'Incident Management',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF2C3E50),
-            ),
-          ),
-          SizedBox(height: 20),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFFE74C3C),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-            ),
-            icon: Icon(Icons.report_problem, color: Colors.white),
-            label: Text(
-              'View Sample Incident',
-              style: TextStyle(color: Colors.white, fontSize: 16),
-            ),
-            onPressed: () {
-              // Sample incident data - you can modify this with real data
-              final sampleIncident = {
-                'actualLat': 18.0179,
-                'actualLng': -76.8099,
-                'designatedLat': 18.0200,
-                'designatedLng': -76.8120,
-                'distance': 150.5,
-                'type': 'Outside Geofence',
-                'dateId': DateTime.now().toString().substring(0, 10),
-              };
-
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      AdminIncidentDetailPage(data: sampleIncident),
-                ),
-              );
-            },
-          ),
-          SizedBox(height: 16),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFFE67E22),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-            ),
-            icon: Icon(Icons.list, color: Colors.white),
-            label: Text(
-              'View All Incidents',
-              style: TextStyle(color: Colors.white, fontSize: 16),
-            ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => AdminIncidentsList(
-                    studentId:
-                        'default_student', // You can modify this as needed
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
+ 
+  
 
   // Weekly Trend Comparison Widget
   Widget _buildWeeklyTrendComparison() {
@@ -838,6 +746,241 @@ class _TrendsPageState extends State<TrendsPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildOverviewStats() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('users').snapshots(),
+      builder: (context, usersSnapshot) {
+        if (usersSnapshot.connectionState == ConnectionState.waiting) {
+          return Center(
+            child: Padding(
+              padding: EdgeInsets.all(32),
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+
+        if (usersSnapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('Error loading data: ${usersSnapshot.error}'),
+            ),
+          );
+        }
+
+        // Calculate real statistics from user data
+        int totalStudents = 0;
+        int usersWithGeofences = 0;
+        int totalCustomLocations = 0;
+
+        if (usersSnapshot.hasData) {
+          for (var doc in usersSnapshot.data!.docs) {
+            final data = doc.data() as Map<String, dynamic>?;
+
+            if (data != null) {
+              // Count all users as students (exclude admin check for now)
+              totalStudents++;
+
+              // Check if user has geofences configured
+              if (data['geofences'] != null) {
+                usersWithGeofences++;
+
+                final geofences = data['geofences'] as Map<String, dynamic>;
+                totalCustomLocations += geofences.length;
+              }
+            }
+          }
+        }
+
+        return StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('geofence_incidents')
+              .snapshots(),
+          builder: (context, incidentsSnapshot) {
+            // Count recent incidents/overrides (last 30 days)
+            int recentIncidents = 0;
+
+            if (incidentsSnapshot.hasData) {
+              final thirtyDaysAgo = DateTime.now().subtract(Duration(days: 30));
+
+              for (var doc in incidentsSnapshot.data!.docs) {
+                final data = doc.data() as Map<String, dynamic>?;
+                if (data?['timestamp'] != null) {
+                  try {
+                    final timestamp = (data!['timestamp'] as Timestamp)
+                        .toDate();
+                    if (timestamp.isAfter(thirtyDaysAgo)) {
+                      recentIncidents++;
+                    }
+                  } catch (e) {
+                    // Handle timestamp parsing errors gracefully
+                  }
+                }
+              }
+            }
+
+            return GridView.count(
+              shrinkWrap: true,
+              physics: NeverScrollableScrollPhysics(),
+              crossAxisCount: 2,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              childAspectRatio: 1.5,
+              children: [
+                _buildStatCard(
+                  'Total Students',
+                  totalStudents.toString(),
+                  Icons.people,
+                  Colors.blue,
+                ),
+                _buildStatCard(
+                  'Users with Geofences',
+                  usersWithGeofences.toString(),
+                  Icons.location_on,
+                  Colors.green,
+                ),
+                _buildStatCard(
+                  'Custom Locations',
+                  totalCustomLocations.toString(),
+                  Icons.place,
+                  Colors.orange,
+                ),
+                _buildStatCard(
+                  'Recent Incidents',
+                  recentIncidents.toString(),
+                  Icons.warning,
+                  Colors.purple,
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 20),
+              Spacer(),
+            ],
+          ),
+          SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          SizedBox(height: 4),
+          Text(title, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickActions() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Quick Actions',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF2C3E50),
+          ),
+        ),
+        SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildActionButton(
+                'Create Profile',
+                Icons.add_location,
+                Colors.green,
+                () {
+                  // Navigate to create profile
+                },
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: _buildActionButton(
+                'Bulk Override',
+                Icons.edit_location,
+                Colors.orange,
+                () {
+                  // Navigate to bulk override
+                },
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionButton(
+    String title,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          border: Border.all(color: color.withOpacity(0.3)),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 16),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: color,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -252,6 +252,27 @@ service cloud.firestore {
       allow read: if isAdmin();
     }
 
+    // Custom locations subcollection - user's saved custom geofence locations
+    match /users/{userId}/custom_locations/{locationId} {
+      // Users can read and write their own custom locations
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      // Admins can read all custom locations
+      allow read: if isAdmin();
+      // Admins can also modify custom locations for management purposes
+      allow write: if isAdmin();
+      // Ensure proper data structure on create/update
+      allow create, update: if (isAdmin() || request.auth.uid == userId) &&
+                               request.resource.data.keys().hasAll(['name', 'description', 'latitude', 'longitude', 'radius', 'createdAt', 'isActive']) &&
+                               request.resource.data.name is string &&
+                               request.resource.data.description is string &&
+                               request.resource.data.latitude is number &&
+                               request.resource.data.longitude is number &&
+                               request.resource.data.radius is number &&
+                               request.resource.data.radius > 0 &&
+                               request.resource.data.radius <= 1000 && // Max 1km radius
+                               request.resource.data.isActive is bool;
+    }
+
     // Additional rules for admin dashboard data access
     match /{document=**} {
       allow read: if isAdmin();

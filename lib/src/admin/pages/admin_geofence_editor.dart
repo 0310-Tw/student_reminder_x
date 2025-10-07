@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:students_reminder/src/admin/models/geofence_model.dart';
-import 'package:students_reminder/src/features/geofence/geofence_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 
 class AdminGeofenceEditor extends StatefulWidget {
