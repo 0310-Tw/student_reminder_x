@@ -75,8 +75,8 @@ class LiveCharCounterTextField extends StatelessWidget {
                     color: isAtLimit
                         ? Colors.red
                         : isNearLimit
-                            ? Colors.orange
-                            : Colors.grey.shade600,
+                        ? Colors.orange
+                        : Colors.grey.shade600,
                     fontWeight: isAtLimit ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),

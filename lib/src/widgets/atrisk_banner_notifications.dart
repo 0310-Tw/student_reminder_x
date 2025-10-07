@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/notification_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AtRiskBannerNotifications extends StatefulWidget {
   const AtRiskBannerNotifications({super.key});
@@ -12,9 +13,8 @@ class AtRiskBannerNotifications extends StatefulWidget {
 }
 
 class _AtRiskBannerNotificationsState extends State<AtRiskBannerNotifications> {
-  // Track notification state to prevent spam
-  String? _lastNotificationSent;
-  bool _isNotificationSending = false;
+  // Track notification state to prevent duplicates - use static to persist across rebuilds
+  static final Map<String, String> _lastNotificationsSent = {};
 
   /// Get stream of at-risk status from the existing at-risk collection
   /// This leverages the Firebase Cloud Functions that automatically monitor attendance
@@ -27,20 +27,41 @@ class _AtRiskBannerNotificationsState extends State<AtRiskBannerNotifications> {
         .snapshots();
   }
 
-  /// Send push notification for at-risk status
+  /// Send push notification for at-risk status with duplicate prevention
   Future<void> _sendAtRiskNotification({
     required String riskType,
     required String title,
     required String body,
   }) async {
-    // Avoid sending duplicate notifications
-    final notificationKey = '${riskType}_${DateTime.now().day}';
-    if (_lastNotificationSent == notificationKey || _isNotificationSending) {
+    final user = AuthService.instance.currentUser;
+    if (user == null) return;
+
+    // Create unique key combining user ID, risk type, and date
+    final today = DateTime.now();
+    final dateKey =
+        '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+    final notificationKey = '${user.uid}_${riskType}_$dateKey';
+
+    // Check if we already sent this notification today (persistent check)
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastSent = prefs.getString('last_notification_$notificationKey');
+      if (lastSent == dateKey) {
+        print('Notification already sent today for: $notificationKey');
+        return;
+      }
+    } catch (e) {
+      print('Error checking notification cache: $e');
+    }
+
+    // Check static cache as secondary check
+    if (_lastNotificationsSent[notificationKey] == dateKey) {
+      print('Notification already sent (cached) for: $notificationKey');
       return;
     }
 
     try {
-      _isNotificationSending = true;
+      print('Sending at-risk notification: $riskType for user: ${user.uid}');
 
       final token = await NotificationService.getFCMToken();
       if (token != null) {
@@ -51,8 +72,21 @@ class _AtRiskBannerNotificationsState extends State<AtRiskBannerNotifications> {
         );
 
         if (success) {
-          _lastNotificationSent = notificationKey;
-          print('At-risk notification sent: $riskType');
+          // Mark as sent in both caches
+          _lastNotificationsSent[notificationKey] = dateKey;
+
+          // Persist to SharedPreferences
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString(
+              'last_notification_$notificationKey',
+              dateKey,
+            );
+          } catch (e) {
+            print('Error saving notification cache: $e');
+          }
+
+          print('At-risk notification sent successfully: $riskType');
         } else {
           print('Failed to send at-risk notification: $riskType');
         }
@@ -61,8 +95,6 @@ class _AtRiskBannerNotificationsState extends State<AtRiskBannerNotifications> {
       }
     } catch (e) {
       print('Error sending at-risk notification: $e');
-    } finally {
-      _isNotificationSending = false;
     }
   }
 
@@ -111,7 +143,7 @@ class _AtRiskBannerNotificationsState extends State<AtRiskBannerNotifications> {
             riskType: 'monthly',
             title: 'CRITICAL: Monthly Attendance Risk',
             body:
-                'Your attendance is at $monthlyRate% this month. Please contact your instructor immediately.A suspension may be imposed if no action is taken.',
+                'Your attendance is at $monthlyRate% this month. Please contact your instructor immediately. A suspension may be imposed if no action is taken.',
           );
 
           return _buildMonthlyAtRiskBanner(context, atRiskData);
@@ -128,7 +160,7 @@ class _AtRiskBannerNotificationsState extends State<AtRiskBannerNotifications> {
             riskType: 'weekly',
             title: 'Weekly Attendance Risk Alert',
             body:
-                'Your attendance is at $weeklyRate% this week. You have $weeklyAbsences absences. please contact your instructor/school for follow-up or actions will be taken.',
+                'Your attendance is at $weeklyRate% this week. You have $weeklyAbsences absences. Please contact your instructor/school for follow-up or actions will be taken.',
           );
 
           return _buildWeeklyAtRiskBanner(context, atRiskData);

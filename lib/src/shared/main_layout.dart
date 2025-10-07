@@ -12,11 +12,9 @@ import 'package:students_reminder/src/history/attendance_history.dart';
 import 'package:students_reminder/src/services/auth_service.dart';
 import 'package:students_reminder/src/services/admin_service.dart';
 import 'package:students_reminder/src/services/notification_service.dart';
-import 'package:students_reminder/src/admin/pages/admin_profileview_page.dart';
 import 'package:students_reminder/src/admin/pages/admin_public_feeds.dart';
 import 'package:students_reminder/src/admin/pages/attendance_admin_page.dart';
 import 'package:students_reminder/src/timetable/timetable.dart';
-import 'package:students_reminder/src/timetable/timetable_display.dart';
 
 class MainLayoutPage extends StatefulWidget {
   const MainLayoutPage({super.key});
@@ -131,10 +129,10 @@ class _MainLayoutPageState extends State<MainLayoutPage> {
         AttendanceHistory14d(),
       ];
 
-    // Reset index if switching between admin/student mode or if current index is out of bounds
-    if (previousPageCount != _pages.length || _index >= _pages.length) {
-      _index = 0;
-     }
+      // Reset index if switching between admin/student mode or if current index is out of bounds
+      if (previousPageCount != _pages.length || _index >= _pages.length) {
+        _index = 0;
+      }
     }
   }
 

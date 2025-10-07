@@ -20,7 +20,7 @@ class GeofenceProfile {
     required this.outRadius,
     required this.bandType,
     required this.outsidePolicy,
-    this.outsideMessage,
+    this.outsideMessage, required int dayOfWeek,
   });
 
   /// Build from a Firestore document
@@ -37,7 +37,7 @@ class GeofenceProfile {
       outLng: (outLoc['lng'] as num).toDouble(),
       outRadius: (outLoc['radius'] as num).toDouble(),
       bandType: data['bandType'] ?? 'fixed',
-      outsidePolicy: data['outsidePolicy'] ?? 'block',
+      outsidePolicy: data['outsidePolicy'] ?? 'allow_flag',
       outsideMessage: data['outsideMessage'],
     );
   }
@@ -45,16 +45,8 @@ class GeofenceProfile {
   /// Convert to Firestore map
   Map<String, dynamic> toMap() {
     return {
-      'checkInLocation': {
-        'lat': inLat,
-        'lng': inLng,
-        'radius': inRadius,
-      },
-      'checkOutLocation': {
-        'lat': outLat,
-        'lng': outLng,
-        'radius': outRadius,
-      },
+      'checkInLocation': {'lat': inLat, 'lng': inLng, 'radius': inRadius},
+      'checkOutLocation': {'lat': outLat, 'lng': outLng, 'radius': outRadius},
       'bandType': bandType,
       'outsidePolicy': outsidePolicy,
       'outsideMessage': outsideMessage,

@@ -16,7 +16,8 @@ class GroupFilter extends StatelessWidget {
             backgroundColor: Colors.indigoAccent,
             label: Text('Mobile'),
             selected: value == 'mobile',
-            onSelected: (_) => onChanged('mobile')),
+            onSelected: (_) => onChanged('mobile'),
+          ),
           ChoiceChip(
             backgroundColor: Colors.tealAccent,
             label: Text('Web'),

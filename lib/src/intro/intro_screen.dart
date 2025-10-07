@@ -34,7 +34,10 @@ class _IntroScreenState extends State<IntroScreen> {
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [Color(0xFF6A11CB), Color(0xFF2575FC)], // purple to blue
+                colors: [
+                  Color(0xFF6A11CB),
+                  Color(0xFF2575FC),
+                ], // purple to blue
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -74,8 +77,9 @@ class _IntroScreenState extends State<IntroScreen> {
                         color: subtleMode
                             ? Colors.white.withOpacity(0.6) // watermark
                             : Colors.deepPurple.withOpacity(0.4), // blend
-                        colorBlendMode:
-                            subtleMode ? BlendMode.modulate : BlendMode.overlay,
+                        colorBlendMode: subtleMode
+                            ? BlendMode.modulate
+                            : BlendMode.overlay,
                       ),
                     ),
                   ),

@@ -61,6 +61,18 @@ service cloud.firestore {
       }
     }
 
+    // Attendance records collection - alternative structure for at-risk calculations
+    match /attendance_records/{recordId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || 
+                      (isAuthenticated() && 
+                       request.resource.data.studentId == request.auth.uid);
+      allow create: if isAuthenticated() && 
+                       request.resource.data.keys().hasAll(['studentId', 'date', 'status']) &&
+                       request.resource.data.status is string &&
+                       request.resource.data.status in ['present', 'absent', 'late', 'early'];
+    }
+
     // Admin actions collection
     match /adminActions/{actionId} {
       allow read, write: if isAdmin();
@@ -88,23 +100,19 @@ service cloud.firestore {
       allow read, write: if isAuthenticated();
     }
 
-    // Public notes collection
-    match /notes/{noteId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
-    }
-
     // Documents collection
     match /documents/{documentId} {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
     }
 
-    // User notes subcollection
+    // User notes subcollection - main notes storage
     match /users/{userId}/notes/{noteId} {
+      // Users can read their own notes, admins can read all notes, anyone can read public notes
       allow read: if isAdmin() || isOwner(userId) || resource.data.visibility == 'public';
+      // Users can write their own notes, admins can write any notes
       allow write: if isAdmin() || isOwner(userId);
-      // Allow list operations for users on their own notes
+      // Allow list operations for users on their own notes and for public notes queries
       allow list: if isAdmin() || isOwner(userId);
       // Allow authenticated users to like/unlike public notes
       allow update: if isAuthenticated() && 
@@ -135,11 +143,11 @@ service cloud.firestore {
       allow read, write: if isAuthenticated();
     }
 
-    // Allow reading public notes via collection group queries
+    // Allow reading and listing public notes via collection group queries
     match /{path=**}/notes/{noteId} {
-      allow read: if isAuthenticated() && 
-                     (resource.data.visibility == 'public' || 
-                      resource.data.authorId == request.auth.uid);
+      allow read, list: if isAuthenticated() && 
+                           (resource.data.visibility == 'public' || 
+                            resource.data.authorId == request.auth.uid);
     }
     
     // Allow reading reports via collection group queries for admins and report owners
@@ -151,6 +159,120 @@ service cloud.firestore {
     // Allow reading at-risk data via collection group queries for admins
     match /{path=**}/at-risk/{statusId} {
       allow read: if isAdmin();
+    }
+
+    // Geofencing collections - student location schedules
+    match /student_schedules/{userId} {
+      allow read, write: if isAdmin() || isOwner(userId);
+      allow list: if isAdmin();
+    }
+
+
+
+    // Geofencing collections - geofence profiles (new structure)
+    match /users/{userId}/geofence_profiles/{profileId} {
+      allow read, write: if isAdmin() || isOwner(userId);
+      allow list: if isAdmin() || isOwner(userId);
+    }
+
+    // Geofencing collections - geofence incidents
+    match /geofence_incidents/{incidentId} {
+      allow read, write: if isAdmin();
+      // Students can read their own incidents and create new ones during checkout
+      allow read: if isStudent() && resource.data.studentId == request.auth.uid;
+      allow create: if isAuthenticated();
+      allow list: if isAdmin();
+    }
+
+    // Main geofenceIncidents collection with nested incidents subcollection
+    match /geofenceIncidents/{studentId} {
+      allow read, write: if isAdmin() || isOwner(studentId);
+      allow create: if isAuthenticated(); // Allow creating student documents
+      
+      // Nested incidents subcollection
+      match /incidents/{incidentId} {
+        allow read: if isAdmin() || isOwner(studentId);
+        allow write: if isAdmin() || isOwner(studentId);
+        allow create: if isAuthenticated(); // Allow system/students to create incidents
+        allow list: if isAdmin() || isOwner(studentId); // Allow querying incidents
+      }
+    }
+
+    // Collection group query for all incidents (admin access)
+    match /{path=**}/incidents/{incidentId} {
+      allow read: if isAdmin();
+      allow list: if isAdmin();
+    }
+
+    // Alternative geofence incidents collection structure
+    match /users/{userId}/geofenceIncidents/{incidentId} {
+      allow read, write: if isAdmin() || isOwner(userId);
+      allow list: if isAdmin() || isOwner(userId);
+    }
+
+
+
+    match /{path=**}/geofenceIncidents/{incidentId} {
+      allow read: if isAdmin() || 
+                     (isAuthenticated() && 
+                      resource.data.studentId == request.auth.uid);
+    }
+
+    // Auto-checkout logs - system generated, admin readable
+    match /auto_checkout_logs/{logId} {
+      allow read: if isAdmin();
+      allow write: if request.auth == null; // Allow system writes
+    }
+
+    // Checkout logs - track manual and auto checkout events
+    match /checkout_logs/{logId} {
+      allow read: if isAdmin() || 
+                     (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow write: if isAuthenticated();
+    }
+
+    // Notes collection - personal notes for each user
+    match /users/{userId}/notes/{noteId} {
+      // User can read and write their own notes
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      // Admins can read all notes
+      allow read: if isAdmin();
+      // Anyone can read public notes
+      allow read: if isAuthenticated() && resource.data.visibility == 'public';
+      // Allow reports subcollection
+      match /reports/{reportId} {
+        allow read: if isAdmin();
+        allow create: if isAuthenticated();
+      }
+    }
+
+    // Collection group queries for notes (used by public feeds)
+    match /{path=**}/notes/{noteId} {
+      // Allow reading public notes through collection group queries
+      allow read: if isAuthenticated() && resource.data.visibility == 'public';
+      // Admins can read all notes
+      allow read: if isAdmin();
+    }
+
+    // Custom locations subcollection - user's saved custom geofence locations
+    match /users/{userId}/custom_locations/{locationId} {
+      // Users can read and write their own custom locations
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      // Admins can read all custom locations
+      allow read: if isAdmin();
+      // Admins can also modify custom locations for management purposes
+      allow write: if isAdmin();
+      // Ensure proper data structure on create/update
+      allow create, update: if (isAdmin() || request.auth.uid == userId) &&
+                               request.resource.data.keys().hasAll(['name', 'description', 'latitude', 'longitude', 'radius', 'createdAt', 'isActive']) &&
+                               request.resource.data.name is string &&
+                               request.resource.data.description is string &&
+                               request.resource.data.latitude is number &&
+                               request.resource.data.longitude is number &&
+                               request.resource.data.radius is number &&
+                               request.resource.data.radius > 0 &&
+                               request.resource.data.radius <= 1000 && // Max 1km radius
+                               request.resource.data.isActive is bool;
     }
 
     // Additional rules for admin dashboard data access

@@ -1,8 +1,9 @@
 // lib/src/services/geofence_helper.dart
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:students_reminder/src/services/geofence_service.dart';
+
 import 'package:students_reminder/src/admin/models/geofence_model.dart';
+import 'package:students_reminder/src/features/geofence/geofence_service.dart';
 
 /// Checks if the current GPS position is inside the geofence and
 /// logs an incident or blocks based on the admin override.
@@ -56,6 +57,9 @@ Future<bool> handleClockAction({
   }
 
   // Outside zone:
+  print(
+    '🌐 Outside geofence - Distance: ${distance.toInt()}m, Policy: ${profile.outsidePolicy}',
+  );
   if (profile.outsidePolicy == 'block') {
     // Show optional message if provided
     if (profile.outsideMessage != null && profile.outsideMessage!.isNotEmpty) {
@@ -69,14 +73,17 @@ Future<bool> handleClockAction({
             TextButton(
               onPressed: () => Navigator.pop(ctx),
               child: const Text('OK'),
-            )
+            ),
           ],
         ),
       );
     }
     return false; // Block clock-in/out
-  } else {
+  } else if (profile.outsidePolicy == 'allow_flag') {
     // allow_flag: allow but log incident
+    print(
+      '🚨 Creating geofence incident: ${actionType.toUpperCase()} violation - Distance: ${distance.toInt()}m',
+    );
     await GeofenceService.instance.logIncident(
       studentId: studentId,
       dateId: dateId,
@@ -87,15 +94,20 @@ Future<bool> handleClockAction({
       designatedLng: targetLng,
       distance: distance,
     );
+    print('✅ Geofence incident created successfully');
 
     // Optionally still show message
     if (profile.outsideMessage != null && profile.outsideMessage!.isNotEmpty) {
       // ignore: use_build_context_synchronously
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(profile.outsideMessage!)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(profile.outsideMessage!)));
     }
 
+    return true; // Allow
+  } else {
+    // Default case for 'allow' policy (no incident logging)
+    print('✅ Allow policy - no incident logged');
     return true; // Allow
   }
 }

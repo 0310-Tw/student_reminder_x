@@ -554,6 +554,68 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
               ),
+              // Quick Access to Geofence Dashboard
+              // Container(
+              //   margin: const EdgeInsets.all(16),
+              //   child: Card(
+              //     elevation: 4,
+              //     child: InkWell(
+              //       onTap: () => Navigator.pushNamed(
+              //         context,
+              //         AppRoutes.geofenceDashboard,
+              //       ),
+              //       borderRadius: BorderRadius.circular(12),
+              //       child: Padding(
+              //         padding: const EdgeInsets.all(16),
+              //         child: Row(
+              //           children: [
+              //             Container(
+              //               padding: const EdgeInsets.all(12),
+              //               decoration: BoxDecoration(
+              //                 color: Colors.blue.withValues(alpha: 0.1),
+              //                 borderRadius: BorderRadius.circular(8),
+              //               ),
+              //               child: Icon(
+              //                 Icons.location_on,
+              //                 color: Colors.blue.shade600,
+              //                 size: 28,
+              //               ),
+              //             ),
+              //             const SizedBox(width: 16),
+              //             Expanded(
+              //               child: Column(
+              //                 crossAxisAlignment: CrossAxisAlignment.start,
+              //                 children: [
+              //                   Text(
+              //                     'Geofence Attendance',
+              //                     style: TextStyle(
+              //                       fontSize: 18,
+              //                       fontWeight: FontWeight.bold,
+              //                       color: Colors.blue.shade700,
+              //                     ),
+              //                   ),
+              //                   const SizedBox(height: 4),
+              //                   Text(
+              //                     'Check in/out, set locations & view compliance',
+              //                     style: TextStyle(
+              //                       fontSize: 14,
+              //                       color: Colors.grey.shade600,
+              //                     ),
+              //                   ),
+              //                 ],
+              //               ),
+              //             ),
+              //             Icon(
+              //               Icons.arrow_forward_ios,
+              //               color: Colors.grey.shade400,
+              //               size: 20,
+              //             ),
+              //           ],
+              //         ),
+              //       ),
+              //     ),
+              //   ),
+              // ),
               Expanded(
                 child: TabBarView(
                   children: [_buildStudentsTab(), _buildDocumentsTab()],

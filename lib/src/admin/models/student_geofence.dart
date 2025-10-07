@@ -11,7 +11,7 @@ class StudentProfile {
 
   String getCampusForToday() {
     final now = DateTime.now();
-    final weekday = now.weekday; // 1 = Monday, 5 = Sunday
+    final weekday = now.weekday; // 1 = Monday, 7 = Sunday
 
     const dayMap = {
       1: "monday",
@@ -19,8 +19,8 @@ class StudentProfile {
       3: "wednesday",
       4: "thursday",
       5: "friday",
-      // 6: "saturday",
-      // 7: "sunday"
+      6: "saturday",
+      7: "sunday",
     };
 
     final todayKey = dayMap[weekday]!;

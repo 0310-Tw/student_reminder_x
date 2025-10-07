@@ -520,7 +520,6 @@ class _ProfilePageState extends State<ProfilePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // User notifications for flags/suspensions
-                  
                     const SizedBox(height: 16),
                     // Profile image section
                     Center(

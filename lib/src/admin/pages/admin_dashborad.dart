@@ -456,7 +456,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       ConnectionState.waiting) {
                     return Center(child: CircularProgressIndicator());
                   }
-        
+
                   if (attendanceSnapshot.hasError) {
                     print(
                       'Attendance overview error: ${attendanceSnapshot.error}',
@@ -485,7 +485,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       ),
                     );
                   }
-        
+
                   return StreamBuilder<QuerySnapshot>(
                     stream: _getStudentsStream(),
                     builder: (context, studentsSnapshot) {
@@ -493,7 +493,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           ConnectionState.waiting) {
                         return Center(child: CircularProgressIndicator());
                       }
-        
+
                       if (studentsSnapshot.hasError) {
                         print(
                           'Students overview error: ${studentsSnapshot.error}',
@@ -505,7 +505,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           ),
                         );
                       }
-        
+
                       if (!studentsSnapshot.hasData ||
                           studentsSnapshot.data!.docs.isEmpty) {
                         return Center(
@@ -515,7 +515,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           ),
                         );
                       }
-        
+
                       final totalStudents = studentsSnapshot.data!.docs.length;
                       final attendanceRecords =
                           attendanceSnapshot.data?.docs ?? [];
@@ -523,11 +523,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         attendanceRecords,
                         totalStudents,
                       );
-        
+
                       print(
                         'Overview - Total students: $totalStudents, Records: ${attendanceRecords.length}',
                       );
-        
+
                       return Column(
                         children: [
                           _buildProgressIndicator(
@@ -1519,25 +1519,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     return weekdays;
   }
 
-  // Student Creation Date Helper
-  Future<DateTime?> _getStudentCreationDate(String studentId) async {
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(studentId)
-          .get();
-
-      if (doc.exists) {
-        final data = doc.data()!;
-        final createdAt = data['createdAt'] as Timestamp?;
-        return createdAt?.toDate();
-      }
-    } catch (e) {
-      print('Error getting student creation date: $e');
-    }
-    return null;
-  }
-
   // Filter attendance records to only include weekday records (Monday-Friday)
   // This ensures attendance tracking only occurs during school operating days
   List<DocumentSnapshot> _filterWeekdayRecords(List<DocumentSnapshot> records) {
@@ -1547,28 +1528,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
       if (dayId != null) {
         final recordDate = DateTime.tryParse(dayId);
         return recordDate != null && _isWeekday(recordDate);
-      }
-      return false;
-    }).toList();
-  }
-
-  // Filter attendance records to only include records after student creation date
-  // This ensures new students' attendance tracking starts from their enrollment date
-  Future<List<DocumentSnapshot>> _filterRecordsByStudentCreation(
-    List<DocumentSnapshot> records,
-    String studentId,
-  ) async {
-    final creationDate = await _getStudentCreationDate(studentId);
-    if (creationDate == null) return records;
-
-    return records.where((record) {
-      final data = record.data() as Map<String, dynamic>;
-      final dayId = data['dayId'] as String?;
-      if (dayId != null) {
-        final recordDate = DateTime.tryParse(dayId);
-        return recordDate != null &&
-            (recordDate.isAfter(creationDate) ||
-                recordDate.isAtSameMomentAs(creationDate));
       }
       return false;
     }).toList();
@@ -1638,8 +1597,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
     // Filter to only include weekday records
     final weekdayRecords = _filterWeekdayRecords(attendanceRecords);
 
-    Set<String> uniqueStudents = {};
+    Set<String> presentStudents = {};
     Set<String> lateStudents = {};
+    Set<String> allAttendedStudents = {};
 
     for (final record in weekdayRecords) {
       final data = record.data() as Map<String, dynamic>;
@@ -1647,26 +1607,30 @@ class _AdminDashboardState extends State<AdminDashboard> {
           record.reference.parent.parent?.id; // Get userId from document path
       final status = data['status'] as String? ?? 'absent';
 
-      if (userId != null &&
-          (status == 'present' || status == 'late' || status == 'early')) {
-        uniqueStudents.add(userId);
-      }
-
-      // Count unique students who were late (not individual late records)
-      if (userId != null && (status == 'late' || data['lateReason'] != null)) {
-        lateStudents.add(userId);
+      if (userId != null) {
+        // Count students who were late
+        if (status == 'late' || data['lateReason'] != null) {
+          lateStudents.add(userId);
+          allAttendedStudents.add(userId);
+        }
+        // Count students who were present (not late)
+        else if (status == 'present' || status == 'early') {
+          presentStudents.add(userId);
+          allAttendedStudents.add(userId);
+        }
       }
     }
 
-    final present = uniqueStudents.length;
-    final absent = totalStudents - present;
+    final present = presentStudents.length;
     final late = lateStudents.length;
+    final attended = allAttendedStudents.length;
+    final absent = totalStudents - attended;
 
     return {
       'present': present,
       'absent': absent,
       'late': late,
-      'total': totalStudents,
+      'total': attended + absent, // This should equal totalStudents
     };
   }
 
