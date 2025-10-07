@@ -13,10 +13,12 @@ class GroupFilter extends StatelessWidget {
         spacing: 6,
         children: [
           ChoiceChip(
+            backgroundColor: Colors.indigoAccent,
             label: Text('Mobile'),
             selected: value == 'mobile',
             onSelected: (_) => onChanged('mobile')),
           ChoiceChip(
+            backgroundColor: Colors.tealAccent,
             label: Text('Web'),
             selected: value == 'web',
             onSelected: (_) => onChanged('web'),

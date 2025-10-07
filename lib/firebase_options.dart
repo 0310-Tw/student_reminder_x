@@ -30,10 +30,7 @@ class DefaultFirebaseOptions {
           'you can reconfigure this by running the FlutterFire CLI again.',
         );
       case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -72,4 +69,12 @@ class DefaultFirebaseOptions {
     iosBundleId: 'com.example.studentRemeinderApp',
   );
 
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyCJHWjUJtZQjZjoZiWpQomrN0MVOicrVtk',
+    appId: '1:562730922018:windows:8fefad6d11fa775b2d5a7b',
+    messagingSenderId: '562730922018',
+    projectId: 'student-reminder-xx-16738',
+    authDomain: 'student-reminder-xx-16738.firebaseapp.com',
+    storageBucket: 'student-reminder-xx-16738.firebasestorage.app',
+  );
 }

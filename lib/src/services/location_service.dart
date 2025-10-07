@@ -1,86 +1,35 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
 
-class AttendanceService {
-  static final _firestore = FirebaseFirestore.instance;
-
-  /// ---------------- Stream last 14 days attendance ----------------
-  static Stream<QuerySnapshot<Map<String, dynamic>>> streamLast14Days(String uid) {
-    final now = DateTime.now();
-    final start = now.subtract(const Duration(days: 14));
-
-    return _firestore
-        .collection('attendance')
-        .doc(uid)
-        .collection('days')
-        .where('dayId', isGreaterThanOrEqualTo: _dateId(start))
-        .where('dayId', isLessThanOrEqualTo: _dateId(now))
-        .snapshots();
+class LocationService {
+  // Request permissions (fine/coarse)
+  static Future<bool> requestPermission() async {
+    final status = await Permission.locationWhenInUse.request();
+    return status.isGranted;
   }
 
-  /// ---------------- Clock in ----------------
-  static Future<void> clockIn(String uid, Position pos, String placeName) async {
-    final now = DateTime.now();
-    final dayId = _dateId(now);
-
-    final data = {
-      'dayId': dayId,
-      'inAt': Timestamp.fromDate(now),
-      'inLoc': GeoPoint(pos.latitude, pos.longitude),
-      'placeIn': placeName,
-      'status': 'early', // optionally compute based on time
-    };
-
-    await _firestore
-        .collection('attendance')
-        .doc(uid)
-        .collection('days')
-        .doc(dayId)
-        .set(data, SetOptions(merge: true));
-  }
-
-  /// ---------------- Clock out ----------------
-  static Future<void> clockOut(String uid, Position pos, String placeName) async {
-    final now = DateTime.now();
-    final dayId = _dateId(now);
-
-    final docRef = _firestore.collection('attendance').doc(uid).collection('days').doc(dayId);
-    final snapshot = await docRef.get();
-
-    if (!snapshot.exists || snapshot.data()?['inAt'] == null) {
-      throw Exception("Cannot clock out before clocking in.");
+  // Returns current position or throws
+  static Future<Position> getCurrentPosition({LocationAccuracy accuracy = LocationAccuracy.high}) async {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      throw Exception('Location services are disabled.');
     }
 
-    await docRef.set({
-      'outAt': Timestamp.fromDate(now),
-      'outLoc': GeoPoint(pos.latitude, pos.longitude),
-      'placeOut': placeName,
-    }, SetOptions(merge: true));
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.deniedForever || permission == LocationPermission.denied) {
+      throw Exception('Location permission denied.');
+    }
+
+    return await Geolocator.getCurrentPosition(desiredAccuracy: accuracy);
   }
 
-  /// ---------------- Live location updates ----------------
-  static Future<void> updateLiveLocation(String uid, Position pos, String placeName) async {
-    final now = DateTime.now();
-    final dayId = _dateId(now);
-
-    await _firestore
-        .collection('attendance')
-        .doc(uid)
-        .collection('days')
-        .doc(dayId)
-        .set({
-      'liveLat': pos.latitude,
-      'liveLng': pos.longitude,
-      'livePlace': placeName,
-      'liveUpdated': Timestamp.now(),
-    }, SetOptions(merge: true));
-  }
-
-  /// ---------------- Helper: YYYYMMDD format ----------------
-  static String _dateId(DateTime dt) {
-    final y = dt.year.toString().padLeft(4, '0');
-    final m = dt.month.toString().padLeft(2, '0');
-    final d = dt.day.toString().padLeft(2, '0');
-    return "$y$m$d";
+  // Optional: Listen to position stream
+  static Stream<Position> positionStream({LocationAccuracy accuracy = LocationAccuracy.best, int distanceFilter = 10}) {
+    return Geolocator.getPositionStream(
+      locationSettings: LocationSettings(accuracy: accuracy, distanceFilter: distanceFilter),
+    );
   }
 }

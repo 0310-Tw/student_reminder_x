@@ -51,5 +51,18 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	
+	<!-- Notification permissions -->
+	<key>NSLocalNotificationUsageDescription</key>
+	<string>This app needs notification access to remind you about attendance and note due dates.</string>
+	<key>NSUserNotificationUsageDescription</key>
+	<string>This app needs notification access to remind you about attendance and note due dates.</string>
+	
+	<!-- Background modes for notifications -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>background-fetch</string>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>
