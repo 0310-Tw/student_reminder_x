@@ -411,14 +411,16 @@ class _AdminGeofenceEditorState extends State<AdminGeofenceEditor> {
             'radius': radius,
             'description': 'Admin override for ${_formatDay(widget.dateId)}',
             'isEnabled': true,
-            'source': 'adminOverride', // Changed from 'studentCustom' to properly identify admin overrides
+            'source':
+                'adminOverride', // Changed from 'studentCustom' to properly identify admin overrides
             'bandType': bandType == GeofenceBandType.floating
                 ? 'floating'
                 : 'fixed',
             'outsideAreaMessage': outsideAreaMessage.trim().isEmpty
                 ? null
                 : outsideAreaMessage.trim(),
-            'updatedAt': FieldValue.serverTimestamp(), // Changed to match student format
+            'updatedAt':
+                FieldValue.serverTimestamp(), // Changed to match student format
             'updatedBy': 'admin', // Simplified to match student format
           });
 

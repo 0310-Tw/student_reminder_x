@@ -21,8 +21,48 @@ class _MyNotesPageState extends State<MyNotesPage> {
   bool _sortAscending = false;
   final TextEditingController _searchController = TextEditingController();
 
-  // Get all unique tags from notes
-  Set<String> _getAllTags(
+  // Add timeout tracking
+  DateTime? _streamStartTime;
+  bool _showTimeoutWarning = false;
+
+  Set<String> _cachedTags = {};
+
+  @override
+  void initState() {
+    super.initState();
+    print('🔍 MyNotesPage: initState called');
+    final user = AuthService.instance.currentUser;
+    if (user != null) {
+      print('🔍 MyNotesPage: User found, uid: ${user.uid}');
+    } else {
+      print('🔍 MyNotesPage: No user found in AuthService');
+    }
+    _testNotesAccess();
+  }
+
+  // Test if we can access notes at all
+  Future<void> _testNotesAccess() async {
+    final user = AuthService.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      print('🧪 Testing direct notes access...');
+      final result = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('notes')
+          .get();
+      print('🧪 Direct query result: ${result.docs.length} notes found');
+      for (var doc in result.docs) {
+        print('🧪 Note doc: ${doc.id} - ${doc.data()}');
+      }
+    } catch (e) {
+      print('🧪 Direct query error: $e');
+    }
+  }
+
+  // Get all unique tags from notes and cache them
+  void _updateCachedTags(
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
   ) {
     Set<String> allTags = {};
@@ -31,7 +71,7 @@ class _MyNotesPageState extends State<MyNotesPage> {
       final tags = data['tags'] as List<dynamic>? ?? [];
       allTags.addAll(tags.cast<String>());
     }
-    return allTags;
+    _cachedTags = allTags;
   }
 
   @override
@@ -171,16 +211,94 @@ class _MyNotesPageState extends State<MyNotesPage> {
             ),
             Expanded(
               child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: NotesService.instance.watchMyNotes(uid),
+                stream: FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(user.uid)
+                    .collection('notes')
+                    .orderBy('aud_dt', descending: true)
+                    .snapshots(),
                 builder: (context, snap) {
-                  if (snap.connectionState == ConnectionState.waiting) {
-                    return const Center(
+                  // Debug all connection states
+                  print(
+                    '🔍 MyNotesPage StreamBuilder state: ${snap.connectionState}, hasData: ${snap.hasData}, hasError: ${snap.hasError}',
+                  );
+                  if (snap.hasError) {
+                    print('🔍 MyNotesPage StreamBuilder error: ${snap.error}');
+                  }
+
+                  // Only log connection state changes, not every build
+                  if (snap.connectionState == ConnectionState.waiting &&
+                      _streamStartTime == null) {
+                    _streamStartTime = DateTime.now();
+                    print('🔍 MyNotesPage: Stream started loading');
+
+                    // Schedule timeout check without causing immediate rebuilds
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      Future.delayed(Duration(seconds: 5), () {
+                        if (mounted &&
+                            _streamStartTime != null &&
+                            DateTime.now()
+                                    .difference(_streamStartTime!)
+                                    .inSeconds >=
+                                5) {
+                          if (mounted) {
+                            setState(() => _showTimeoutWarning = true);
+                          }
+                        }
+                      });
+                    });
+                  } else if ((snap.connectionState == ConnectionState.active ||
+                          snap.hasData) &&
+                      _streamStartTime != null) {
+                    _streamStartTime = null;
+                    if (_showTimeoutWarning) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted) {
+                          setState(() => _showTimeoutWarning = false);
+                        }
+                      });
+                    }
+                    print(
+                      '🔍 MyNotesPage: Stream connected with ${snap.data?.docs.length ?? 0} notes',
+                    );
+                  }
+
+                  // Show loading state - but only if we don't have data yet
+                  if (snap.connectionState == ConnectionState.waiting &&
+                      !snap.hasData) {
+                    return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           CircularProgressIndicator(),
                           SizedBox(height: 16),
                           Text('Loading your notes...'),
+                          if (_showTimeoutWarning) ...[
+                            SizedBox(height: 8),
+                            Text(
+                              'This is taking longer than expected',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.orange,
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              'There might be a connection issue',
+                              style: TextStyle(fontSize: 11, color: Colors.red),
+                            ),
+                            SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: () {
+                                setState(() {
+                                  _streamStartTime = null;
+                                  _showTimeoutWarning = false;
+                                  // Just rebuild to refresh the direct stream
+                                });
+                              },
+                              child: Text('Refresh'),
+                            ),
+                          ],
                         ],
                       ),
                     );
@@ -208,7 +326,38 @@ class _MyNotesPageState extends State<MyNotesPage> {
                     );
                   }
 
+                  // Handle case where we have no data and are not waiting
+                  if (!snap.hasData &&
+                      snap.connectionState != ConnectionState.waiting) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.cloud_off, size: 64, color: Colors.orange),
+                          SizedBox(height: 16),
+                          Text('No connection to notes'),
+                          SizedBox(height: 8),
+                          Text('Check your internet connection'),
+                          SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: () {
+                              setState(() {
+                                _streamStartTime = null;
+                                _showTimeoutWarning = false;
+                                // Just rebuild to refresh the direct stream
+                              });
+                            },
+                            child: Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
                   final docs = snap.data?.docs ?? [];
+
+                  // Update cached tags when we get new data
+                  _updateCachedTags(docs);
 
                   if (docs.isEmpty) {
                     return const Center(
@@ -219,7 +368,10 @@ class _MyNotesPageState extends State<MyNotesPage> {
                           SizedBox(height: 16),
                           Text(
                             'No notes found',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           SizedBox(height: 8),
                           Text('Tap the + button to create your first note!'),
@@ -476,189 +628,168 @@ class _MyNotesPageState extends State<MyNotesPage> {
     showDialog(
       context: context,
       builder: (context) {
-        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: NotesService.instance.watchMyNotes(
-            AuthService.instance.currentUser!.uid,
-          ),
-          builder: (context, snapshot) {
-            final docs = snapshot.data?.docs ?? [];
-            final allTags = _getAllTags(docs);
-
-            return StatefulBuilder(
-              builder: (context, setDialogState) {
-                return AlertDialog(
-                  title: const Text('Filter Notes'),
-                  content: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Visibility Filter
-                        const Text(
-                          'Visibility:',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Filter Notes'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Visibility Filter
+                    const Text(
+                      'Visibility:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: _visibilityFilter,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
                         ),
-                        const SizedBox(height: 8),
-                        DropdownButtonFormField<String>(
-                          value: _visibilityFilter,
-                          decoration: const InputDecoration(
-                            border: OutlineInputBorder(),
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'all',
+                          child: Text('All Notes'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'public',
+                          child: Text('Public Only'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'private',
+                          child: Text('Private Only'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        setDialogState(() {
+                          _visibilityFilter = value ?? 'all';
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Due Date Range Filter
+                    const Text(
+                      'Due Date Range:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              final DateTimeRange? picked =
+                                  await showDateRangePicker(
+                                    context: context,
+                                    firstDate: DateTime(2020),
+                                    lastDate: DateTime(2030),
+                                    initialDateRange: _dueDateRange,
+                                  );
+                              if (picked != null) {
+                                setDialogState(() {
+                                  _dueDateRange = picked;
+                                });
+                              }
+                            },
+                            icon: const Icon(Icons.calendar_today, size: 16),
+                            label: Text(
+                              _dueDateRange == null
+                                  ? 'Select Date Range'
+                                  : '${_dueDateRange!.start.toString().split(' ').first} - ${_dueDateRange!.end.toString().split(' ').first}',
+                              style: const TextStyle(fontSize: 12),
                             ),
                           ),
-                          items: const [
-                            DropdownMenuItem(
-                              value: 'all',
-                              child: Text('All Notes'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'public',
-                              child: Text('Public Only'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'private',
-                              child: Text('Private Only'),
-                            ),
-                          ],
-                          onChanged: (value) {
-                            setDialogState(() {
-                              _visibilityFilter = value ?? 'all';
-                            });
-                          },
                         ),
-                        const SizedBox(height: 16),
-
-                        // Due Date Range Filter
-                        const Text(
-                          'Due Date Range:',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: () async {
-                                  final DateTimeRange? picked =
-                                      await showDateRangePicker(
-                                        context: context,
-                                        firstDate: DateTime(2020),
-                                        lastDate: DateTime(2030),
-                                        initialDateRange: _dueDateRange,
-                                      );
-                                  if (picked != null) {
-                                    setDialogState(() {
-                                      _dueDateRange = picked;
-                                    });
-                                  }
-                                },
-                                icon: const Icon(
-                                  Icons.calendar_today,
-                                  size: 16,
-                                ),
-                                label: Text(
-                                  _dueDateRange == null
-                                      ? 'Select Date Range'
-                                      : '${_dueDateRange!.start.toString().split(' ').first} - ${_dueDateRange!.end.toString().split(' ').first}',
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                              ),
-                            ),
-                            if (_dueDateRange != null)
-                              IconButton(
-                                onPressed: () {
-                                  setDialogState(() {
-                                    _dueDateRange = null;
-                                  });
-                                },
-                                icon: const Icon(Icons.clear, size: 16),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Tags Filter
-                        const Text(
-                          'Tags:',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        if (allTags.isEmpty)
-                          const Text(
-                            'No tags available',
-                            style: TextStyle(
-                              color: Colors.grey,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          )
-                        else
-                          Container(
-                            constraints: const BoxConstraints(maxHeight: 200),
-                            child: SingleChildScrollView(
-                              child: Wrap(
-                                spacing: 6,
-                                runSpacing: 4,
-                                children: allTags.map((tag) {
-                                  final isSelected = _selectedTags.contains(
-                                    tag,
-                                  );
-                                  return FilterChip(
-                                    label: Text(
-                                      tag,
-                                      style: const TextStyle(fontSize: 12),
-                                    ),
-                                    selected: isSelected,
-                                    onSelected: (selected) {
-                                      setDialogState(() {
-                                        if (selected) {
-                                          _selectedTags.add(tag);
-                                        } else {
-                                          _selectedTags.remove(tag);
-                                        }
-                                      });
-                                    },
-                                    backgroundColor: Colors.grey[100],
-                                    selectedColor: const Color(
-                                      0xFF3498DB,
-                                    ).withOpacity(0.2),
-                                    checkmarkColor: const Color(0xFF3498DB),
-                                  );
-                                }).toList(),
-                              ),
-                            ),
+                        if (_dueDateRange != null)
+                          IconButton(
+                            onPressed: () {
+                              setDialogState(() {
+                                _dueDateRange = null;
+                              });
+                            },
+                            icon: const Icon(Icons.clear, size: 16),
                           ),
                       ],
                     ),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () {
-                        setDialogState(() {
-                          _visibilityFilter = 'all';
-                          _dueDateRange = null;
-                          _selectedTags.clear();
-                        });
-                      },
-                      child: const Text('Clear All'),
+                    const SizedBox(height: 16),
+
+                    // Tags Filter
+                    const Text(
+                      'Tags:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel'),
-                    ),
-                    ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          // Filters are already updated in real-time
-                        });
-                        Navigator.pop(context);
-                      },
-                      child: const Text('Apply'),
-                    ),
+                    const SizedBox(height: 8),
+                    if (_cachedTags.isEmpty)
+                      const Text(
+                        'No tags available',
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      )
+                    else
+                      Wrap(
+                        spacing: 8,
+                        children: _cachedTags.map((tag) {
+                          final isSelected = _selectedTags.contains(tag);
+                          return FilterChip(
+                            label: Text(
+                              tag,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            selected: isSelected,
+                            onSelected: (selected) {
+                              setDialogState(() {
+                                if (selected) {
+                                  _selectedTags.add(tag);
+                                } else {
+                                  _selectedTags.remove(tag);
+                                }
+                              });
+                            },
+                            backgroundColor: Colors.grey[100],
+                            selectedColor: const Color(
+                              0xFF3498DB,
+                            ).withOpacity(0.2),
+                            checkmarkColor: const Color(0xFF3498DB),
+                          );
+                        }).toList(),
+                      ),
                   ],
-                );
-              },
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    setDialogState(() {
+                      _visibilityFilter = 'all';
+                      _dueDateRange = null;
+                      _selectedTags.clear();
+                    });
+                  },
+                  child: const Text('Clear All'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      // Filters are already updated in real-time
+                    });
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Apply'),
+                ),
+              ],
             );
           },
         );

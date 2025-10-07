@@ -251,12 +251,17 @@ class PublicFeeds extends StatelessWidget {
                     SizedBox(height: 16),
                     Text(
                       'No public notes yet',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     SizedBox(height: 8),
                     Text('Be the first to share a public note!'),
                     SizedBox(height: 16),
-                    Text('Tap the + button to create a note and set it to public.'),
+                    Text(
+                      'Tap the + button to create a note and set it to public.',
+                    ),
                   ],
                 ),
               );

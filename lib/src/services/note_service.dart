@@ -11,7 +11,23 @@ class NotesService {
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> watchMyNotes(String uid) {
-    return _notesCol(uid).orderBy('aud_dt', descending: true).snapshots();
+    // Reduced logging to prevent excessive console output
+    print('� NotesService: Starting notes stream for uid: $uid');
+
+    try {
+      // Create stream with ordering for consistent results
+      final stream = _notesCol(
+        uid,
+      ).orderBy('aud_dt', descending: true).snapshots();
+
+      // Add error handling without excessive logging
+      return stream.handleError((error) {
+        print('❌ NotesService stream error: $error');
+      });
+    } catch (e) {
+      print('❌ NotesService setup error: $e');
+      rethrow;
+    }
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> watchPublicNotes(String uid) {

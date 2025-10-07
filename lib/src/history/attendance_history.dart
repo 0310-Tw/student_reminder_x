@@ -1454,165 +1454,275 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
 
   // ------------------ Clock In ------------------
   Future<void> _clockIn(String uid) async {
-    final now = DateTime.now();
-
-    // Check if today is a weekend (Saturday = 6, Sunday = 7)
-    if (now.weekday > 5) {
-      final weekendDay = now.weekday == 6 ? 'Saturday' : 'Sunday';
-      _showSnack(
-        "Clock in is not available on weekends. Enjoy your $weekendDay!",
-      );
-      return;
-    }
-
-    final eightAM = DateTime(now.year, now.month, now.day, 8, 0);
-    final eightThirty = DateTime(now.year, now.month, now.day, 8, 30);
-
-    Position? location;
     try {
-      location = await _getLocation();
-    } catch (e) {
-      _showSnack("Location error: $e");
-      return;
-    }
+      final now = DateTime.now();
 
-    String status;
-    String? reason;
-    if (now.isBefore(eightAM)) {
-      _showSnack("Too early to clock in. Please wait until 8:00 AM.");
-      return;
-    } else if (now.isAfter(eightAM) && now.isBefore(eightThirty)) {
-      status = "present"; // On time or early
-    } else if (now.isAfter(eightThirty) &&
-        now.isBefore(DateTime(now.year, now.month, now.day, 16))) {
-      status = "late";
-      reason = await _askLateReason();
-      if (reason == null || reason.trim().isEmpty) {
-        _showSnack("Late reason required.");
+      // Check if today is a weekend (Saturday = 6, Sunday = 7)
+      if (now.weekday > 5) {
+        final weekendDay = now.weekday == 6 ? 'Saturday' : 'Sunday';
+        _showSnack(
+          "Clock in is not available on weekends. Enjoy your $weekendDay!",
+        );
         return;
       }
-    } else {
-      _showSnack("Too late to clock in.");
-      return;
+
+      final eightAM = DateTime(now.year, now.month, now.day, 8, 0);
+      final eightThirty = DateTime(now.year, now.month, now.day, 8, 30);
+
+      Position? location;
+      try {
+        location = await _getLocation();
+      } catch (e) {
+        _showSnack("Location error: $e");
+        return;
+      }
+
+      String status;
+      String? reason;
+      if (now.isBefore(eightAM)) {
+        _showSnack("Too early to clock in. Please wait until 8:00 AM.");
+        return;
+      } else if (now.isAfter(eightAM) && now.isBefore(eightThirty)) {
+        status = "present"; // On time or early
+      } else if (now.isAfter(eightThirty) &&
+          now.isBefore(DateTime(now.year, now.month, now.day, 16))) {
+        status = "late";
+        try {
+          reason = await _askLateReason();
+          if (reason == null || reason.trim().isEmpty) {
+            _showSnack("Late reason required.");
+            return;
+          }
+        } catch (e) {
+          _showSnack("Error getting late reason: ${e.toString()}");
+          return;
+        }
+      } else {
+        _showSnack("Too late to clock in.");
+        return;
+      }
+
+      // Get place name for better user experience
+      final placeName = await _getPlaceName(location);
+
+      // Validate geofence before proceeding with clock-in
+      final dateId = JmTime.dateId(now);
+      bool canProceed = true;
+      try {
+        canProceed = await handleClockAction(
+          context: context,
+          studentId: uid,
+          dateId: dateId,
+          actionType: 'checkin',
+        );
+      } catch (e) {
+        print('Error in geofence validation: $e');
+        _showSnack("Error validating location - proceeding with clock in");
+        // Continue with clock in even if geofence check fails
+        canProceed = true;
+      }
+
+      if (!canProceed) {
+        _showSnack("Clock In blocked - outside designated area");
+        return;
+      }
+
+      final attendanceData = {
+        'dayId': dateId,
+        'inAt': Timestamp.fromDate(now),
+        'inLoc': GeoPoint(location.latitude, location.longitude),
+        'placeIn': placeName,
+        'status': status,
+      };
+
+      if (reason != null && reason.trim().isNotEmpty) {
+        attendanceData['lateReason'] = reason.trim();
+      }
+
+      // Attempt to save attendance data
+      try {
+        await FirebaseFirestore.instance
+            .collection('attendance')
+            .doc(uid)
+            .collection('days')
+            .doc(dateId)
+            .set(attendanceData, SetOptions(merge: true));
+
+        // Start live location tracking
+        try {
+          await _startLiveTracking(uid);
+        } catch (e) {
+          print('Error starting live tracking: $e');
+          // Don't fail clock-in if live tracking fails
+        }
+
+        // Reschedule auto clock-out after clock-in
+        try {
+          _scheduleAutoClockOut();
+        } catch (e) {
+          print('Error scheduling auto clock-out: $e');
+          // Don't fail clock-in if scheduling fails
+        }
+
+        final displayMessage = reason != null && reason.trim().isNotEmpty
+            ? "Clocked in: $status (Reason: $reason) at $placeName"
+            : "Clocked in: $status at $placeName";
+
+        _showSnack(displayMessage);
+      } catch (e) {
+        String errorMessage;
+        if (e.toString().contains('permission-denied')) {
+          errorMessage =
+              "Permission denied - cannot clock in. Please contact admin.";
+        } else if (e.toString().contains('unavailable')) {
+          errorMessage =
+              "Service temporarily unavailable - please try again later.";
+        } else if (e.toString().contains('deadline-exceeded')) {
+          errorMessage =
+              "Request timeout - please check your internet connection and try again.";
+        } else {
+          errorMessage = "Clock in failed: ${e.toString()}";
+        }
+
+        _showSnack(errorMessage);
+        print('Clock in error: $e');
+      }
+    } catch (e) {
+      // Catch-all for any unexpected errors
+      _showSnack("Unexpected error during clock in: ${e.toString()}");
+      print('Unexpected clock in error: $e');
     }
-
-    // Get place name for better user experience
-    final placeName = await _getPlaceName(location);
-
-    // Validate geofence before proceeding with clock-in
-    final dateId = JmTime.dateId(now);
-    final canProceed = await handleClockAction(
-      context: context,
-      studentId: uid,
-      dateId: dateId,
-      actionType: 'checkin',
-    );
-
-    if (!canProceed) {
-      _showSnack("Clock In blocked - outside designated area");
-      return;
-    }
-
-    final attendanceData = {
-      'dayId': dateId,
-      'inAt': Timestamp.fromDate(now),
-      'inLoc': GeoPoint(location.latitude, location.longitude),
-      'placeIn': placeName,
-      'status': status,
-    };
-
-    if (reason != null && reason.trim().isNotEmpty) {
-      attendanceData['lateReason'] = reason.trim();
-    }
-
-    await FirebaseFirestore.instance
-        .collection('attendance')
-        .doc(uid)
-        .collection('days')
-        .doc(dateId)
-        .set(attendanceData, SetOptions(merge: true));
-
-    // Start live location tracking
-    await _startLiveTracking(uid);
-
-    // Reschedule auto clock-out after clock-in
-    _scheduleAutoClockOut();
-
-    final displayMessage = reason != null && reason.trim().isNotEmpty
-        ? "Clocked in: $status (Reason: $reason) at $placeName"
-        : "Clocked in: $status at $placeName";
-
-    _showSnack(displayMessage);
   }
 
   // ------------------ Clock Out ------------------
   Future<void> _clockOut(String uid) async {
-    final now = DateTime.now();
-
-    // Check if today is a weekend (Saturday = 6, Sunday = 7)
-    if (now.weekday > 5) {
-      final weekendDay = now.weekday == 6 ? 'Saturday' : 'Sunday';
-      _showSnack(
-        "Clock out is not available on weekends. Enjoy your $weekendDay!",
-      );
-      return;
-    }
-
-    Position? location;
     try {
-      location = await _getLocation();
+      final now = DateTime.now();
+
+      // Check if today is a weekend (Saturday = 6, Sunday = 7)
+      if (now.weekday > 5) {
+        final weekendDay = now.weekday == 6 ? 'Saturday' : 'Sunday';
+        _showSnack(
+          "Clock out is not available on weekends. Enjoy your $weekendDay!",
+        );
+        return;
+      }
+
+      Position? location;
+      try {
+        location = await _getLocation();
+      } catch (e) {
+        _showSnack("Location error: $e");
+        return;
+      }
+
+      final dayDoc = FirebaseFirestore.instance
+          .collection('attendance')
+          .doc(uid)
+          .collection('days')
+          .doc(JmTime.dateId(now));
+
+      // Check if user has clocked in
+      DocumentSnapshot? snapshot;
+      try {
+        snapshot = await dayDoc.get();
+      } catch (e) {
+        if (e.toString().contains('permission-denied')) {
+          _showSnack(
+            "Permission denied - cannot access attendance data. Please contact admin.",
+          );
+        } else {
+          _showSnack("Error accessing attendance data: ${e.toString()}");
+        }
+        print('Error reading attendance document: $e');
+        return;
+      }
+
+      if (!snapshot.exists || snapshot.data() == null) {
+        _showSnack("Cannot clock out before clocking in.");
+        return;
+      }
+
+      final existingData = snapshot.data() as Map<String, dynamic>?;
+      if (existingData?['inAt'] == null) {
+        _showSnack("Cannot clock out before clocking in.");
+        return;
+      }
+
+      final currentStatus = existingData?['status'] ?? 'present';
+
+      // Get place name for better user experience
+      final placeName = await _getPlaceName(location);
+
+      // Validate geofence before proceeding with clock-out
+      final dateId = JmTime.dateId(now);
+      bool canProceed = true;
+      try {
+        canProceed = await handleClockAction(
+          context: context,
+          studentId: uid,
+          dateId: dateId,
+          actionType: 'checkout',
+        );
+      } catch (e) {
+        print('Error in geofence validation: $e');
+        _showSnack("Error validating location - proceeding with clock out");
+        // Continue with clock out even if geofence check fails
+        canProceed = true;
+      }
+
+      if (!canProceed) {
+        _showSnack("Clock Out blocked - outside designated area");
+        return;
+      }
+
+      // Maintain the original status (present/late) when clocking out
+      try {
+        await dayDoc.set({
+          'outAt': Timestamp.fromDate(now),
+          'outLoc': GeoPoint(location.latitude, location.longitude),
+          'placeOut': placeName,
+          'status': currentStatus, // Keep the original clock-in status
+        }, SetOptions(merge: true));
+
+        // Stop live location tracking
+        await _stopLiveTracking();
+
+        // Cancel auto clock-out timer
+        _autoClockOutTimer?.cancel();
+
+        _showSnack("Clocked out successfully at $placeName");
+      } catch (e) {
+        String errorMessage;
+        if (e.toString().contains('permission-denied')) {
+          errorMessage =
+              "Permission denied - cannot clock out. Please contact admin.";
+        } else if (e.toString().contains('unavailable')) {
+          errorMessage =
+              "Service temporarily unavailable - please try again later.";
+        } else if (e.toString().contains('deadline-exceeded')) {
+          errorMessage =
+              "Request timeout - please check your internet connection and try again.";
+        } else {
+          errorMessage = "Clock out failed: ${e.toString()}";
+        }
+
+        _showSnack(errorMessage);
+        print('Clock out error: $e');
+
+        // Still try to stop tracking and cancel timer for cleanup
+        try {
+          await _stopLiveTracking();
+          _autoClockOutTimer?.cancel();
+        } catch (cleanupError) {
+          print('Cleanup error: $cleanupError');
+        }
+      }
     } catch (e) {
-      _showSnack("Location error: $e");
-      return;
+      // Catch-all for any unexpected errors
+      _showSnack("Unexpected error during clock out: ${e.toString()}");
+      print('Unexpected clock out error: $e');
     }
-
-    final dayDoc = FirebaseFirestore.instance
-        .collection('attendance')
-        .doc(uid)
-        .collection('days')
-        .doc(JmTime.dateId(now));
-
-    final snapshot = await dayDoc.get();
-    if (!snapshot.exists || snapshot.data()?['inAt'] == null) {
-      _showSnack("Cannot clock out before clocking in.");
-      return;
-    }
-
-    final existingData = snapshot.data();
-    final currentStatus = existingData?['status'] ?? 'present';
-
-    // Get place name for better user experience
-    final placeName = await _getPlaceName(location);
-
-    // Validate geofence before proceeding with clock-out
-    final dateId = JmTime.dateId(now);
-    final canProceed = await handleClockAction(
-      context: context,
-      studentId: uid,
-      dateId: dateId,
-      actionType: 'checkout',
-    );
-
-    if (!canProceed) {
-      _showSnack("Clock Out blocked - outside designated area");
-      return;
-    }
-
-    // Maintain the original status (present/late) when clocking out
-    await dayDoc.set({
-      'outAt': Timestamp.fromDate(now),
-      'outLoc': GeoPoint(location.latitude, location.longitude),
-      'placeOut': placeName,
-      'status': currentStatus, // Keep the original clock-in status
-    }, SetOptions(merge: true));
-
-    // Stop live location tracking
-    await _stopLiveTracking();
-
-    // Cancel auto clock-out timer
-    _autoClockOutTimer?.cancel();
-
-    _showSnack("Clocked out successfully at $placeName");
   }
 
   Future<Position> _getLocation() async {
@@ -1665,25 +1775,66 @@ class _AttendanceHistory14dState extends State<AttendanceHistory14d> {
 
   // ------------------ Auto Clock Out ------------------
   void _scheduleAutoClockOut() {
-    _autoClockOutTimer?.cancel();
+    try {
+      _autoClockOutTimer?.cancel();
 
-    final now = DateTime.now();
-    final clockOutTime = DateTime(now.year, now.month, now.day, 16, 0); // 4 PM
-    Duration durationUntil4PM = clockOutTime.difference(now);
+      final now = DateTime.now();
 
-    if (durationUntil4PM.isNegative) {
-      // Already past 4 PM today, no timer needed
-      return;
-    }
-
-    _autoClockOutTimer = Timer(durationUntil4PM, () async {
-      final currentUser = AuthService.instance.currentUser;
-      if (currentUser != null && _isClockedIn) {
-        await _clockOut(currentUser.uid);
-        await _loadTodayClockStatus();
-        _showSnack("Automatically clocked out at 4:00 PM");
+      // Don't schedule auto-clockout on weekends
+      if (now.weekday > 5) {
+        print('Skipping auto-clockout scheduling: Weekend detected');
+        return;
       }
-    });
+
+      final clockOutTime = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        16,
+        0,
+      ); // 4 PM
+      Duration durationUntil4PM = clockOutTime.difference(now);
+
+      if (durationUntil4PM.isNegative) {
+        // Already past 4 PM today, no timer needed
+        print('Skipping auto-clockout scheduling: Already past 4 PM');
+        return;
+      }
+
+      print('Auto-clockout scheduled for: ${clockOutTime.toString()}');
+
+      _autoClockOutTimer = Timer(durationUntil4PM, () async {
+        try {
+          final currentUser = AuthService.instance.currentUser;
+          if (currentUser != null && _isClockedIn) {
+            print('Auto-clockout triggered for user: ${currentUser.uid}');
+
+            // Use the error-handled _clockOut method
+            await _clockOut(currentUser.uid);
+
+            // Update the clock status
+            try {
+              await _loadTodayClockStatus();
+            } catch (e) {
+              print('Error loading clock status after auto-clockout: $e');
+            }
+
+            if (mounted) {
+              _showSnack("Automatically clocked out at 4:00 PM");
+            }
+          } else {
+            print('Auto-clockout skipped: User not found or not clocked in');
+          }
+        } catch (e) {
+          print('Auto-clockout error: $e');
+          if (mounted) {
+            _showSnack("Auto-clockout failed: ${e.toString()}");
+          }
+        }
+      });
+    } catch (e) {
+      print('Error scheduling auto-clockout: $e');
+    }
   }
 
   // ------------------ Live Location Tracking ------------------

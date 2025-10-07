@@ -54,6 +54,39 @@ class _StudentLocationSelectionPageState
     _loadCurrentSchedule();
   }
 
+  // Helper method to safely extract campus ID as string
+  String _getCampusIdAsString(dynamic campusIdValue) {
+    if (campusIdValue is String) {
+      return campusIdValue;
+    } else if (campusIdValue is Map && campusIdValue.containsKey('id')) {
+      return campusIdValue['id'].toString();
+    } else {
+      // Return fallback value
+      return 'up_park_camp';
+    }
+  }
+
+  // Helper method to safely extract numeric values from custom location
+  double _safeToDouble(dynamic value, double fallback) {
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) {
+      final parsed = double.tryParse(value);
+      if (parsed != null) return parsed;
+    }
+    return fallback;
+  }
+
+  int _safeToInt(dynamic value, int fallback) {
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) {
+      final parsed = int.tryParse(value);
+      if (parsed != null) return parsed;
+    }
+    return fallback;
+  }
+
   // Debug method to validate schedule data structure
   void _validateScheduleData() {
     _weeklySchedule.forEach((day, config) {
@@ -69,6 +102,8 @@ class _StudentLocationSelectionPageState
           print(
             'Warning: $day campusId is not String: ${config['campusId']} (${config['campusId'].runtimeType})',
           );
+          // Fix the campusId on the spot
+          config['campusId'] = _getCampusIdAsString(config['campusId']);
         }
       }
     });
@@ -131,12 +166,25 @@ class _StudentLocationSelectionPageState
                   }
 
                   // Ensure campusId field exists and is a String
-                  if (!dayConfig.containsKey('campusId') ||
-                      dayConfig['campusId'] is! String) {
+                  if (!dayConfig.containsKey('campusId')) {
                     dayConfig['campusId'] =
                         day == 'wednesday' || day == 'thursday'
                         ? 'stony_hill'
                         : 'up_park_camp';
+                  } else {
+                    // Convert campusId to String if it's not already
+                    final campusIdValue = dayConfig['campusId'];
+                    if (campusIdValue is! String) {
+                      if (campusIdValue is Map &&
+                          campusIdValue.containsKey('id')) {
+                        dayConfig['campusId'] = campusIdValue['id'].toString();
+                      } else {
+                        dayConfig['campusId'] =
+                            day == 'wednesday' || day == 'thursday'
+                            ? 'stony_hill'
+                            : 'up_park_camp';
+                      }
+                    }
                   }
 
                   return MapEntry(day, dayConfig);
@@ -178,6 +226,32 @@ class _StudentLocationSelectionPageState
     }
   }
 
+  // Method to clean and normalize the schedule data before saving
+  Map<String, dynamic> _cleanScheduleData() {
+    final cleaned = <String, dynamic>{};
+
+    _weeklySchedule.forEach((day, config) {
+      if (config is Map<String, dynamic>) {
+        final cleanedConfig = Map<String, dynamic>.from(config);
+
+        // Ensure campusId is always a string
+        cleanedConfig['campusId'] = _getCampusIdAsString(
+          cleanedConfig['campusId'],
+        );
+
+        // Ensure type field is present
+        if (!cleanedConfig.containsKey('type')) {
+          final isFlexibleDay = ['monday', 'tuesday', 'friday'].contains(day);
+          cleanedConfig['type'] = isFlexibleDay ? 'custom' : 'fixed';
+        }
+
+        cleaned[day] = cleanedConfig;
+      }
+    });
+
+    return cleaned;
+  }
+
   Future<void> _saveSchedule() async {
     try {
       final user = AuthService.instance.currentUser;
@@ -187,12 +261,13 @@ class _StudentLocationSelectionPageState
         setState(() => _isSaving = true);
       }
 
-      // Save weekly schedule
+      // Save weekly schedule with cleaned data
+      final cleanedSchedule = _cleanScheduleData();
       await FirebaseFirestore.instance
           .collection('student_schedules')
           .doc(user.uid)
           .set({
-            'weeklySchedule': _weeklySchedule,
+            'weeklySchedule': cleanedSchedule,
             'updatedAt': FieldValue.serverTimestamp(),
             'updatedBy': 'student',
           }, SetOptions(merge: true));
@@ -251,25 +326,30 @@ class _StudentLocationSelectionPageState
               final source = geofenceData['source']?.toString();
 
               // Show the location regardless of source (admin override or student custom)
-              if (geofenceData['latitude'] != null && 
+              if (geofenceData['latitude'] != null &&
                   geofenceData['longitude'] != null) {
-                
                 // If admin has set a location, mark it as non-editable so student can see but can't edit
                 if (source == 'adminOverride') {
-                  dayConfig['type'] = 'admin_override'; // Admin override - make it read-only
+                  dayConfig['type'] =
+                      'admin_override'; // Admin override - make it read-only
                   dayConfig['campusId'] = 'admin_override';
-                  dayConfig['isReadOnly'] = true; // Flag to indicate admin control
+                  dayConfig['isReadOnly'] =
+                      true; // Flag to indicate admin control
                 } else if (source == 'studentCustom') {
-                  dayConfig['type'] = 'custom'; // Student can still edit their own
+                  dayConfig['type'] =
+                      'custom'; // Student can still edit their own
                   dayConfig['isReadOnly'] = false;
                 }
 
                 dayConfig['customLocation'] = {
-                  'lat': geofenceData['latitude'],
-                  'lng': geofenceData['longitude'],
-                  'radius': geofenceData['radius'] ?? 100.0,
-                  'description': geofenceData['description'] ?? 'Location for $day',
+                  'lat': _safeToDouble(geofenceData['latitude'], 0.0),
+                  'lng': _safeToDouble(geofenceData['longitude'], 0.0),
+                  'radius': _safeToDouble(geofenceData['radius'], 100.0),
+                  'description':
+                      geofenceData['description'] ?? 'Location for $day',
                   'source': source, // Include source info for UI display
+                  if (geofenceData['address'] != null)
+                    'address': geofenceData['address'].toString(),
                 };
               }
             }
@@ -310,15 +390,17 @@ class _StudentLocationSelectionPageState
                 .collection('geofence_profiles')
                 .doc(day.toLowerCase())
                 .set({
-              'latitude': lat,
-              'longitude': lng,
-              'radius': radius,
-              'source': 'studentCustom',
-              'description': customLoc['description'] ?? 'Custom location for $day',
-              'bandType': 'fixed', // Student custom locations are typically fixed
-              'updatedAt': FieldValue.serverTimestamp(),
-              'updatedBy': 'student',
-            }, SetOptions(merge: true));
+                  'latitude': lat,
+                  'longitude': lng,
+                  'radius': radius,
+                  'source': 'studentCustom',
+                  'description':
+                      customLoc['description'] ?? 'Custom location for $day',
+                  'bandType':
+                      'fixed', // Student custom locations are typically fixed
+                  'updatedAt': FieldValue.serverTimestamp(),
+                  'updatedBy': 'student',
+                }, SetOptions(merge: true));
           }
         }
       }
@@ -360,11 +442,10 @@ class _StudentLocationSelectionPageState
     // Get existing custom location if available
     if (dayConfig['customLocation'] != null) {
       final customLoc = dayConfig['customLocation'] as Map<String, dynamic>;
-      initialLocation = LatLng(
-        customLoc['lat'] as double,
-        customLoc['lng'] as double,
-      );
-      initialRadius = (customLoc['radius'] as num?)?.toDouble() ?? 100.0;
+      final lat = _safeToDouble(customLoc['lat'], 18.0179);
+      final lng = _safeToDouble(customLoc['lng'], -76.8099);
+      initialLocation = LatLng(lat, lng);
+      initialRadius = _safeToDouble(customLoc['radius'], 100.0);
     }
 
     final result = await Navigator.push<Map<String, dynamic>>(
@@ -662,15 +743,16 @@ class _StudentLocationSelectionPageState
     bool hasCustomLocation = false;
     String? locationSource;
 
-    if ((isCustomDay || isAdminOverride) && dayConfig['customLocation'] != null) {
+    if ((isCustomDay || isAdminOverride) &&
+        dayConfig['customLocation'] != null) {
       final customLoc = dayConfig['customLocation'] as Map<String, dynamic>;
-      final lat = (customLoc['lat'] as double).toStringAsFixed(4);
-      final lng = (customLoc['lng'] as double).toStringAsFixed(4);
-      final radius = (customLoc['radius'] as num).toInt();
+      final lat = _safeToDouble(customLoc['lat'], 0.0).toStringAsFixed(4);
+      final lng = _safeToDouble(customLoc['lng'], 0.0).toStringAsFixed(4);
+      final radius = _safeToInt(customLoc['radius'], 100);
       locationSource = customLoc['source']?.toString();
-      
+
       if (isAdminOverride || locationSource == 'adminOverride') {
-        displayName = '🔒 Admin Override Location';
+        displayName = '🔒 ADMIN OVERRIDE';
       } else {
         displayName = 'Custom Location Set';
       }
@@ -678,19 +760,24 @@ class _StudentLocationSelectionPageState
       // Use address if available, otherwise show coordinates
       if (customLoc['address'] != null &&
           customLoc['address'].toString().isNotEmpty) {
-        addressText = '📍 ${customLoc['address']} (${radius}m radius)';
+        if (isAdminOverride || locationSource == 'adminOverride') {
+          addressText =
+              '🚨 Admin Set: ${customLoc['address']} (${radius}m radius)';
+        } else {
+          addressText = '📍 ${customLoc['address']} (${radius}m radius)';
+        }
       } else {
-        addressText = '📍 Lat: $lat, Lng: $lng (${radius}m radius)';
+        if (isAdminOverride || locationSource == 'adminOverride') {
+          addressText =
+              '🚨 Admin Set: Lat: $lat, Lng: $lng (${radius}m radius)';
+        } else {
+          addressText = '📍 Lat: $lat, Lng: $lng (${radius}m radius)';
+        }
       }
       hasCustomLocation = true;
     } else {
       // Safe type handling for campusId
-      final campusIdValue = dayConfig['campusId'];
-      final selectedCampusId = campusIdValue is String
-          ? campusIdValue
-          : (campusIdValue is Map && campusIdValue['id'] != null)
-          ? campusIdValue['id'].toString()
-          : 'up_park_camp'; // fallback default
+      final selectedCampusId = _getCampusIdAsString(dayConfig['campusId']);
 
       final matchedCampus = campusOptions.firstWhere(
         (campus) => campus['id'] == selectedCampusId,
@@ -708,7 +795,10 @@ class _StudentLocationSelectionPageState
         borderRadius: BorderRadius.circular(16),
         gradient: LinearGradient(
           colors: isAdminOverride
-              ? [Colors.red.shade50, Colors.red.shade100] // Red for admin overrides
+              ? [
+                  Colors.red.shade50,
+                  Colors.red.shade100,
+                ] // Red for admin overrides
               : isCustomDay
               ? [Colors.green.shade50, Colors.green.shade100]
               : isDefaultDay
@@ -824,7 +914,7 @@ class _StudentLocationSelectionPageState
                       const SizedBox(width: 4),
                       Text(
                         isAdminOverride
-                            ? 'Admin Set'
+                            ? 'ADMIN OVERRIDE'
                             : isCustomDay
                             ? 'Flexible'
                             : isDefaultDay
@@ -861,6 +951,41 @@ class _StudentLocationSelectionPageState
                   ),
               ],
             ),
+
+            // Admin Override Warning Banner
+            if (isAdminOverride || isReadOnly) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.shade300, width: 2),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.warning_rounded,
+                      color: Colors.red.shade700,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'This location was set by an administrator and cannot be changed',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.red.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             const SizedBox(height: 16),
 
             if (isCustomDay || isAdminOverride) ...[
@@ -868,14 +993,21 @@ class _StudentLocationSelectionPageState
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 child: InkWell(
-                  onTap: isReadOnly ? null : () => _openLocationPicker(day), // Disable tap for admin overrides
+                  onTap: isReadOnly
+                      ? null
+                      : () => _openLocationPicker(
+                          day,
+                        ), // Disable tap for admin overrides
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: isReadOnly
-                            ? [Colors.grey.shade400, Colors.grey.shade500] // Grey for read-only admin overrides
+                            ? [
+                                Colors.grey.shade400,
+                                Colors.grey.shade500,
+                              ] // Grey for read-only admin overrides
                             : hasCustomLocation
                             ? [Colors.green.shade400, Colors.green.shade500]
                             : [Colors.blue.shade400, Colors.blue.shade500],
@@ -886,11 +1018,11 @@ class _StudentLocationSelectionPageState
                       boxShadow: [
                         BoxShadow(
                           color:
-                              (isReadOnly 
-                                  ? Colors.grey
-                                  : hasCustomLocation 
-                                  ? Colors.green 
-                                  : Colors.blue)
+                              (isReadOnly
+                                      ? Colors.grey
+                                      : hasCustomLocation
+                                      ? Colors.green
+                                      : Colors.blue)
                                   .withOpacity(0.3),
                           blurRadius: 8,
                           offset: const Offset(0, 4),
@@ -907,7 +1039,8 @@ class _StudentLocationSelectionPageState
                           ),
                           child: Icon(
                             isReadOnly
-                                ? Icons.lock // Lock icon for admin overrides
+                                ? Icons
+                                      .lock // Lock icon for admin overrides
                                 : hasCustomLocation
                                 ? Icons.edit_location_alt
                                 : Icons.add_location_alt,
@@ -962,15 +1095,25 @@ class _StudentLocationSelectionPageState
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.green.shade50,
+                    color: isAdminOverride || isReadOnly
+                        ? Colors.red.shade50
+                        : Colors.green.shade50,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.green.shade200),
+                    border: Border.all(
+                      color: isAdminOverride || isReadOnly
+                          ? Colors.red.shade200
+                          : Colors.green.shade200,
+                    ),
                   ),
                   child: Row(
                     children: [
                       Icon(
-                        Icons.location_on,
-                        color: Colors.green.shade600,
+                        isAdminOverride || isReadOnly
+                            ? Icons.admin_panel_settings
+                            : Icons.location_on,
+                        color: isAdminOverride || isReadOnly
+                            ? Colors.red.shade600
+                            : Colors.green.shade600,
                         size: 20,
                       ),
                       const SizedBox(width: 8),
@@ -982,14 +1125,18 @@ class _StudentLocationSelectionPageState
                               displayName,
                               style: TextStyle(
                                 fontWeight: FontWeight.w600,
-                                color: Colors.green.shade800,
+                                color: isAdminOverride || isReadOnly
+                                    ? Colors.red.shade800
+                                    : Colors.green.shade800,
                               ),
                             ),
                             Text(
                               addressText!,
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.green.shade600,
+                                color: isAdminOverride || isReadOnly
+                                    ? Colors.red.shade600
+                                    : Colors.green.shade600,
                               ),
                             ),
                           ],
@@ -1062,13 +1209,9 @@ class _StudentLocationSelectionPageState
                             _updateDayLocation(day, campusId),
                         itemBuilder: (context) => campusOptions.map((campus) {
                           // Safe comparison handling different types
-                          final campusIdValue = dayConfig['campusId'];
-                          final currentCampusId = campusIdValue is String
-                              ? campusIdValue
-                              : (campusIdValue is Map &&
-                                    campusIdValue['id'] != null)
-                              ? campusIdValue['id'].toString()
-                              : '';
+                          final currentCampusId = _getCampusIdAsString(
+                            dayConfig['campusId'],
+                          );
                           final isSelected = campus['id'] == currentCampusId;
                           return PopupMenuItem(
                             value: campus['id'],
