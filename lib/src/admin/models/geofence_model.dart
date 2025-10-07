@@ -20,7 +20,7 @@ class GeofenceProfile {
     required this.outRadius,
     required this.bandType,
     required this.outsidePolicy,
-    this.outsideMessage, required int dayOfWeek,
+    this.outsideMessage,
   });
 
   /// Build from a Firestore document

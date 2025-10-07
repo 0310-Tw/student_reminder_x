@@ -7,7 +7,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter/material.dart';
 import 'package:students_reminder/src/admin/models/advanced_geofence.dart';
-import 'package:students_reminder/src/admin/models/geofence_model.dart';
 import 'package:students_reminder/src/admin/models/geofence_profile.dart';
 import '../services/org_config_service.dart';
 import '../services/geofence_incident_service.dart';
