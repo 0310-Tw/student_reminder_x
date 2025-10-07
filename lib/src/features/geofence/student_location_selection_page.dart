@@ -373,10 +373,16 @@ class _StudentLocationSelectionPageState
         final day = entry.key;
         final dayConfig = entry.value as Map<String, dynamic>;
 
-        // Only save geofences for custom days and Monday-Friday
+        // Check if this day is admin-controlled and should not be modified by student
+        final isAdminControlled =
+            dayConfig['isReadOnly'] == true ||
+            dayConfig['type'] == 'admin_override';
+
+        // Only save geofences for custom days and Monday-Friday, and NOT admin overrides
         if (dayConfig['type'] == 'custom' &&
             GeofenceService.isValidDay(day) &&
-            dayConfig['customLocation'] != null) {
+            dayConfig['customLocation'] != null &&
+            !isAdminControlled) {
           final customLoc = dayConfig['customLocation'] as Map<String, dynamic>;
           final lat = _extractDouble(customLoc['lat']);
           final lng = _extractDouble(customLoc['lng']);
@@ -402,6 +408,9 @@ class _StudentLocationSelectionPageState
                   'updatedBy': 'student',
                 }, SetOptions(merge: true));
           }
+        } else if (isAdminControlled) {
+          // Log when we skip saving due to admin override
+          print('Skipping save for $day - Admin override active');
         }
       }
     } catch (e) {
@@ -424,6 +433,26 @@ class _StudentLocationSelectionPageState
         if (_weeklySchedule.containsKey(day) &&
             _weeklySchedule[day] is Map<String, dynamic>) {
           final dayConfig = _weeklySchedule[day] as Map<String, dynamic>;
+
+          // Check if this day is admin-controlled and should not be modified by student
+          final isAdminControlled =
+              dayConfig['isReadOnly'] == true ||
+              dayConfig['type'] == 'admin_override';
+
+          if (isAdminControlled) {
+            // Show error message and return early
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'This location was set by an administrator and cannot be changed',
+                ),
+                backgroundColor: Colors.red,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+            return;
+          }
+
           dayConfig['campusId'] = campusId;
           // Clear any existing custom location if switching to a different campus
           if (dayConfig.containsKey('customLocation')) {
@@ -436,6 +465,26 @@ class _StudentLocationSelectionPageState
 
   Future<void> _openLocationPicker(String day) async {
     final dayConfig = _weeklySchedule[day] as Map<String, dynamic>;
+
+    // Check if this day is admin-controlled and should not be modified by student
+    final isAdminControlled =
+        dayConfig['isReadOnly'] == true ||
+        dayConfig['type'] == 'admin_override';
+
+    if (isAdminControlled) {
+      // Show error message and return early
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'This location was set by an administrator and cannot be changed',
+          ),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     LatLng? initialLocation;
     double initialRadius = 100.0;
 
@@ -1199,7 +1248,7 @@ class _StudentLocationSelectionPageState
                         ],
                       ),
                     ),
-                    if (!isDefaultDay)
+                    if (!isDefaultDay && !isAdminOverride && !isReadOnly)
                       PopupMenuButton<String>(
                         icon: Icon(
                           Icons.edit,
