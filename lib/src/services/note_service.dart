@@ -22,31 +22,12 @@ class NotesService {
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> publicFeeds() {
-    print('🔍 Querying public feeds...');
-    try {
-      return _db
-          .collectionGroup('notes')
-          .where('visibility', isEqualTo: 'public')
-          .orderBy('aud_dt', descending: true)
-          .limit(100)
-          .snapshots()
-          .handleError((error) {
-            print('❌ Error in publicFeeds stream: $error');
-            print('Error type: ${error.runtimeType}');
-            if (error.toString().contains('permission-denied')) {
-              print('🔐 Permission denied: Check Firestore security rules');
-              print('Make sure collection group queries for notes are allowed');
-              print(
-                'Try updating Firestore rules or check user authentication',
-              );
-            }
-            throw error; // Re-throw to let UI handle it
-          });
-    } catch (e) {
-      print('❌ Exception in publicFeeds setup: $e');
-      // Return an empty stream in case of setup errors
-      return Stream.empty();
-    }
+    return _db
+        .collectionGroup('notes')
+        .where('visibility', isEqualTo: 'public')
+        .orderBy('aud_dt', descending: true)
+        .limit(100)
+        .snapshots();
   }
 
   Future<String> createNote(

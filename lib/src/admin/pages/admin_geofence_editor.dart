@@ -409,17 +409,17 @@ class _AdminGeofenceEditorState extends State<AdminGeofenceEditor> {
             'latitude': selectedLocation!.latitude,
             'longitude': selectedLocation!.longitude,
             'radius': radius,
-            'description': 'Custom location for ${_formatDay(widget.dateId)}',
+            'description': 'Admin override for ${_formatDay(widget.dateId)}',
             'isEnabled': true,
-            'source': 'studentCustom',
+            'source': 'adminOverride', // Changed from 'studentCustom' to properly identify admin overrides
             'bandType': bandType == GeofenceBandType.floating
                 ? 'floating'
                 : 'fixed',
             'outsideAreaMessage': outsideAreaMessage.trim().isEmpty
                 ? null
                 : outsideAreaMessage.trim(),
-            'lastModified': FieldValue.serverTimestamp(),
-            'modifiedBy': 'admin_override',
+            'updatedAt': FieldValue.serverTimestamp(), // Changed to match student format
+            'updatedBy': 'admin', // Simplified to match student format
           });
 
       ScaffoldMessenger.of(context).showSnackBar(

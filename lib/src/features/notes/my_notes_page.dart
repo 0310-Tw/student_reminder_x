@@ -174,7 +174,16 @@ class _MyNotesPageState extends State<MyNotesPage> {
                 stream: NotesService.instance.watchMyNotes(uid),
                 builder: (context, snap) {
                   if (snap.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(),
+                          SizedBox(height: 16),
+                          Text('Loading your notes...'),
+                        ],
+                      ),
+                    );
                   }
 
                   if (snap.hasError) {
@@ -200,6 +209,24 @@ class _MyNotesPageState extends State<MyNotesPage> {
                   }
 
                   final docs = snap.data?.docs ?? [];
+
+                  if (docs.isEmpty) {
+                    return const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.note_add, size: 64, color: Colors.grey),
+                          SizedBox(height: 16),
+                          Text(
+                            'No notes found',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          SizedBox(height: 8),
+                          Text('Tap the + button to create your first note!'),
+                        ],
+                      ),
+                    );
+                  }
 
                   final filteredDocs = docs.where((doc) {
                     final data = doc.data();

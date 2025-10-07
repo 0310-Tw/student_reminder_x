@@ -216,7 +216,16 @@ class PublicFeeds extends StatelessWidget {
           stream: NotesService.instance.publicFeeds(),
           builder: (context, snap) {
             if (snap.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Loading public feeds...'),
+                  ],
+                ),
+              );
             }
 
             // Handle errors (including permission denied during logout)
@@ -235,8 +244,20 @@ class PublicFeeds extends StatelessWidget {
             final docs = snap.data!.docs;
             if (docs.isEmpty) {
               return const Center(
-                child: Text(
-                  'No notes to show. Click the + button to add a note.',
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.public, size: 64, color: Colors.grey),
+                    SizedBox(height: 16),
+                    Text(
+                      'No public notes yet',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    SizedBox(height: 8),
+                    Text('Be the first to share a public note!'),
+                    SizedBox(height: 16),
+                    Text('Tap the + button to create a note and set it to public.'),
+                  ],
                 ),
               );
             }

@@ -8,6 +8,7 @@ enum LocationSource {
   setDay, // Mandatory Wed/Thu days
   fallback, // Default campus locations
   studentCustom, // Student's own custom locations
+  adminOverride, // Admin-set overrides for students
 }
 
 enum GeofenceBandType {
@@ -44,6 +45,8 @@ class GeofenceLocationInfo {
         return 'Fallback';
       case LocationSource.studentCustom:
         return 'Student Custom';
+      case LocationSource.adminOverride:
+        return 'Admin Override';
     }
   }
 
@@ -153,6 +156,8 @@ class ComprehensiveGeofenceResolver {
             radius: _extractDouble(profileData['radius']) ?? 100.0,
             source: source == 'studentCustom'
                 ? LocationSource.studentCustom
+                : source == 'adminOverride'
+                ? LocationSource.adminOverride
                 : LocationSource.setDay,
             description: profileData['description'] ?? 'Location for $day',
             bandType: _parseBandType(profileData['bandType']),

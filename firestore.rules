@@ -100,23 +100,19 @@ service cloud.firestore {
       allow read, write: if isAuthenticated();
     }
 
-    // Public notes collection
-    match /notes/{noteId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
-    }
-
     // Documents collection
     match /documents/{documentId} {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
     }
 
-    // User notes subcollection
+    // User notes subcollection - main notes storage
     match /users/{userId}/notes/{noteId} {
+      // Users can read their own notes, admins can read all notes, anyone can read public notes
       allow read: if isAdmin() || isOwner(userId) || resource.data.visibility == 'public';
+      // Users can write their own notes, admins can write any notes
       allow write: if isAdmin() || isOwner(userId);
-      // Allow list operations for users on their own notes
+      // Allow list operations for users on their own notes and for public notes queries
       allow list: if isAdmin() || isOwner(userId);
       // Allow authenticated users to like/unlike public notes
       allow update: if isAuthenticated() && 
@@ -147,11 +143,11 @@ service cloud.firestore {
       allow read, write: if isAuthenticated();
     }
 
-    // Allow reading public notes via collection group queries
+    // Allow reading and listing public notes via collection group queries
     match /{path=**}/notes/{noteId} {
-      allow read: if isAuthenticated() && 
-                     (resource.data.visibility == 'public' || 
-                      resource.data.authorId == request.auth.uid);
+      allow read, list: if isAuthenticated() && 
+                           (resource.data.visibility == 'public' || 
+                            resource.data.authorId == request.auth.uid);
     }
     
     // Allow reading reports via collection group queries for admins and report owners

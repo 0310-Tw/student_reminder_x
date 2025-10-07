@@ -538,6 +538,8 @@ class _EnhancedAdminGeofencePageState extends State<EnhancedAdminGeofencePage>
         return Colors.orange;
       case LocationSource.studentCustom:
         return Colors.blue;
+      case LocationSource.adminOverride:
+        return Colors.red;
     }
   }
 
@@ -549,6 +551,8 @@ class _EnhancedAdminGeofencePageState extends State<EnhancedAdminGeofencePage>
         return 'Fallback';
       case LocationSource.studentCustom:
         return 'Student Custom';
+      case LocationSource.adminOverride:
+        return 'Admin Override';
     }
   }
 
@@ -846,6 +850,13 @@ class _EnhancedAdminGeofencePageState extends State<EnhancedAdminGeofencePage>
         case LocationSource.studentCustom:
           // This should go through custom location picker
           return;
+        case LocationSource.adminOverride:
+          coordinates = {
+            'latitude': 18.0179,
+            'longitude': -76.8099,
+          }; // Default admin location
+          description = 'Admin Override - ${_formatDay(day)}';
+          break;
       }
 
       // Update or create geofence profile for this day

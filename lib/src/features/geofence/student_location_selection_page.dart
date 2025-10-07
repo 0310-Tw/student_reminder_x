@@ -232,26 +232,44 @@ class _StudentLocationSelectionPageState
       final user = AuthService.instance.currentUser;
       if (user == null) return;
 
-      final geofences = await GeofenceService.instance.getAllGeofences(
-        user.uid,
-      );
+      // Load from geofence_profiles subcollection (same as admin)
+      final geofenceProfilesSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('geofence_profiles')
+          .get();
 
       if (mounted) {
         setState(() {
-          // Update weekly schedule with loaded geofences
-          for (final entry in geofences.entries) {
-            final day = entry.key;
-            final geofenceData = entry.value;
+          // Update weekly schedule with loaded geofence profiles
+          for (final doc in geofenceProfilesSnapshot.docs) {
+            final day = doc.id;
+            final geofenceData = doc.data();
 
             if (_weeklySchedule.containsKey(day)) {
               final dayConfig = _weeklySchedule[day] as Map<String, dynamic>;
+              final source = geofenceData['source']?.toString();
 
-              // Only update if this is a custom day
-              if (dayConfig['type'] == 'custom') {
+              // Show the location regardless of source (admin override or student custom)
+              if (geofenceData['latitude'] != null && 
+                  geofenceData['longitude'] != null) {
+                
+                // If admin has set a location, mark it as non-editable so student can see but can't edit
+                if (source == 'adminOverride') {
+                  dayConfig['type'] = 'admin_override'; // Admin override - make it read-only
+                  dayConfig['campusId'] = 'admin_override';
+                  dayConfig['isReadOnly'] = true; // Flag to indicate admin control
+                } else if (source == 'studentCustom') {
+                  dayConfig['type'] = 'custom'; // Student can still edit their own
+                  dayConfig['isReadOnly'] = false;
+                }
+
                 dayConfig['customLocation'] = {
-                  'lat': geofenceData['lat'],
-                  'lng': geofenceData['lng'],
-                  'radius': geofenceData['radius'],
+                  'lat': geofenceData['latitude'],
+                  'lng': geofenceData['longitude'],
+                  'radius': geofenceData['radius'] ?? 100.0,
+                  'description': geofenceData['description'] ?? 'Location for $day',
+                  'source': source, // Include source info for UI display
                 };
               }
             }
@@ -270,7 +288,7 @@ class _StudentLocationSelectionPageState
       final user = AuthService.instance.currentUser;
       if (user == null) return;
 
-      // Save custom locations as geofences
+      // Save custom locations to geofence_profiles subcollection (same as admin)
       for (final entry in _weeklySchedule.entries) {
         final day = entry.key;
         final dayConfig = entry.value as Map<String, dynamic>;
@@ -285,13 +303,22 @@ class _StudentLocationSelectionPageState
           final radius = _extractDouble(customLoc['radius']);
 
           if (lat != null && lng != null && radius != null) {
-            await GeofenceService.instance.saveGeofence(
-              user.uid,
-              day,
-              lat,
-              lng,
-              radius,
-            );
+            // Save to the same collection that admin uses
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .collection('geofence_profiles')
+                .doc(day.toLowerCase())
+                .set({
+              'latitude': lat,
+              'longitude': lng,
+              'radius': radius,
+              'source': 'studentCustom',
+              'description': customLoc['description'] ?? 'Custom location for $day',
+              'bandType': 'fixed', // Student custom locations are typically fixed
+              'updatedAt': FieldValue.serverTimestamp(),
+              'updatedBy': 'student',
+            }, SetOptions(merge: true));
           }
         }
       }
@@ -626,18 +653,27 @@ class _StudentLocationSelectionPageState
     final dayName = day[0].toUpperCase() + day.substring(1);
     final dayConfig = _weeklySchedule[day] as Map<String, dynamic>;
     final isCustomDay = dayConfig['type'] == 'custom';
+    final isAdminOverride = dayConfig['type'] == 'admin_override';
+    final isReadOnly = dayConfig['isReadOnly'] == true;
     final isDefaultDay = day == 'wednesday' || day == 'thursday';
 
     String displayName;
     String? addressText;
     bool hasCustomLocation = false;
+    String? locationSource;
 
-    if (isCustomDay && dayConfig['customLocation'] != null) {
+    if ((isCustomDay || isAdminOverride) && dayConfig['customLocation'] != null) {
       final customLoc = dayConfig['customLocation'] as Map<String, dynamic>;
       final lat = (customLoc['lat'] as double).toStringAsFixed(4);
       final lng = (customLoc['lng'] as double).toStringAsFixed(4);
       final radius = (customLoc['radius'] as num).toInt();
-      displayName = 'Custom Location Set';
+      locationSource = customLoc['source']?.toString();
+      
+      if (isAdminOverride || locationSource == 'adminOverride') {
+        displayName = '🔒 Admin Override Location';
+      } else {
+        displayName = 'Custom Location Set';
+      }
 
       // Use address if available, otherwise show coordinates
       if (customLoc['address'] != null &&
@@ -671,7 +707,9 @@ class _StudentLocationSelectionPageState
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         gradient: LinearGradient(
-          colors: isCustomDay
+          colors: isAdminOverride
+              ? [Colors.red.shade50, Colors.red.shade100] // Red for admin overrides
+              : isCustomDay
               ? [Colors.green.shade50, Colors.green.shade100]
               : isDefaultDay
               ? [Colors.orange.shade50, Colors.orange.shade100]
@@ -682,7 +720,9 @@ class _StudentLocationSelectionPageState
         boxShadow: [
           BoxShadow(
             color:
-                (isCustomDay
+                (isAdminOverride
+                        ? Colors.red
+                        : isCustomDay
                         ? Colors.green
                         : isDefaultDay
                         ? Colors.orange
@@ -700,7 +740,9 @@ class _StudentLocationSelectionPageState
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color:
-                (isCustomDay
+                (isAdminOverride
+                        ? Colors.red
+                        : isCustomDay
                         ? Colors.green
                         : isDefaultDay
                         ? Colors.orange
@@ -722,7 +764,9 @@ class _StudentLocationSelectionPageState
                   ),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: isCustomDay
+                      colors: isAdminOverride
+                          ? [Colors.red.shade400, Colors.red.shade600]
+                          : isCustomDay
                           ? [Colors.green.shade400, Colors.green.shade600]
                           : isDefaultDay
                           ? [Colors.orange.shade400, Colors.orange.shade600]
@@ -747,7 +791,9 @@ class _StudentLocationSelectionPageState
                   ),
                   decoration: BoxDecoration(
                     color:
-                        (isCustomDay
+                        (isAdminOverride
+                                ? Colors.red
+                                : isCustomDay
                                 ? Colors.green
                                 : isDefaultDay
                                 ? Colors.orange
@@ -759,13 +805,17 @@ class _StudentLocationSelectionPageState
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        isCustomDay
+                        isAdminOverride
+                            ? Icons.admin_panel_settings
+                            : isCustomDay
                             ? Icons.my_location
                             : isDefaultDay
                             ? Icons.location_on
                             : Icons.school,
                         size: 14,
-                        color: isCustomDay
+                        color: isAdminOverride
+                            ? Colors.red.shade600
+                            : isCustomDay
                             ? Colors.green.shade600
                             : isDefaultDay
                             ? Colors.orange.shade600
@@ -773,7 +823,9 @@ class _StudentLocationSelectionPageState
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        isCustomDay
+                        isAdminOverride
+                            ? 'Admin Set'
+                            : isCustomDay
                             ? 'Flexible'
                             : isDefaultDay
                             ? 'Fixed'
@@ -781,7 +833,9 @@ class _StudentLocationSelectionPageState
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: isCustomDay
+                          color: isAdminOverride
+                              ? Colors.red.shade600
+                              : isCustomDay
                               ? Colors.green.shade600
                               : isDefaultDay
                               ? Colors.orange.shade600
@@ -809,18 +863,20 @@ class _StudentLocationSelectionPageState
             ),
             const SizedBox(height: 16),
 
-            if (isCustomDay) ...[
+            if (isCustomDay || isAdminOverride) ...[
               // Enhanced custom location section
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 child: InkWell(
-                  onTap: () => _openLocationPicker(day),
+                  onTap: isReadOnly ? null : () => _openLocationPicker(day), // Disable tap for admin overrides
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: hasCustomLocation
+                        colors: isReadOnly
+                            ? [Colors.grey.shade400, Colors.grey.shade500] // Grey for read-only admin overrides
+                            : hasCustomLocation
                             ? [Colors.green.shade400, Colors.green.shade500]
                             : [Colors.blue.shade400, Colors.blue.shade500],
                         begin: Alignment.topLeft,
@@ -830,7 +886,11 @@ class _StudentLocationSelectionPageState
                       boxShadow: [
                         BoxShadow(
                           color:
-                              (hasCustomLocation ? Colors.green : Colors.blue)
+                              (isReadOnly 
+                                  ? Colors.grey
+                                  : hasCustomLocation 
+                                  ? Colors.green 
+                                  : Colors.blue)
                                   .withOpacity(0.3),
                           blurRadius: 8,
                           offset: const Offset(0, 4),
@@ -846,7 +906,9 @@ class _StudentLocationSelectionPageState
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Icon(
-                            hasCustomLocation
+                            isReadOnly
+                                ? Icons.lock // Lock icon for admin overrides
+                                : hasCustomLocation
                                 ? Icons.edit_location_alt
                                 : Icons.add_location_alt,
                             color: Colors.white,
@@ -859,7 +921,9 @@ class _StudentLocationSelectionPageState
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                hasCustomLocation
+                                isReadOnly
+                                    ? 'Admin Override Active'
+                                    : hasCustomLocation
                                     ? 'Location Configured'
                                     : 'Set Custom Location',
                                 style: const TextStyle(
@@ -870,7 +934,9 @@ class _StudentLocationSelectionPageState
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                hasCustomLocation
+                                isReadOnly
+                                    ? 'Location set by administrator'
+                                    : hasCustomLocation
                                     ? 'Tap to modify on map'
                                     : 'Tap to choose on interactive map',
                                 style: TextStyle(

@@ -53,12 +53,7 @@ class _EnhancedAdminIncidentPageState extends State<EnhancedAdminIncidentPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Color(0xFFF7F9FC),
-      appBar: AppBar(
-        backgroundColor: Color(0xFF2C3E50),
-        foregroundColor: Colors.white,
-        title: Text('Incident Management'),
-        elevation: 0,
-      ),
+      
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('geofence_incidents')
